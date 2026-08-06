@@ -7,7 +7,7 @@
 3. [좌표계 규약 (절대 규칙)](#좌표계-규약-절대-규칙) — 월드는 아이소, 캐릭터는 세워진 카드
 4. [데이터 흐름: Seed → Spec → Body → Pose → Skeleton → Paths → Pixels](#데이터-흐름)
 5. [모듈별 공개 API](#모듈별-공개-api)
-6. [새 액터를 추가하는 절차](#새-액터를-추가하는-절차)
+6. [새 캐릭터를 추가하는 절차](#새-캐릭터를-추가하는-절차)
 7. [의존성 규칙](#의존성-규칙)
 
 ---
@@ -20,13 +20,13 @@
 
 | 레이어 | 책임 | 하지 말아야 할 것 |
 |--------|------|------------------|
-| `core/` | 난수·노이즈·스플라인·색 유틸 | 캐릭터를 안다 |
+| `core/` | 난수·노이즈·스플라인·색·**셰이딩** | 캐릭터를 안다 |
 | `rig/` | 치수(Body)·포즈(Pose)·순운동학(solve)·IK | 색이나 Canvas 를 안다 |
 | `anim/` | 시간 → Pose, 베를레 2차 모션 | 그린다 |
-| `render/` | 조명(LightRig)·재질(Surface)·픽셀 | 난수를 뽑는다 |
+| `render/` | 아이소 카메라(IsoView·Facing) | 난수를 뽑는다 |
 | `actor/` | 위 넷을 조립한 한 종류의 캐릭터 | 위 넷의 내부를 재구현한다 |
 
-**단방향**이라는 것이 핵심이다. `rig/` 는 `render/` 를 import 하지 않는다. 그래서 같은 골격에 완전히 다른 셰이딩을 입힐 수 있고, 같은 애니메이션 클립을 8등신 영웅과 4등신 몬스터에 동시에 재생할 수 있다.
+**단방향**이라는 것이 핵심이다. `rig/` 는 셰이딩을 import 하지 않는다. 그래서 같은 골격에 완전히 다른 셰이딩을 입힐 수 있고, 같은 애니메이션 클립을 8등신 영웅과 4등신 몬스터에 동시에 재생할 수 있다.
 
 ---
 
@@ -40,13 +40,14 @@
 lib/
 ├── entry.dart                 【트랙 B 진입점】 로스터 갤러리 앱
 ├── main.dart                  【트랙 A 진입점】 절차 액터 뷰어 (ActorComponent 인라인)
+├── iso_game.dart              【게임 화면】 아이소 필드 — 완성 9종이 타일 위에 선다
 └── src/
     ├── core/                  아무것도 캐릭터를 모른다
     │   ├── rng.dart           Rng — xorshift 결정론 난수
     │   ├── noise.dart         Noise — 값 노이즈·fbm, wobble()
     │   ├── spline.dart        Offset2 확장, tube()/blob()/web(), smoothClosedPath()
     │   ├── palette.dart       ColorTune 확장, Ramp, Pal (세계관 공기색)
-    │   └── shading.dart       [계보 B] LightRig, Finish, Surface — 아래 주의 참조
+    │   └── shading.dart       **유일한 셰이딩 계보** — LightRig, Finish 16종, Surface, paintSurface
     ├── rig/                   치수와 관절. Canvas 를 모른다
     │   ├── body.dart          Body — 골격 치수 (humanoid/beast 팩토리)
     │   ├── pose.dart          Pose/ArmPose/LegPose, Limb, Skeleton, solve()
@@ -56,10 +57,11 @@ lib/
     │   ├── clip.dart          Clip, sampleLoop()/sampleOnce() (Catmull-Rom 키프레임)
     │   ├── animator.dart      Animator — 클립 전환·블렌딩 상태 기계
     │   └── library.dart       Anims — 이름으로 꺼내 쓰는 클립 모음
-    ├── render/                [계보 A] 픽셀. 난수를 뽑지 않는다
-    │   ├── light.dart         LightRig — 3점 조명 리그 + 4가지 프리셋
-    │   ├── palette.dart       hsl()/shiftColor()/mix(), Palette.hero/.monster
-    │   └── surface.dart       Surface, Quality, paintSurface() 외 보조 페인터
+    ├── render/                아이소 카메라와 생성용 팔레트
+    │   ├── iso.dart           IsoView, Facing, paintTopPlane, BakedPart, detailFor
+    │   └── palette.dart       hsl()/shiftColor()/mix(), Palette.hero/.monster
+    ├── iso/
+    │   └── iso_stage.dart     Artist → 아이소 맵 브리지 (IsoActor, y-sort, 지면, haze)
     ├── art/                   【트랙 B】 이름 있는 작품 캐릭터 — 완성 9종이 전부 여기
     │   ├── creature.dart      Artist 추상 클래스, Camp/Sex, kStage(1000×1400), kGround(1332)
     │   ├── anatomy.dart       headShape/torsoShape/limb/drawEye/handShape/bootShape/
@@ -73,17 +75,23 @@ lib/
         └── humanoid_renderer.dart
 ```
 
-### 주의 ① — 셰이딩 계보가 둘이다
+### 주의 ① — 셰이딩 계보는 하나다 (2026-08-06 통합)
 
-현재 저장소에는 **두 개의 `LightRig` 와 두 개의 `Surface`** 가 있다.
+한때 `render/surface.dart`(계보 A)와 `core/shading.dart`(계보 B)가 공존했다. **계보 A 는 삭제됐다.**
+`Finish` 16종이 각각 전용 알고리즘을 갖는 계보 B 가 품질에서 앞섰고, 완성 캐릭터 전원이 그쪽을
+쓰고 있었기 때문이다.
 
-| | 계보 A: `render/surface.dart` + `render/light.dart` | 계보 B: `core/shading.dart` |
-|---|---|---|
-| 재질 | `Surface` + `SurfaceKind`(10종) + `Quality` | `Surface` + `Finish` |
-| 조명 | `LightRig`(keyDir/rimDir/ambient/bounce/exposure, 프리셋 4종) | `LightRig`(dir/rim/key/intensity) |
-| 진입점 | `paintSurface()` 9패스 | 파일별 헬퍼 |
+| 사라진 것 (계보 A) | 지금 (`core/shading.dart`) |
+|---|---|
+| `SurfaceKind` 10종 | `Finish` **16종** |
+| `Quality` enum | `detail` 0..1 |
+| `Surface(albedo:, roughness:, metalness:…)` | `Surface(base, finish, {contrast, sss, glow, alpha})` |
+| `LightRig.keyDir`(빛의 진행 방향) | `LightRig.dir`(**피사체 → 광원**) |
+| `paintContactShadow` (호출 0건이었다) | `occlude` · `castShadow` |
+| `paintTopPlane(…, iso)` | `topPlane(…, elevationSin:)` |
+| `paintTrim` | `trimBand` |
 
-**새 코드를 쓸 때는 한 파일 안에서 한 계보만 쓴다.** 둘을 섞으면 조명 방향 규약(`keyDir` = 빛의 진행 방향)이 어긋나 명암이 뒤집힌다. 어느 계보를 쓸지는 **수정하려는 파일이 이미 import 하고 있는 쪽**을 따른다. [shading.md](shading.md) 는 계보 A 를 문서화한 것이며, 9패스 원리 자체는 양쪽에 동일하게 적용된다.
+옛 코드에서 위 왼쪽 열의 이름을 보면 낡은 것이다. 전 API 는 [artist-craft.md](artist-craft.md).
 
 ### 주의 ② — `palette.dart` 도 둘이다
 
@@ -315,22 +323,24 @@ class ClothStrip {
 ### render/light.dart — `LightRig`
 
 ```dart
-LightRig({Offset keyDir, Color keyColor, double keyIntensity,
-          Offset rimDir, Color rimColor, double rimIntensity,
-          Color ambient, Color bounce, double exposure});
-Alignment get keyAlign;      // = Alignment(-keyDir.dx, -keyDir.dy) — 광원이 있는 쪽
-Alignment get rimAlign;
-Offset get shadowDir;
+LightRig({Offset dir, Offset rimDir, Color key, Color fill, Color rim,
+          Color bounce, Color ambient, double intensity});
+Alignment get keyAlign;             // dir 쪽으로 치우친 그라디언트 중심
 LightRig copyWith({...});
-static LightRig preset(int i);      // 0 정오 / 1 황혼 / 2 달빛 / 3 던전 화톳불
-LightRig rotatedKey(double radians);
+LightRig get mirrored;              // 캔버스 반전 시 광원도 함께 뒤집는다
+LightRig rotated(double radians);   // 파츠 회전 시 월드 조명 유지
+static const heroic / infernal / spectral;          // 초상용 무드
+static const daylight / dusk / moonlit / torchlit;  // 인게임 시각
+static LightRig preset(int i);      // 0 정오 / 1 황혼 / 2 달빛 / 3 화톳불
 ```
+
+`dir` 은 **피사체가 광원을 바라보는 방향**이다. 빛이 진행하는 방향이 아니다 — 부호를 헷갈리면 명암이 통째로 뒤집힌다.
 
 `keyDir` 은 **빛이 진행하는 방향**(광원 → 피사체)이다. 광원 위치가 아니다. 부호를 헷갈리면 명암이 통째로 뒤집힌다.
 
 ### render/surface.dart
 
-상세는 [shading.md](shading.md). 시그니처만:
+상세는 [artist-craft.md](artist-craft.md). 시그니처만:
 
 ```dart
 enum SurfaceKind { skin, cloth, leather, metal, chitin, bone, hair, gem, stone, flesh }

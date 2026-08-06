@@ -109,38 +109,18 @@ class Rng {
 **② `branch` 로 하위 시스템을 격리한다.**
 장비 생성이 몸 비율 생성의 난수 상태를 소비하면, **장비 규칙을 하나 추가하는 것만으로 기존 모든 캐릭터의 체형이 바뀐다.** 이것은 절차적 시스템에서 가장 흔하고 가장 치명적인 버그다.
 
-> ### ⚠️ `branch` 의 현재 한계 — 격리가 완전하지 않다
->
-> `core/rng.dart:77` 의 실제 구현은 **루트 시드가 아니라 호출 시점의 상태 `_s`** 에서 파생한다:
+> ### ✅ `branch` 는 루트 시드에서 파생한다 (2026-08-06 수정)
 >
 > ```dart
-> Rng branch(int salt) => Rng((_s ^ (salt * 0x9E3779B9)) & 0xFFFFFFFF);
+> Rng branch(int salt) => Rng((_root ^ (salt * 0x9E3779B9)) & 0xFFFFFFFF);
 > ```
 >
-> 따라서 브랜치 **앞에** 부모 난수 호출을 하나라도 추가하면 그 브랜치의 결과도 함께 바뀐다.
-> 문서가 약속하는 완전한 격리는 현재 성립하지 않는다.
+> `_root` 는 생성 당시의 시드이며 소비되지 않는다. 그래서 **부모 스트림을 얼마나 소비한 뒤에
+> 불러도 같은 salt 는 언제나 같은 자식을 낸다.** 생성 규칙을 하나 추가해도 다른 하위 시스템의
+> 결과가 보존되므로, 생성기를 계속 손볼 수 있다.
 >
-> **당장의 대처**: 안정성이 필요한 브랜치는 **부모 난수를 소비하기 전에** 먼저 만든다.
->
-> ```dart
-> final r = Rng(seed);
-> final paletteRng = r.branch(11);   // ← 먼저 확보
-> final gearRng    = r.branch(23);
-> final body = buildBody(r);          // 그다음 메인 스트림 소비
-> ```
->
-> **근본 수정안**(적용 시 기존 모든 시드의 결과가 한 번 바뀌므로 사람 확인 필요):
->
-> ```dart
-> class Rng {
->   Rng(int seed)
->       : _root = (seed == 0 ? 0x9E3779B9 : seed) & 0xFFFFFFFF,
->         _s = (seed == 0 ? 0x9E3779B9 : seed) & 0xFFFFFFFF;
->   final int _root;
->   int _s;
->   Rng branch(int salt) => Rng((_root ^ (salt * 0x9E3779B9)) & 0xFFFFFFFF);
-> }
-> ```
+> 이 불변식은 **`test/rng_test.dart` 가 지킨다**. 예전 구현(`_s` 파생)으로 되돌리면 테스트가
+> 즉시 실패한다 — 조용한 회귀가 불가능하다.
 
 ```dart
 final r = Rng(seed);

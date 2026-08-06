@@ -1,11 +1,16 @@
-# 작품 캐릭터 제작 (트랙 B) — Artist · core/shading · anatomy
+# 캐릭터 제작 — Artist · core/shading · anatomy
 
-**현재 저장소에서 AAA 품질을 내고 있는 유일한 경로다.** 완성된 9종(PC 5 · Mob 4)이 전부 이 방식이다.
+**이 저장소의 유일한 셰이딩 계보이자, AAA 품질이 나오는 경로다.** 완성 9종(PC 5 · Mob 4)이 전부 이 방식이며, 2026-08-06 계보 통합 이후 아이소 액터(`humanoid_renderer`)도 같은 API를 쓴다.
 
-`lib/src/art/creature.dart`, `lib/src/core/shading.dart`, `lib/src/art/anatomy.dart`, `lib/src/art/roster.dart` 의 완전한 참조.
+`lib/src/core/shading.dart`, `lib/src/art/creature.dart`, `lib/src/art/anatomy.dart`, `lib/src/art/roster.dart` 의 완전한 참조.
+
+> **폐기됨**: `render/surface.dart`(`SurfaceKind` 10종, 9패스)와 `render/light.dart`(`keyDir` 규약)는
+> 삭제됐다. 옛 문서나 코드에서 `SurfaceKind`·`Quality`·`paintTopPlane(…, iso)`·`paintContactShadow`
+> 를 보면 낡은 것이다. 지금은 `Finish` 16종과 `detail`(0..1) 하나뿐이다.
 
 ## 목차
 
+0. [셰이딩의 제1 원리](#셰이딩의-제1-원리)
 1. [핵심 개념: 왜 자동 생성하지 않는가](#핵심-개념-왜-자동-생성하지-않는가)
 2. [Artist 계약 (전체 소스)](#artist-계약)
 3. [좌표계 — kStage / kGround](#좌표계--kstage--kground)
@@ -19,6 +24,20 @@
 11. [로스터 등록](#로스터-등록)
 12. [신규 캐릭터 작성 골격](#신규-캐릭터-작성-골격)
 13. [체크리스트](#체크리스트)
+
+---
+
+## 셰이딩의 제1 원리
+
+절차적 2D 캐릭터가 싸구려로 보이는 이유는 형태가 아니라 **조명 논리의 부재**다. 파츠마다 임의의 그라디언트를 넣으면 각 파츠는 예뻐도 전체가 "스티커 콜라주"가 된다.
+
+**① 파츠 하나 = `paintSurface` 한 번.** 이 함수는 클립 → 재질 고유 레이어 → AO → 림 순으로 쌓는다. 순서가 곧 결과이므로 호출부에서 개별 패스를 재조합하지 않는다.
+
+**② 그림자는 차갑게, 하이라이트는 따뜻하게.** 그림자를 검정 쪽으로 어둡게만 하면 진흙처럼 탁해진다. 그림자에는 환경광(`ambient`)을, 하이라이트에는 키라이트의 색온도(`key`)를 섞는다. `Ramp.of()`(`core/palette.dart`)가 이 규칙을 구현하며, 모든 `Surface` 가 `ramp` 게터로 그것을 통과한다. **이 한 가지 규칙이 플라스틱과 실물의 차이를 만든다.**
+
+**③ 밝아질수록 채도가 내려가고, 명암 경계에서는 오른다.** 하이라이트의 채도를 안 낮추면 형광색이 되고, 터미네이터에서 채도가 안 오르면 회색 그라디언트가 된다. 후자가 피부의 SSS 붉은 띠이며, `Finish.skin` 이 그것을 그린다.
+
+**④ 색은 전부 HSL 에서 조작한다.** RGB 로 직접 더하고 빼면 금방 탁해지고 색상이 예측 불가능하게 튄다. `core/palette.dart` 의 `darken`/`lighten`/`saturate`/`shiftHue`/`mix` 를 쓴다.
 
 ---
 
@@ -258,10 +277,11 @@ void paintSurface(
   Path path,
   Surface s,
   LightRig l, {
-  double detail = 1.0,
-  int seed = 7,
+  double detail = 1.0,     // 0..1. 카드 썸네일 0.3~0.5, 대형 스테이지 1.0
+  int seed = 7,            // 텍스처 무작위성. 파츠마다 고정값을 준다
   bool rim = true,
   bool ao = true,
+  double occlusion = 0.0,  // 뒤쪽 평면에 있는 파츠를 눌러 앞뒤를 가른다
 }) {
   final b = path.getBounds();
   if (b.width < 0.5 || b.height < 0.5) return;
@@ -339,6 +359,38 @@ void panelLine(Canvas c, Path line, Ramp r, LightRig l,
 
 `rimBand` 는 `Path.combine(PathOperation.difference, p, p.shift(-l.rimDir * width))` 로 띠를
 만들므로 비용이 있다. **전 파츠에 쓰지 말고 시선이 머무는 곳에만.**
+
+---
+
+## 아이소메트릭 전용
+
+계보 통합으로 아이소 액터도 이 API 를 쓴다. 초상 뷰에 없는 두 가지가 아이소에서 생긴다.
+
+```dart
+/// 위를 향한 면에 얹는 하늘빛 하이라이트.
+///
+/// 어깨·투구·어깨보호대·발등처럼 윗면이 실제로 보이는 파츠에만 준다. 사지
+/// 옆면에 주면 오히려 형태가 납작해진다. paintSurface 직후에 호출한다.
+/// [elevationSin] 은 카메라 고도각의 sin — 2:1 타일이면 0.5(=30°).
+void topPlane(Canvas c, Path path, LightRig l,
+    {double strength = 0.5, double elevationSin = 0.5});
+
+/// 금속 트림·테두리. 단색 선이 아니라 광원 축 그라디언트여야 금속 띠로 읽힌다.
+void trimBand(Canvas c, Path path, Color color, LightRig l,
+    {double width = 2.0, double alpha = 0.9});
+```
+
+`LightRig` 에도 아이소용 API 가 있다:
+
+```dart
+LightRig get mirrored;              // 캔버스를 뒤집을 때 광원도 함께 뒤집는다
+LightRig rotated(double radians);   // 파츠를 회전해 그릴 때 월드 조명을 유지한다
+static LightRig preset(int i);      // 0 정오 / 1 황혼 / 2 달빛 / 3 화톳불
+```
+
+**인게임 씬은 하나의 `LightRig` 를 공유한다** — `LightRig.preset()` 넷은 그 용도다. 반면 갤러리 초상은 `Artist` 마다 `light` 를 갖는 것이 의도된 설계다(캐릭터별 무드 조명).
+
+`Artist` 를 아이소 맵에 세우는 방법은 [isometric.md](isometric.md#작품-캐릭터를-아이소-맵에-세우기) 참조.
 
 ---
 

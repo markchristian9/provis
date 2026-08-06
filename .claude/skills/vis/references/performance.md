@@ -24,7 +24,7 @@
 
 따라서 전략은 셋이다:
 
-1. **품질 티어** — 멀리 있고 작은 액터는 패스를 줄인다 (`Quality.low` 는 글로우·SSS·디테일을 건너뛴다).
+1. **디테일 티어** — 멀리 있고 작은 액터는 `detail` 을 낮춘다. 각 `Finish` 구현이 `detail` 로 미세 텍스처(스크래치·섬유결·기공)를 게이팅하고, `Artist` 는 파티클까지 생략한다.
 2. **캐싱** — 포즈가 바뀌지 않는 파츠(무기·장비·정적 몹)는 `ui.Picture` 로 한 번 굽는다.
 3. **임포스터** — 아주 멀거나 아주 많은 액터는 실루엣 + 그림자만 그린다.
 
@@ -36,9 +36,11 @@
 > 실측한 값이 아니라 일반적인 Skia/Impeller 특성에서 온 출발점이다. 최적화 판단의 근거로 쓰되,
 > **합격 기준으로 쓰지 마라.** `flutter run --profile` 로 실측한 뒤 이 표를 갱신할 것.
 >
-> **또한 이 모델은 트랙 A(`render/surface.dart`) 한정이다.** 파츠마다 `saveLayer` 를 여는 구조를
-> 전제하기 때문이다. 트랙 B(`core/shading.dart`)의 `paintSurface` 는 `saveLayer` 없이 `clipPath` +
-> `Finish` 별 분기로 그리므로 병목 지점이 다르다 — 트랙 B 는 별도로 프로파일해야 한다.
+> **또한 이 표는 이미 삭제된 계보 A(`render/surface.dart`)의 파츠당 `saveLayer` 구조를 전제한다.**
+> 현재 유일한 계보인 `core/shading.dart` 의 `paintSurface` 는 **`saveLayer` 를 쓰지 않고**
+> `save`+`clipPath` 로만 그린다. 따라서 아래 `saveLayer` 예산은 지금 코드에 그대로 적용되지 않는다 —
+> 실제 병목은 `MaskFilter.blur`(글로우·`rimBand`·`castShadow`)와 `Path.combine`(`rimBand`) 쪽이다.
+> 실측 후 이 절을 다시 쓸 것.
 
 | 연산 | 상대 비용 | 비고 |
 |------|-----------|------|
@@ -85,7 +87,7 @@ class ActorComponent extends PositionComponent {
   Offset worldTile = Offset.zero;
   double airborne = 0;          // 지면 위 높이(월드 단위)
   Facing facing = const Facing(0);
-  Quality quality = Quality.high;
+  double detail = 1.0;
 
   late final Body _body = /* spec → Body */;
   late final ClothStrip? _cape = spec.hasCape ? /* … */ : null;
@@ -140,9 +142,9 @@ class ActorComponent extends PositionComponent {
 
 ## 품질 티어
 
-`Quality` 는 이미 `paintSurface` 안에서 패스를 게이팅한다:
+`detail`(0..1)은 각 `Finish` 구현 안에서 미세 텍스처를 게이팅한다:
 
-| 패스 | low | medium | high |
+| 패스 | detail 0.25 | detail 0.6 | detail 1.0 |
 |------|-----|--------|------|
 | 외곽 글로우 | ✗ | ✓ | ✓ |
 | 확산 / 반사광 / AO / 정반사 / 림 / 윤곽선 | ✓ | ✓ | ✓ |
@@ -153,11 +155,11 @@ class ActorComponent extends PositionComponent {
 **티어를 무엇으로 정하는가** — 화면상 크기와 게임플레이 중요도:
 
 ```dart
-Quality qualityFor(double screenHeightPx, {bool isPlayer = false, bool isBoss = false}) {
-  if (isPlayer || isBoss) return Quality.high;      // 항상 최고
-  if (screenHeightPx > 140) return Quality.high;
-  if (screenHeightPx > 70) return Quality.medium;
-  return Quality.low;
+double detailFor(double screenHeightPx, {bool isPlayer = false, bool isBoss = false}) {
+  if (isPlayer || isBoss) return 1.0;      // 항상 최고
+  if (screenHeightPx > 140) return 1.0;
+  if (screenHeightPx > 70) return 0.6;
+  return 0.25;
 }
 ```
 

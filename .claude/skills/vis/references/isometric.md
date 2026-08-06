@@ -121,6 +121,71 @@ void renderActor(Canvas canvas, IsoView iso, Offset worldTile, void Function(Can
 
 ---
 
+## 작품 캐릭터를 아이소 맵에 세우기
+
+**`lib/src/iso/iso_stage.dart`** — 이 저장소에서 AAA 품질이 나오는 손수 만든 `Artist` 를 아이소 필드에 그대로 세우는 다리다. 실행: `flutter run -t lib/iso_game.dart`
+
+### 왜 다리 하나로 충분한가
+
+`Artist` 는 `kStage`(1000×1400) 라는 **초상용** 논리 캔버스에 그려지도록 만들어졌다. 게임 맵은 아이소다. 얼핏 캐릭터를 다시 만들어야 할 것 같지만 그렇지 않다 — **셰이딩·부위 형상·마무리 패스는 자기가 어느 좌표계에 있는지 모른다.** 초상과 아이소를 가르는 것은 좌표 변환뿐이므로, 다리는 네 줄이면 된다.
+
+```dart
+final anchor = iso.project(a.tile.dx, a.tile.dy, a.airborne);
+c.save();
+c.translate(anchor.dx, anchor.dy);              // ① 접지점만 아이소 투영
+c.scale(s * (a.facesLeft ? -1 : 1), s * iso.squash);  // ② 키 스케일 ③ 세로 단축
+c.translate(-kStage.width / 2, -kGround);       // ④ 원점을 발밑으로
+a.artist.paint(c, time + a.timeOffset, detail: detail);
+c.restore();
+```
+
+**`art/pc`·`art/mob` 은 한 줄도 고치지 않는다.** `roster.dart` 에 등록하면 갤러리와 아이소 필드 양쪽에 자동으로 나타난다.
+
+### 공개 API
+
+```dart
+class IsoActor {
+  IsoActor({required Artist artist, required Offset tile,
+            double height = 430, bool facesLeft = false,
+            double airborne = 0, double timeOffset = 0});
+  Offset tile;          // 월드 타일 좌표. 게임 로직은 이것만 갱신한다
+  double height;        // 화면상 키(px)
+  double get depth => tile.dx + tile.dy;   // 정렬 키
+}
+
+void paintIsoActor(Canvas c, IsoActor a, IsoView iso, double time, {double detail});
+void paintIsoActors(Canvas c, List<IsoActor> actors, IsoView iso, double time,
+                    {double Function(IsoActor)? detailOf});   // 깊이 정렬 포함
+void paintIsoGround(Canvas c, IsoView iso, int cols, int rows, LightRig l,
+                    {Color? base, double lineAlpha});
+void paintIsoHaze(Canvas c, Rect view, LightRig l, {double strength});
+double isoDetailFor(IsoActor a, {bool isHero});
+Offset isoCameraOffset(IsoView iso, int cols, int rows, Size view);
+List<Offset> scatterTiles(int count, int cols, int rows, int seed);
+```
+
+### 배치 규칙 — 실측으로 얻은 것
+
+| 항목 | 값 | 왜 |
+|---|---|---|
+| **캐릭터 키 : 타일 폭** | **1.2 ~ 1.6배** | 넘으면 격자가 캐릭터에 묻혀 **지면 평면이 사라진다**. 타일 156px 이면 인간형 210px, 대형 몹 285px |
+| 액터 간 타일 간격 | 1.3 이상 | 그보다 좁으면 실루엣이 겹쳐 개체 수가 안 읽힌다 |
+| 배치 형태 | 대각선으로 흩기 | 일렬로 세우면 아이소의 깊이가 드러나지 않는다 |
+| `timeOffset` | 개체마다 다르게 | 같으면 군집이 한 몸처럼 호흡해 즉시 가짜로 보인다 |
+
+### 씬을 완성하는 두 겹
+
+1. **`paintIsoGround`** — 체커 패턴 + 거리 감쇠. 격자가 없으면 캐릭터가 허공의 카드로 보인다.
+2. **`paintIsoHaze`** — 대기 원근. 먼 곳이 환경광 쪽으로 흐려지면 평면이던 화면에 깊이가 생긴다. **2D 에서 비용 대비 효과가 가장 큰 한 겹이다.**
+
+### 이 방식의 한계
+
+`Artist` 는 고정된 3/4 시점으로 그려지므로 **연속 8방향 회전이 되지 않는다.** 좌우 반전(`facesLeft`)으로 실질 2방향이다. 많은 2.5D 게임이 채택하는 빌보드 방식이며 정당한 선택이지만, 진짜 8방향이 필요하면 캐릭터마다 측면·후면 파츠를 추가로 저작해야 한다. 그 비용을 치를지는 게임플레이가 결정할 문제다.
+
+연속 회전이 필요한 군중·잡몹은 `HumanoidSpec` + `humanoid_renderer` 경로를 쓴다 — 아래 [8방향 페이싱](#8방향-페이싱) 참조.
+
+---
+
 ## 8방향 페이싱
 
 아이소 게임은 보통 8방향 스프라이트를 굽는다. 이 프로젝트는 **절차적 벡터**이므로 스프라이트가 필요 없다 — yaw 를 연속 값으로 받아 골격을 재배치한다. 8방향으로 스냅하는 것은 **입력 처리 쪽 선택**이지 렌더러의 제약이 아니다.
