@@ -437,7 +437,7 @@ class Seraphine extends Artist {
 
     final sleeve = tube(
       [shoulder, lerpO(shoulder, elbow, 0.5), elbow],
-      const [46, 40, 34],
+      const [38, 32, 26],
       samples: 18,
     );
     paintSurface(c, sleeve, _sRobe, l, detail: detail, seed: 415);
@@ -448,18 +448,18 @@ class Seraphine extends Artist {
 
     // 소매 끝 나팔. 팔 방향과 반대로 흘러내려 중력을 드러낸다.
     final cuff = smoothClosedPath([
-      elbow + const Offset(-40, -8),
-      elbow + const Offset(38, -14),
-      elbow + const Offset(64, 92),
-      elbow + const Offset(10, 130),
-      elbow + const Offset(-52, 74),
+      elbow + const Offset(-30, -10),
+      elbow + const Offset(28, -14),
+      elbow + const Offset(46, 62),
+      elbow + const Offset(6, 92),
+      elbow + const Offset(-40, 52),
     ], tension: 0.82);
     paintSurface(c, cuff, _sRobe, l, detail: detail, seed: 419);
     c.drawPath(
       smoothOpenPath([
-        elbow + const Offset(-52, 74),
-        elbow + const Offset(10, 130),
-        elbow + const Offset(64, 92),
+        elbow + const Offset(-40, 52),
+        elbow + const Offset(6, 92),
+        elbow + const Offset(46, 62),
       ]),
       Paint()
         ..style = PaintingStyle.stroke
@@ -484,7 +484,7 @@ class Seraphine extends Artist {
 
     final sleeve = tube(
       [shoulder, lerpO(shoulder, elbow, 0.5), elbow],
-      const [46, 42, 36],
+      const [38, 34, 28],
       samples: 18,
     );
     paintSurface(c, sleeve, _sRobe, l, detail: detail, seed: 423);
@@ -495,12 +495,12 @@ class Seraphine extends Artist {
 
     // 아래로 늘어진 넓은 소매.
     final drape = smoothClosedPath([
-      elbow + const Offset(-46, -20),
-      elbow + const Offset(34, -16),
-      elbow + const Offset(52, 90),
-      elbow + const Offset(88, 200),
-      elbow + const Offset(20, 230),
-      elbow + const Offset(-62, 120),
+      elbow + const Offset(-36, -22),
+      elbow + const Offset(26, -18),
+      elbow + const Offset(40, 74),
+      elbow + const Offset(66, 168),
+      elbow + const Offset(12, 192),
+      elbow + const Offset(-48, 96),
     ], tension: 0.82);
     paintSurface(c, drape, _sRobe, l, detail: detail, seed: 427);
     c.save();

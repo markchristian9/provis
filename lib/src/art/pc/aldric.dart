@@ -460,12 +460,12 @@ class Aldric extends Artist {
 
     // 목의 고짓.
     final gorget = smoothClosedPath([
-      const Offset(438, 500),
-      const Offset(500, 486),
-      const Offset(562, 500),
-      const Offset(566, 534),
-      const Offset(500, 548),
-      const Offset(434, 534),
+      const Offset(432, 474),
+      const Offset(500, 458),
+      const Offset(568, 474),
+      const Offset(574, 516),
+      const Offset(500, 534),
+      const Offset(426, 516),
     ]);
     paintSurface(c, gorget, _sSteelDark, l, detail: detail, seed: 105);
 
@@ -479,8 +479,12 @@ class Aldric extends Artist {
       final elbow = Offset(500 + s * 168, 730);
       final wrist = Offset(500 + s * 42, 790 + (s > 0 ? 62 : 0));
 
-      final arm = limb(shoulder, elbow, wrist, r0: 44, r1: 34, r2: 26);
-      paintSurface(c, arm, _sSteelDark, l, detail: detail, seed: 111 + side);
+      final upper = tube(
+        [shoulder, lerpO(shoulder, elbow, 0.48), elbow],
+        const [48, 42, 34],
+        samples: 16,
+      );
+      paintSurface(c, upper, _sSteelDark, l, detail: detail, seed: 111 + side);
 
       // 뱀브레이스: 팔뚝을 감싸는 원통. 세로 하이라이트가 원통성을 만든다.
       final fore = tube(
@@ -542,23 +546,23 @@ class Aldric extends Artist {
 
   void _hands(Canvas c, LightRig l, double bob) {
     // 위쪽 손(캐릭터의 오른손)이 자루 머리를, 아래쪽 손이 그립을 잡는다.
-    final upper = handShape(const Offset(556, 792), math.pi * 0.86, 62,
+    final upper = handShape(const Offset(560, 790), math.pi * 0.86, 72,
         grip: 1.0, mirrored: true);
-    final lower = handShape(const Offset(452, 858), math.pi * 0.12, 60,
+    final lower = handShape(const Offset(446, 862), math.pi * 0.12, 70,
         grip: 1.0);
     for (final rec in [
-      (upper, const Offset(556, 792), math.pi * 0.86, true),
-      (lower, const Offset(452, 858), math.pi * 0.12, false),
+      (upper, const Offset(560, 790), math.pi * 0.86, true),
+      (lower, const Offset(446, 862), math.pi * 0.12, false),
     ]) {
       paintSurface(c, rec.$1, _sSteel, l, seed: 151);
       c.save();
       c.clipPath(rec.$1);
-      drawKnuckles(c, rec.$2, rec.$3, 60, _rSteel, l, mirrored: rec.$4);
+      drawKnuckles(c, rec.$2, rec.$3, 70, _rSteel, l, mirrored: rec.$4);
       c.restore();
       inkOutline(c, rec.$1, _rSteel.deep.darken(0.4), 2.2, alpha: 0.5);
     }
     // 손목 이음쇠.
-    for (final p in const [Offset(556, 792), Offset(452, 858)]) {
+    for (final p in const [Offset(560, 790), Offset(446, 862)]) {
       c.drawCircle(p, 20, Paint()..color = _rGold.shadow.fade(0.8));
       c.drawCircle(
         p,
@@ -680,21 +684,21 @@ class Aldric extends Artist {
 
     // 목.
     final neck = tube(
-      [hc + const Offset(2, 66), hc + const Offset(0, 124)],
-      const [36, 44],
+      [hc + const Offset(2, 58), hc + const Offset(0, 112)],
+      const [36, 46],
       samples: 10,
     );
     paintSurface(c, neck, _sSkin, l, detail: detail, seed: 201);
     occlude(c, neck, const Offset(0, -1), depth: 0.5, alpha: 0.6);
-    drawJawShadow(c, hc + const Offset(2, 112), hw * 1.6, hh * 0.52, _rSkin,
+    drawJawShadow(c, hc + const Offset(2, 102), hw * 1.6, hh * 0.50, _rSkin,
         alpha: 0.62);
     // 승모근. 목이 어깨에서 솟았다는 연결을 만든다.
     for (final s in const [-1.0, 1.0]) {
       c.drawPath(
         smoothOpenPath([
-          hc + Offset(s * 30, 108),
-          hc + Offset(s * 68, 132),
-          hc + Offset(s * 104, 152),
+          hc + Offset(s * 30, 96),
+          hc + Offset(s * 66, 118),
+          hc + Offset(s * 100, 138),
         ]),
         Paint()
           ..style = PaintingStyle.stroke
@@ -757,8 +761,8 @@ class Aldric extends Artist {
         const Color(0xFF4A3220), arch: 0.30, angle: -0.10, mirrored: true);
 
     drawNose(c, Offset(hc.dx + 2, eyeY + 8), 30, 48, _rSkin, l, turn: 0.15);
-    drawMouth(c, Offset(hc.dx + 2, hc.dy + 68), 30,
-        skin: _rSkin, smile: -0.12, turn: 0.15);
+    drawMouth(c, Offset(hc.dx + 2, hc.dy + 70), 25,
+        skin: _rSkin, smile: -0.10, turn: 0.15);
 
     // 귀.
     for (final s in const [-1.0, 1.0]) {

@@ -64,8 +64,8 @@ void main() {
   }
 
   testWidgets('전체 캐릭터 시트를 렌더한다', (tester) async {
-    const cw = 620.0;
-    const ch = 880.0;
+    const cw = 430.0;
+    const ch = 610.0;
     const cols = 4;
     final rows = (everyone.length + cols - 1) ~/ cols;
     await dump('sheet_all', (cw * cols).toInt(), (ch * rows).toInt(), (c) {
@@ -84,8 +84,8 @@ void main() {
 
   testWidgets('캐릭터별 고해상도 개별 컷을 렌더한다', (tester) async {
     for (final a in everyone) {
-      await dump('solo_${a.id}', 900, 1260, (c) {
-        drawOne(c, a, const Rect.fromLTWH(0, 0, 900, 1260), 2.3);
+      await dump('solo_${a.id}', 640, 900, (c) {
+        drawOne(c, a, const Rect.fromLTWH(0, 0, 640, 900), 2.3);
       });
     }
   });

@@ -322,16 +322,18 @@ class _SelectionStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final males = heroes.where((a) => a.sex == Sex.male).length;
+    final females = heroes.where((a) => a.sex == Sex.female).length;
     final left = _Group(
       label: 'CHAMPIONS',
-      hint: '남성 2 · 여성 2',
+      hint: '남성 $males · 여성 $females',
       accent: matchup.hero.accent,
       list: heroes,
       matchup: matchup,
     );
     final right = _Group(
       label: 'NIGHTMARES',
-      hint: '4 종의 이형',
+      hint: '${monsters.length} 종의 이형',
       accent: matchup.monster.accent,
       list: monsters,
       matchup: matchup,

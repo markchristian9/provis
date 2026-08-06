@@ -45,17 +45,48 @@ class LightRig {
   Alignment get keyAlign => Alignment(dir.dx * 0.78, dir.dy * 0.78);
   Alignment get rimAlign => Alignment(rimDir.dx, rimDir.dy);
 
-  LightRig copyWith({Offset? dir, Color? rim, Color? key, double? intensity}) =>
+  LightRig copyWith({
+    Offset? dir,
+    Offset? rimDir,
+    Color? rim,
+    Color? key,
+    Color? fill,
+    Color? bounce,
+    Color? ambient,
+    double? intensity,
+  }) =>
       LightRig(
         dir: dir ?? this.dir,
-        rimDir: rimDir,
+        rimDir: rimDir ?? this.rimDir,
         key: key ?? this.key,
-        fill: fill,
+        fill: fill ?? this.fill,
         rim: rim ?? this.rim,
-        bounce: bounce,
-        ambient: ambient,
+        bounce: bounce ?? this.bounce,
+        ambient: ambient ?? this.ambient,
         intensity: intensity ?? this.intensity,
       );
+
+  /// 좌우로 뒤집은 리그.
+  ///
+  /// 캐릭터를 미러링해 그릴 때 조명까지 함께 뒤집지 않으면 광원이 몸을 따라
+  /// 돌아 버려, 같은 씬의 다른 액터와 그림자 방향이 어긋난다.
+  LightRig get mirrored => copyWith(
+        dir: Offset(-dir.dx, dir.dy),
+        rimDir: Offset(-rimDir.dx, rimDir.dy),
+      );
+
+  /// 광원 전체를 [radians] 만큼 회전한 리그.
+  ///
+  /// 파츠를 회전시켜 그릴 때(무기·머리) 그 국소 좌표계에서는 광원이 반대로
+  /// 돌아야 월드 조명이 유지된다. 그 보정에 쓴다.
+  LightRig rotated(double radians) {
+    Offset rot(Offset v) {
+      final c = math.cos(radians), s = math.sin(radians);
+      return Offset(v.dx * c - v.dy * s, v.dx * s + v.dy * c);
+    }
+
+    return copyWith(dir: rot(dir), rimDir: rot(rimDir));
+  }
 
   /// 영웅 프리셋: 좌상단에서 떨어지는 따뜻한 키라이트, 우측 상단의 차가운 림.
   static const heroic = LightRig();
@@ -81,6 +112,69 @@ class LightRig {
     bounce: Color(0xFF39627F),
     ambient: Color(0xFF141E33),
   );
+
+  // ── 아이소메트릭 씬용 시각(時刻) 프리셋 ────────────────────────────────
+  //
+  // 인게임 씬은 액터마다 조명을 갖지 않고 맵 전체가 하나를 공유한다. 그래야
+  // 여러 캐릭터가 같은 태양 아래 서 있는 것으로 보인다. 넷 다 dir 의 y 가 크게
+  // 음수인데, 이는 빛이 위에서 내려온다는 뜻이고 위에서 내려다보는 아이소
+  // 뷰와 자연히 맞아 상단면이 밝게 나온다.
+
+  /// 정오의 야외. 대비가 크고 그림자가 짧다.
+  static const daylight = LightRig(
+    dir: Offset(-0.5, -0.86),
+    rimDir: Offset(0.7, 0.71),
+    key: Color(0xFFFFF4DC),
+    fill: Color(0xFF6C8CC4),
+    rim: Color(0xFF9CD2FF),
+    bounce: Color(0xFF6F6A4E),
+    ambient: Color(0xFF31415F),
+    intensity: 1.05,
+  );
+
+  /// 황혼. 키라이트가 낮고 따뜻하며 그림자가 보랏빛으로 길게 눕는다.
+  static const dusk = LightRig(
+    dir: Offset(-0.82, -0.57),
+    rimDir: Offset(0.6, 0.8),
+    key: Color(0xFFFFB06A),
+    fill: Color(0xFF6A4E86),
+    rim: Color(0xFF7FA8FF),
+    bounce: Color(0xFF7A4630),
+    ambient: Color(0xFF3B2B52),
+    intensity: 1.15,
+  );
+
+  /// 달빛. 키가 약해 형태는 림이 만든다.
+  static const moonlit = LightRig(
+    dir: Offset(-0.45, -0.89),
+    rimDir: Offset(0.75, 0.66),
+    key: Color(0xFFB9D4FF),
+    fill: Color(0xFF2A3C60),
+    rim: Color(0xFFCFE4FF),
+    bounce: Color(0xFF25344F),
+    ambient: Color(0xFF141E38),
+    intensity: 0.85,
+  );
+
+  /// 던전 화톳불. 아래에서 올라오는 주황 바운스가 지배적이다.
+  static const torchlit = LightRig(
+    dir: Offset(-0.35, -0.94),
+    rimDir: Offset(0.8, 0.6),
+    key: Color(0xFFFF9A45),
+    fill: Color(0xFF4A2A22),
+    rim: Color(0xFF56E0C8),
+    bounce: Color(0xFF57210F),
+    ambient: Color(0xFF1B1526),
+    intensity: 1.2,
+  );
+
+  /// 인게임 시각 프리셋을 인덱스로 꺼낸다. 0 정오 / 1 황혼 / 2 달빛 / 3 화톳불.
+  static LightRig preset(int i) => switch (i % 4) {
+        0 => daylight,
+        1 => dusk,
+        2 => moonlit,
+        _ => torchlit,
+      };
 }
 
 /// 재질의 종류. 빛에 반응하는 방식이 근본적으로 다른 것들만 나눈다.
@@ -175,6 +269,9 @@ void paintSurface(
   int seed = 7,
   bool rim = true,
   bool ao = true,
+  /// 다른 파츠에 가려진 정도(0..1). 몸통 뒤로 들어가는 팔처럼 뒤쪽 평면에 있는
+  /// 파츠에 0.3~0.6 을 준다. 이 값이 없으면 사지가 몸통 앞에 떠 보인다.
+  double occlusion = 0.0,
 }) {
   final b = path.getBounds();
   if (b.width < 0.5 || b.height < 0.5) return;
@@ -222,6 +319,19 @@ void paintSurface(
 
   if (ao) _ambientOcclusion(c, b, l, s);
   if (rim && s.finish != Finish.energy) _rimInside(c, b, l, s);
+
+  // 뒤쪽 평면에 있는 파츠를 통째로 눌러 앞뒤를 가른다. 아이소·3/4 뷰에서
+  // 먼 쪽 팔다리가 몸통 앞으로 떠오르는 것을 막는 가장 값싼 수단이다.
+  if (occlusion > 0.01) {
+    c.drawRect(
+      b,
+      _p()
+        ..blendMode = BlendMode.multiply
+        ..color = l.ambient
+            .mix(const Color(0xFF000000), 0.35)
+            .fade((0.62 * occlusion).clamp(0.0, 0.85)),
+    );
+  }
 
   c.restore();
 
@@ -893,6 +1003,85 @@ void groundShadow(Canvas c, Offset at, double rx, double ry,
         Alignment.center,
         [color.fade(alpha), color.fade(alpha * 0.45), color.fade(0.0)],
         const [0.0, 0.5, 1.0],
+      ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 아이소메트릭 전용
+//
+// 2.5D 아이소 뷰는 카메라가 30° 위에서 내려다보므로, 초상 뷰에는 없는 두 가지가
+// 생긴다 — 위를 향한 면이 보이고, 파츠가 앞뒤로 겹친다. 아래 둘이 그것을 그린다.
+// ---------------------------------------------------------------------------
+
+/// 위를 향한 면에 얹는 하늘빛 하이라이트.
+///
+/// 어깨·투구·어깨보호대·발등처럼 윗면이 실제로 보이는 파츠에만 준다. 사지
+/// 옆면에 주면 오히려 형태가 납작해진다. [paintSurface] 직후에 호출한다.
+///
+/// [elevationSin] 은 카메라 고도각의 sin — 2:1 타일이면 0.5(=30°)다. 높을수록
+/// 위에서 내려다보는 각이 커져 상단면이 넓게 보인다.
+void topPlane(
+  Canvas c,
+  Path path,
+  LightRig l, {
+  double strength = 0.5,
+  double elevationSin = 0.5,
+}) {
+  final b = path.getBounds();
+  if (b.height < 0.5 || b.width < 0.5) return;
+
+  final band = (0.18 + 0.30 * elevationSin).clamp(0.05, 0.95);
+
+  c.save();
+  c.clipPath(path);
+  c.drawRect(
+    b,
+    _p()
+      ..blendMode = BlendMode.plus
+      ..shader = _linear(
+        b,
+        Alignment.topCenter,
+        Alignment.bottomCenter,
+        [
+          l.rim.mix(l.key, 0.45).fade((0.34 * strength).clamp(0.0, 1.0)),
+          l.rim.fade(0.0),
+        ],
+        [0.0, band],
+      ),
+  );
+  c.restore();
+}
+
+/// 금속 트림·테두리 장식. 갑옷 가장자리, 무기날의 페룰, 방패 림에 쓴다.
+///
+/// 단색 선이 아니라 광원 축을 따르는 그라디언트여야 금속 띠로 읽힌다.
+void trimBand(
+  Canvas c,
+  Path path,
+  Color color,
+  LightRig l, {
+  double width = 2.0,
+  double alpha = 0.9,
+}) {
+  final b = path.getBounds();
+  if (b.isEmpty) return;
+  c.drawPath(
+    path,
+    _p()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width
+      ..strokeJoin = StrokeJoin.round
+      ..shader = _linear(
+        b,
+        Alignment(l.dir.dx, l.dir.dy),
+        Alignment(-l.dir.dx, -l.dir.dy),
+        [
+          color.mix(l.key, 0.6).fade(alpha),
+          color.fade(alpha),
+          color.darken(0.28).fade(alpha),
+        ],
+        const [0.0, 0.45, 1.0],
       ),
   );
 }
