@@ -222,12 +222,57 @@ class FieldGame extends FlameGame with TapCallbacks {
     _scene.grid?.clear();
     _scene.rigged.clear();
     _mobs.clear();
+    _scene.groundSeed = mapSeed;
     final r = Rng(mapSeed);
 
     _buildTerrain(r);
     _buildVillage();
     _buildForest(r);
+    _buildUndergrowth(r);
     _spawnActors();
+  }
+
+  // ── 밑풀 ──────────────────────────────────────────────────────────────
+  //
+  // 큰 기물만 놓으면 그 사이가 빈 장판으로 남는다. 발치의 작은 것들이
+  // 화면의 밀도를 만든다 — 풀 포기·꽃·그루터기·쓰러진 통나무.
+  void _buildUndergrowth(Rng r) {
+    for (var i = 0; i < 26; i++) {
+      final tile = Offset(r.range(0.4, cols - 0.4), r.range(0.4, rows - 0.4));
+      _scene.addProp(PropInstance(
+        prop: GrassTuft(seed: mapSeed + i * 31, size: r.range(24, 42)),
+        tile: tile,
+        timeOffset: r.range(0, 6),
+      ));
+    }
+    for (var i = 0; i < 9; i++) {
+      _scene.addProp(PropInstance(
+        prop: FlowerBed(seed: mapSeed + i * 53, size: r.range(30, 46)),
+        tile: Offset(r.range(0.4, cols - 0.4), r.range(0.4, rows - 0.4)),
+        timeOffset: r.range(0, 6),
+      ));
+    }
+    for (var i = 0; i < 3; i++) {
+      _scene.addProp(PropInstance(
+        prop: StumpProp(
+          seed: mapSeed + i * 71,
+          size: r.range(24, 34),
+          isoRatio: iso.elevationSin,
+        ),
+        tile: Offset(r.range(0.5, cols - 0.5), r.range(6.5, rows - 0.5)),
+      ));
+    }
+    for (var i = 0; i < 2; i++) {
+      _scene.addProp(PropInstance(
+        prop: LogProp(
+          seed: mapSeed + i * 97,
+          length: r.range(110, 150),
+          isoRatio: iso.elevationSin,
+          alongX: r.chance(0.5),
+        ),
+        tile: Offset(r.range(0.5, cols - 0.5), r.range(6.5, rows - 0.5)),
+      ));
+    }
   }
 
   // ── 지형 ──────────────────────────────────────────────────────────────
@@ -249,9 +294,23 @@ class FieldGame extends FlameGame with TapCallbacks {
         tile: Offset(r.range(0.5, cols - 0.5), r.range(0.5, rows - 0.5)),
       ));
     }
+    // 언덕 — 지면 자체에 높이가 있다는 사실이 맵을 판에서 지형으로 바꾼다.
+    _scene.addProp(PropInstance(
+      prop: MoundProp(
+        seed: mapSeed + 3,
+        radius: 150,
+        rise: 34,
+        isoRatio: iso.elevationSin,
+      ),
+      tile: const Offset(2.5, 10.5),
+    ));
     _scene.addProp(PropInstance(
       prop: WaterProp(seed: mapSeed + 5, radius: 160),
       tile: const Offset(11.5, 11.5),
+    ));
+    _scene.addProp(PropInstance(
+      prop: PebbleField(seed: mapSeed + 6, radius: 100),
+      tile: const Offset(9.5, 12.5),
     ));
     for (var i = 0; i < 5; i++) {
       _scene.addProp(PropInstance(
@@ -268,14 +327,17 @@ class FieldGame extends FlameGame with TapCallbacks {
 
   // ── 마을 ──────────────────────────────────────────────────────────────
   void _buildVillage() {
-    const spots = <(Offset, Size, int, WallStyle, RoofStyle)>[
-      (Offset(2.0, 1.5), Size(2, 2), 2, WallStyle.timber, RoofStyle.gable),
-      (Offset(6.5, 1.0), Size(1, 1), 1, WallStyle.log, RoofStyle.gable),
-      (Offset(10.0, 2.0), Size(2, 2), 1, WallStyle.stone, RoofStyle.gable),
-      (Offset(13.0, 5.0), Size(1, 1), 2, WallStyle.brick, RoofStyle.cone),
+    // 마루 방향(ridgeAlongX)을 섞어야 마을이 한 방향으로 도열하지 않는다.
+    const spots = <(Offset, Size, int, WallStyle, RoofStyle, bool)>[
+      (Offset(2.0, 1.5), Size(2, 2), 2, WallStyle.timber, RoofStyle.gable, true),
+      (Offset(6.5, 1.0), Size(1, 1), 1, WallStyle.log, RoofStyle.gable, false),
+      (Offset(10.0, 2.0), Size(2, 2), 1, WallStyle.stone, RoofStyle.hip, true),
+      (Offset(13.0, 5.0), Size(1, 1), 2, WallStyle.brick, RoofStyle.cone, true),
+      // 헛간 — 감베렐 지붕과 판벽이 정체성이다.
+      (Offset(5.0, 3.5), Size(2, 1), 1, WallStyle.plank, RoofStyle.gambrel, false),
     ];
     for (final (i, spot) in spots.indexed) {
-      final (tile, tiles, storeys, wall, roof) = spot;
+      final (tile, tiles, storeys, wall, roof, alongX) = spot;
       _scene.addProp(PropInstance(
         prop: BuildingProp(
           seed: mapSeed + i * 101,
@@ -285,6 +347,7 @@ class FieldGame extends FlameGame with TapCallbacks {
           storeys: storeys,
           wall: wall,
           roof: roof,
+          ridgeAlongX: alongX,
         ),
         tile: tile,
       ));
@@ -298,6 +361,18 @@ class FieldGame extends FlameGame with TapCallbacks {
           crenellated: true,
         ),
         tile: Offset(1.5 + i, 5.5),
+      ));
+    }
+    // 울타리 — 돌담이 성의 경계라면 이쪽은 사람이 손으로 세운 경계다.
+    for (var i = 0; i < 4; i++) {
+      _scene.addProp(PropInstance(
+        prop: FenceProp(
+          seed: mapSeed + i * 19,
+          tileWidth: iso.tileWidth,
+          isoRatio: iso.elevationSin,
+          alongX: false,
+        ),
+        tile: Offset(8.5, 3.5 + i),
       ));
     }
   }
@@ -315,11 +390,15 @@ class FieldGame extends FlameGame with TapCallbacks {
     _scene.addProps(plantForest(
       seed: mapSeed + 77,
       tiles: tiles,
+      // 실루엣이 서로 다른 종을 섞어야 숲의 밀도가 올라간다 — 전나무의 수직선,
+      // 소나무의 우산, 활엽수의 덩어리, 관목의 낮은 부피.
       kinds: const [
         TreeKind.broadleaf,
         TreeKind.conifer,
+        TreeKind.pine,
         TreeKind.blossom,
         TreeKind.dead,
+        TreeKind.bush,
       ],
       baseHeight: 150,
     ));

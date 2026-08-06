@@ -97,6 +97,14 @@ class HumanoidRenderer {
               ? Surface(pal.leather, Finish.leather)
               : Surface(pal.cloth, Finish.cloth);
 
+  /// 다리의 **밑단**. 판금이어도 여기는 천이나 가죽이고, 그 위에 쿠이스와
+  /// 그리브가 조각으로 얹힌다([_leg] 참고).
+  Surface get _legUnder => beast
+      ? Surface(pal.skin, Finish.skin)
+      : spec.armorHeaviness > 0.26
+          ? Surface(pal.leather, Finish.leather)
+          : Surface(pal.cloth, Finish.cloth);
+
   Surface get _plate => beast
       ? Surface(pal.metal, Finish.chitin)
       : Surface(pal.metal, Finish.metal, contrast: 0.85 + 0.5 * (0.55 + 0.4 * spec.armorHeaviness));
@@ -176,6 +184,11 @@ class HumanoidRenderer {
     canvas.translate(-dz, 0);
     _leg(canvas, sk.legFar, lit, iso, detail, depth: 1);
     _arm(canvas, sk.armFar, lit, iso, detail, depth: 1, holdsBow: ranged);
+    // 방패는 그것을 든 팔과 같은 깊이에 있다. 무기와 함께 맨 앞에 그리면
+    // 가슴 위에 떠 보인다.
+    if (spec.hasShield && !beast && !ranged) {
+      _shield(canvas, sk, lit, iso, detail);
+    }
     canvas.restore();
 
     if (front) _cape(canvas, sk, lit, iso, detail, time);
@@ -244,11 +257,34 @@ class HumanoidRenderer {
     // 이음매가 생기지만, 두께 프로파일 하나로 뽑으면 근육이 이어진다.
     final leg = tube(
       [l.a, lerpO(l.a, l.b, 0.45), l.b, lerpO(l.b, l.c, 0.5), l.c],
-      [r * 1.12, r * 1.18, r * 0.80, r * 0.62, r * 0.52],
+      [r * 0.98, r * 1.02, r * 0.76, r * 0.60, r * 0.50],
       samples: 24,
     );
-    paintSurface(canvas, leg, _limbArmor, light,
+    paintSurface(canvas, leg, _legUnder, light,
         detail: q, occlusion: occ, seed: spec.seed + depth.round());
+
+    // 판금 다리는 **덧댄 조각**으로 그린다.
+    //
+    // 다리 전체를 금속 관 하나로 칠하면 허벅지가 거대한 흰 캡슐이 되어
+    // 실루엣의 중심을 잡아먹는다 — 사람이 아니라 로봇 다리로 읽혔다. 실제
+    // 판금도 쿠이스(허벅지)와 그리브(정강이)로 나뉘고 그 사이 관절에는 천이
+    // 드러난다. 그 틈이 있어야 다리가 접히는 물건으로 보인다.
+    if (!beast && spec.armorHeaviness > 0.52) {
+      final cuisse = tube(
+        [lerpO(l.a, l.b, 0.12), lerpO(l.a, l.b, 0.62)],
+        [r * 1.00, r * 0.84],
+        samples: 12,
+      );
+      paintSurface(canvas, cuisse, _plate, light, detail: q, occlusion: occ);
+      if (depth == 0) paintTopPlane(canvas, cuisse, light, iso, strength: 0.34);
+
+      final greave = tube(
+        [lerpO(l.b, l.c, 0.22), lerpO(l.b, l.c, 0.92)],
+        [r * 0.70, r * 0.54],
+        samples: 12,
+      );
+      paintSurface(canvas, greave, _plate, light, detail: q, occlusion: occ);
+    }
 
     // 발. 아이소에서는 발등이 보이므로 상단면 하이라이트를 얹는다.
     final toeDir = (l.d - l.c);
@@ -287,6 +323,19 @@ class HumanoidRenderer {
       [r * 1.15, r * 1.16, r * 0.86, r * 0.72, r * 0.62],
       samples: 22,
     );
+    // 가까운 쪽 팔은 몸통 **위에** 겹쳐 그려진다. 갑옷이 무거우면 팔도 몸통도
+    // 같은 판금이라 경계가 사라져 팔이 통째로 실종되고, 어깨와 손만 떠 있는
+    // 그림이 된다. 팔 밑에 한 겹 어두운 윤곽을 깔아 떼어 놓는다.
+    if (depth == 0) {
+      canvas.drawPath(
+        arm,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.40
+          ..strokeJoin = StrokeJoin.round
+          ..color = const Color(0xFF05070B).withValues(alpha: 0.34),
+      );
+    }
     paintSurface(canvas, arm, _limbArmor, light,
         detail: q, occlusion: occ, seed: spec.seed + 7 + depth.round());
 
@@ -319,9 +368,15 @@ class HumanoidRenderer {
     // 어깨보호대. 아이소 뷰에서 실루엣의 상단을 지배하는 파츠이므로
     // 상단면 하이라이트를 반드시 준다.
     if (!beast && spec.hasPauldrons) {
-      final ps = r * 2.05 * spec.pauldronScale;
+      // 어깨 관절에 그대로 얹으면 목을 파고들어 머리와 겹친다. 팔이 뻗은
+      // 방향으로 조금 밀어 어깨 **바깥**에 앉혀야 판금이 몸에 얹힌 것으로
+      // 읽힌다. 크기도 팔 굵기의 1.5배면 충분하다 — 그 이상은 머리보다 커져
+      // 실루엣이 사람이 아니라 덩어리가 된다.
+      final ps = r * 1.52 * spec.pauldronScale;
+      final outward = (l.b - l.a).normalized();
+      final seat = l.a + outward * ps * 0.26 - Offset(0, ps * 0.30);
       final pauldron = blob(
-        l.a - Offset(0, ps * 0.18),
+        seat,
         ps * 0.92,
         ps * 0.74,
         points: 16,
@@ -479,6 +534,14 @@ class HumanoidRenderer {
     canvas.translate(sk.headCenter.dx, sk.headCenter.dy);
     canvas.rotate(rot);
     final hLight = light.rotated(-rot);
+
+    // 뒷머리를 두개골 **앞에** 깐다.
+    //
+    // 예전에는 머리카락을 통째로 얼굴 뒤에 그렸는데, 그 덩어리가 두개골보다
+    // 커서 눈·코·입을 전부 덮어 버렸다 — 게임 액터의 머리가 매끈한 공으로
+    // 보이던 원인이 이것이다. 뒤통수 볼륨은 얼굴보다 먼저, 앞머리는 얼굴보다
+    // 나중에 그려야 둘 다 살아난다.
+    if (!beast) _hairBack(canvas, hLight, iso, hl, q);
 
     // 두개골. 뒤통수가 크고 얼굴 쪽이 좁은 계란형이 사람으로 읽히는 최소 조건.
     final skull = blob(
@@ -676,6 +739,89 @@ class HumanoidRenderer {
         detail: q, rim: false);
   }
 
+  /// 뒷머리 — 얼굴보다 **먼저** 그린다.
+  ///
+  /// 뒤통수를 감싸는 볼륨과 늘어뜨린 길이를 맡는다. 두개골 뒤에 깔리므로
+  /// 아무리 두꺼워도 이목구비를 가리지 않는다. 실루엣에서 머리 부피를 만드는
+  /// 것이 이쪽이고, 앞머리([_hairFront])는 이마 위만 덮는 얇은 층이다.
+  void _hairBack(
+      Canvas canvas, LightRig light, IsoView iso, double hl, double q) {
+    final s = spec;
+
+    // 후드의 **뒤통수 부분**도 여기서 그린다. 얼굴보다 먼저 깔아야 두건이
+    // 머리를 감싼 것으로 읽힌다 — 통째로 얼굴 위에 그리면 마법사가 파란 공을
+    // 뒤집어쓴 것처럼 보인다.
+    if (s.headGear == HeadGear.hood) {
+      final cowl = blob(
+        Offset(-hl * 0.18, -hl * 0.04),
+        hl * 0.60,
+        hl * 0.62,
+        points: 16,
+        warp: (a, t) =>
+            1 + 0.18 * math.max(0.0, -math.cos(a)) + 0.08 * math.sin(a * 2),
+      );
+      paintSurface(canvas, cowl, Surface(pal.clothShade, Finish.cloth), light,
+          detail: q, occlusion: 0.12);
+      paintTopPlane(canvas, cowl, light, iso, strength: 0.5);
+    }
+
+    // 완전히 덮는 투구를 쓰면 머리카락은 보이지 않는다. 반투구·서클릿·후드는
+    // 뒤통수가 드러나므로 그린다.
+    if (s.headGear == HeadGear.fullHelm || s.headGear == HeadGear.hornedHelm) {
+      return;
+    }
+
+    // 늘어뜨린 길이. 0 이면 뒤통수까지, 1 이면 어깨를 지난다.
+    final len = s.hairLength.clamp(0.0, 1.0);
+    final drop = hl * (0.10 + 1.35 * len);
+
+    final hair = tube(
+      [
+        // 정수리 앞쪽에서 시작해 뒤통수를 돌아 등으로 떨어진다.
+        Offset(hl * 0.12, -hl * 0.44),
+        Offset(-hl * 0.22, -hl * 0.42),
+        Offset(-hl * 0.44, -hl * 0.02),
+        Offset(-hl * 0.40, drop * 0.55),
+        Offset(-hl * 0.34, drop),
+      ],
+      [
+        hl * 0.30,
+        hl * 0.40,
+        hl * 0.38,
+        hl * (0.30 - 0.10 * (1 - len)),
+        hl * 0.12,
+      ],
+      samples: 24,
+    );
+    paintSurface(canvas, hair, Surface(pal.hair, Finish.hair), light,
+        detail: q, occlusion: 0.18, seed: s.seed + 5);
+    paintTopPlane(canvas, hair, light, iso, strength: 0.4);
+  }
+
+  /// 앞머리 — 얼굴보다 **나중에** 그린다.
+  ///
+  /// 이마에서 관자놀이까지만 덮는다. 눈(y ≈ -0.05hl)보다 위에 머물러야 하므로
+  /// 아래로 내려오는 끝점도 -0.10hl 을 넘지 않는다. 이 한 층이 있어야 머리가
+  /// 두개골에 가발을 씌운 것처럼 보이지 않는다.
+  void _hairFront(
+      Canvas canvas, LightRig light, IsoView iso, double hl, double q) {
+    final s = spec;
+    if (s.headGear != HeadGear.none && s.headGear != HeadGear.circlet) return;
+
+    final fringe = tube(
+      [
+        Offset(hl * 0.34, -hl * 0.20),
+        Offset(hl * 0.16, -hl * 0.40),
+        Offset(-hl * 0.16, -hl * 0.44),
+      ],
+      [hl * 0.10, hl * 0.20, hl * 0.26],
+      samples: 16,
+    );
+    paintSurface(canvas, fringe, Surface(pal.hair, Finish.hair), light,
+        detail: q, occlusion: 0.10, seed: s.seed + 6);
+    paintTopPlane(canvas, fringe, light, iso, strength: 0.46);
+  }
+
   void _hairAndHelm(
     Canvas canvas,
     LightRig light,
@@ -684,24 +830,9 @@ class HumanoidRenderer {
     double q,
     Facing f,
   ) {
-    final s = spec;
+    _hairFront(canvas, light, iso, hl, q);
 
-    if (s.headGear == HeadGear.none || s.headGear == HeadGear.circlet) {
-      final len = 0.35 + s.hairLength * 1.5;
-      final hair = tube(
-        [
-          Offset(hl * 0.26, -hl * 0.30),
-          Offset(-hl * 0.10, -hl * 0.52),
-          Offset(-hl * 0.44, -hl * 0.22),
-          Offset(-hl * 0.50, hl * 0.30 * len),
-        ],
-        [hl * 0.16, hl * 0.40, hl * 0.36, hl * 0.14],
-        samples: 20,
-      );
-      paintSurface(canvas, hair, Surface(pal.hair, Finish.hair), light,
-          detail: q, occlusion: 0.15, seed: s.seed + 5);
-      paintTopPlane(canvas, hair, light, iso, strength: 0.4);
-    }
+    final s = spec;
 
     switch (s.headGear) {
       case HeadGear.none:
@@ -715,16 +846,29 @@ class HumanoidRenderer {
         paintSurface(canvas, band, Surface(pal.metalWarm, Finish.metal, contrast: 0.85 + 0.5 * (0.9)), light,
             detail: q);
       case HeadGear.hood:
-        final hood = blob(
-          Offset(-hl * 0.10, -hl * 0.06),
-          hl * 0.58,
-          hl * 0.60,
-          points: 16,
-          warp: (a, t) => 1 + 0.16 * math.max(0.0, -math.cos(a)) + 0.08 * math.sin(a * 2),
+        // 두건의 **앞테두리**만. 뒤통수는 이미 [_hairBack] 이 깔아 두었고,
+        // 여기서는 이마를 가로지르는 천만 얹어 얼굴을 남긴다. 후드의 인상은
+        // 얼굴을 가리는 데서 오는 게 아니라 **얼굴에 드리운 그늘**에서 온다.
+        final brim = tube(
+          [
+            Offset(hl * 0.36, -hl * 0.06),
+            Offset(hl * 0.30, -hl * 0.34),
+            Offset(-hl * 0.04, -hl * 0.52),
+          ],
+          [hl * 0.12, hl * 0.15, hl * 0.20],
+          samples: 16,
         );
-        paintSurface(canvas, hood, Surface(pal.clothShade, Finish.cloth), light,
-            detail: q, occlusion: 0.1);
-        paintTopPlane(canvas, hood, light, iso, strength: 0.5);
+        paintSurface(canvas, brim, Surface(pal.cloth, Finish.cloth), light,
+            detail: q, occlusion: 0.08);
+        paintTopPlane(canvas, brim, light, iso, strength: 0.5);
+
+        // 두건 안쪽 그늘. 이목구비 위에 얹어 얼굴이 어둠 속에 있게 한다.
+        canvas.drawPath(
+          blob(Offset(hl * 0.10, -hl * 0.10), hl * 0.34, hl * 0.30),
+          Paint()
+            ..color = pal.clothShade.withValues(alpha: 0.42)
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, hl * 0.10),
+        );
       case HeadGear.halfHelm:
       case HeadGear.fullHelm:
       case HeadGear.hornedHelm:
@@ -741,6 +885,31 @@ class HumanoidRenderer {
         paintTopPlane(canvas, helm, light, iso, strength: 0.66);
         if (s.trimAccent) {
           trimBand(canvas, helm, pal.accent, light, width: 1.5, alpha: 0.5);
+        }
+
+        // 바이저 슬릿. 얼굴을 가리는 투구는 이 틈 하나가 없으면 매끈한 금속
+        // 알이고, 그 안에 사람이 있다는 증거가 사라진다. 틈 안쪽에서 눈빛이
+        // 새어 나와야 시선의 방향까지 읽힌다.
+        if (full && f.faceVisible > 0.02) {
+          final vis = f.faceVisible;
+          final slit = tube(
+            [Offset(hl * 0.02, -hl * 0.08), Offset(hl * 0.40, -hl * 0.04)],
+            [hl * 0.075, hl * 0.055],
+            samples: 8,
+          );
+          canvas.drawPath(
+            slit,
+            Paint()..color = const Color(0xFF0A0910).withValues(alpha: 0.88 * vis),
+          );
+          final spark = blob(Offset(hl * 0.26, -hl * 0.055), hl * 0.075, hl * 0.030);
+          paintSurface(
+              canvas,
+              spark,
+              Surface(pal.eye, Finish.energy,
+                  glow: 1.0, glowColor: pal.glow, alpha: vis),
+              light,
+              detail: q);
+          glowPath(canvas, spark, pal.glow, hl * 0.16, alpha: 0.7 * vis);
         }
         if (s.headGear == HeadGear.hornedHelm) {
           for (final side in [1.0, -1.0]) {
@@ -847,6 +1016,17 @@ class HumanoidRenderer {
     final pole = lerpO(up, Offset(math.cos(dir), math.sin(dir)), 0.20 + 0.62 * swing)
         .normalized();
 
+    // 도검류는 장병기만큼 세우지는 않는다 — 늘어뜨린 검이 자연스럽다. 다만
+    // 손목 방향을 그대로 쓰면 신장의 절반짜리 칼날이 지면을 뚫으므로, 쉴
+    // 때는 앞아래로 모으고 휘두를 때만 손을 따라간다.
+    final handDir = Offset(math.cos(dir), math.sin(dir));
+    final edge = lerpO(
+      lerpO(up, handDir, 0.62).normalized(),
+      handDir,
+      swing,
+    ).normalized();
+    final edgeDir = edge.angle;
+
     switch (s.weapon) {
       case WeaponKind.none:
         return;
@@ -879,28 +1059,68 @@ class HumanoidRenderer {
             detail: q);
       case WeaponKind.axe:
         final len = _h * 0.42;
-        final a = grip - Offset(math.cos(dir), math.sin(dir)) * len * 0.28;
-        final b = grip + Offset(math.cos(dir), math.sin(dir)) * len * 0.72;
+        final a = grip - edge * len * 0.28;
+        final b = grip + edge * len * 0.72;
         final shaft = tube([a, b], [_h * 0.011, _h * 0.009], samples: 8);
         paintSurface(canvas, shaft, Surface(pal.leather, Finish.leather), light,
             detail: q);
-        final n = Offset(math.cos(dir), math.sin(dir)).perp;
+        final n = edge.perp;
         final head = smoothClosedPath([
           b + n * _h * 0.012,
-          b + n * _h * 0.085 - Offset(math.cos(dir), math.sin(dir)) * _h * 0.05,
-          b + n * _h * 0.10 + Offset(math.cos(dir), math.sin(dir)) * _h * 0.03,
+          b + n * _h * 0.085 - edge * _h * 0.05,
+          b + n * _h * 0.10 + edge * _h * 0.03,
           b - n * _h * 0.012,
         ]);
         paintSurface(canvas, head, Surface(pal.metal, Finish.metal, contrast: 0.85 + 0.5 * (0.9)), light,
             detail: q);
         paintTopPlane(canvas, head, light, iso, strength: 0.5);
       case WeaponKind.daggers:
-        _blade(canvas, grip, dir, _h * 0.20, _h * 0.014, light, q);
+        _blade(canvas, grip, edgeDir, _h * 0.20, _h * 0.014, light, q);
       case WeaponKind.sword:
-        _blade(canvas, grip, dir, _h * 0.44, _h * 0.020, light, q);
+        _blade(canvas, grip, edgeDir, _h * 0.42, _h * 0.020, light, q);
       case WeaponKind.greatsword:
-        _blade(canvas, grip, dir, _h * 0.66, _h * 0.030, light, q);
+        _blade(canvas, grip, edgeDir, _h * 0.62, _h * 0.030, light, q);
     }
+  }
+
+  /// 방패. 먼 쪽 팔에 채운다.
+  ///
+  /// 명세에 `hasShield` 가 있는데도 오랫동안 그려지지 않아, 방패병으로 선언한
+  /// 캐릭터가 맨손으로 걸어 다녔다.
+  ///
+  /// 방패는 손에 매달리는 물건이 아니라 **팔뚝에 고정**된다. 그래서 손목
+  /// 각도를 따르지 않고 몸의 수직축에 세운다 — 팔을 흔들어도 방패면이
+  /// 팔랑거리지 않아야 무게가 실린다.
+  void _shield(
+      Canvas canvas, Skeleton sk, LightRig light, IsoView iso, double q) {
+    final arm = sk.armFar;
+    final up = (sk.chest - sk.pelvis).normalized();
+    final grip = lerpO(arm.c, arm.d, 0.4);
+
+    // 아이소에서는 방패면이 화면 정면을 향할 때 가장 크게 읽힌다. 몸 바깥으로
+    // 살짝 밀어 몸통에 완전히 가려지지 않게 한다.
+    final outward = (arm.b - sk.chest).normalized();
+    final r = _h * 0.105 * (0.9 + 0.35 * spec.armorHeaviness);
+    final center = grip + outward * r * 0.32 - up * r * 0.18;
+
+    final face = blob(
+      center,
+      r * 0.86,
+      r,
+      points: 18,
+      rotation: up.perp.angle,
+      // 아래로 살짝 뾰족한 연 방패. 완전한 원보다 방향이 읽힌다.
+      warp: (a, t) => 1 + 0.10 * math.sin(a) - 0.06 * math.cos(a * 2),
+    );
+    paintSurface(canvas, face, _plate, light, detail: q, occlusion: 0.16);
+    paintTopPlane(canvas, face, light, iso, strength: 0.42);
+    trimBand(canvas, face, pal.accent, light, width: 2.0, alpha: 0.6);
+
+    // 보스(중앙 돌기). 평평한 판에 하이라이트 하나가 더 생겨 금속으로 읽힌다.
+    final boss = blob(center, r * 0.24, r * 0.26);
+    paintSurface(
+        canvas, boss, Surface(pal.metalWarm, Finish.metal, contrast: 1.15), light,
+        detail: q);
   }
 
   void _blade(

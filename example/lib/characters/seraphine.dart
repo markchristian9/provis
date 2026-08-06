@@ -24,6 +24,25 @@ class Seraphine extends Artist {
   @override
   Sex get sex => Sex.female;
   @override
+  CharacterBuild get build => CharacterBuild(
+        archetype: Archetype.mage,
+        sex: Sex.female,
+        palette: paletteOf(
+          skin: const Color(0xFFE0B49C),
+          hair: const Color(0xFFCFF6FF),
+          cloth: const Color(0xFF2A4A72),
+          accent: const Color(0xFF57E8FF),
+          metal: const Color(0xFF9BB0C6),
+        ),
+        weapon: WeaponKind.staff,
+        headGear: HeadGear.none,
+        hasCape: true,
+        armorHeaviness: 0.04,
+        hairLength: 0.95,
+        muscle: 0.25,
+        glowRunes: true,
+      );
+  @override
   Color get accent => const Color(0xFF57E8FF);
   @override
   LightRig get light => const LightRig(

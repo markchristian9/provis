@@ -54,10 +54,30 @@
 | `ui.Picture` 재생 | 1–2 | 캐싱의 근거 |
 | `drawAtlas` (N개) | 1 + 0.05N | 군중에 압도적으로 유리 |
 
-**즉시 적용할 두 가지:**
+**즉시 적용할 세 가지:**
 
 - `Paint` 와 `Shader` 를 매 프레임 새로 만들지 않는다. 액터 필드에 캐시하고 색/변환만 갱신한다. (단, `paintSurface` 내부는 `Rect` 의존이라 캐시가 어렵다 — 그래서 캐싱은 파츠 단위가 아니라 **Picture 단위**로 한다.)
 - 블러 반경을 파츠 크기에 비례시키되 **상한을 둔다**. `size * 0.42` 가 400px 파츠에서 168px 블러가 되면 그 한 번이 프레임을 먹는다.
+- **블러는 개수로 죽는다 — 형상을 모아 한 번에 태운다.** 실측으로 확인된 가장 큰
+  실수다. 얼룩·반점·잎을 점마다 블러로 그리면 수관 하나에 블러가 수십 번 걸리고,
+  나무 스무 그루면 수천 번이 된다.
+
+```dart
+// ✗ 나쁨 — 셀마다 블러. 한 파츠에 40~50회
+for (var y = ...) for (var x = ...) {
+  c.drawCircle(p, r, paint..maskFilter = blur);
+}
+
+// ✓ 좋음 — 밝은 것과 어두운 것을 각각 한 Path 에 모아 블러 2회
+final lit = Path(), dark = Path();
+for (...) { k > 0.63 ? lit.addOval(...) : dark.addOval(...); }
+c.drawPath(dark, paint..color = r.deep.fade(a) ..maskFilter = blur);
+c.drawPath(lit,  paint..color = r.light.fade(a)..maskFilter = blur);
+```
+
+  같은 이유로 `Path.combine`(= `rimBand`·`translucentBand`)은 복합 형상에서
+  비싸다. **덩어리마다 부르지 말고 앞쪽·위쪽 것에만** 얹는다 — 뒤쪽 잎 덩어리와
+  아래쪽 침엽수 층은 어차피 가려져 보이지 않는다.
 
 ---
 

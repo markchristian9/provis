@@ -194,7 +194,7 @@ class StumpProp extends Prop {
     final r = Rng(seed);
     _tone = color ??
         hsl(r.range(20, 34), r.range(0.18, 0.32), r.range(0.16, 0.25));
-    _core = _tone.lighten(0.42).saturate(0.12);
+    _core = _tone.lighten(0.72).saturate(0.06).shiftHue(6);
     _h = size * r.range(0.6, 1.1);
     _noise = Noise(seed * 29 + 3);
   }
@@ -524,7 +524,7 @@ class FenceProp extends Prop {
     required this.seed,
     this.tileWidth = 156,
     this.isoRatio = 0.5,
-    this.fenceHeight = 46,
+    this.fenceHeight = 58,
     this.color,
     this.alongX = true,
     this.rails = 2,
@@ -582,7 +582,7 @@ class FenceProp extends Prop {
         final p1 = postAt[i + 1] + Offset(0, -v);
         final mid = lerpO(p0, p1, 0.5) + Offset(0, sag);
         final rail = tube([p0, mid, p1],
-            [fenceHeight * 0.055, fenceHeight * 0.062, fenceHeight * 0.055],
+            [fenceHeight * 0.045, fenceHeight * 0.052, fenceHeight * 0.045],
             samples: 8);
         paintSurface(
           c,
@@ -604,7 +604,7 @@ class FenceProp extends Prop {
       contactAO(c, fenceHeight * 0.20, alpha: 0.42, squash: 0.42, at: at);
       final post = tube(
         [at, at + Offset(lean * h * 0.5, -h * 0.55), at + Offset(lean * h, -h)],
-        [fenceHeight * 0.085, fenceHeight * 0.072, fenceHeight * 0.058],
+        [fenceHeight * 0.13, fenceHeight * 0.105, fenceHeight * 0.082],
         samples: 10,
         capStart: false,
       );
@@ -615,10 +615,10 @@ class FenceProp extends Prop {
       final cap = Path()
         ..addOval(Rect.fromCenter(
           center: topAt,
-          width: fenceHeight * 0.13,
-          height: fenceHeight * 0.13 * k,
+          width: fenceHeight * 0.095,
+          height: fenceHeight * 0.095 * k,
         ));
-      paintSurface(c, cap, Surface(_tone.lighten(0.34), Finish.wood), light,
+      paintSurface(c, cap, Surface(_tone.lighten(0.16), Finish.wood), light,
           detail: detail * 0.5, seed: seed + i, rim: false);
       topPlane(c, cap, light, strength: 0.7, elevationSin: isoRatio);
     }

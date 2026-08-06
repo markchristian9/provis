@@ -56,6 +56,8 @@ export 'src/anim/library.dart';
 
 // ── 시드 기반 휴머노이드 ─────────────────────────────────────────────────
 export 'src/actor/spec.dart';
+export 'src/actor/character_build.dart';
+export 'src/actor/built_artist.dart';
 export 'src/actor/humanoid_renderer.dart';
 
 // ── 아이소메트릭: 카메라·배치·조작 ───────────────────────────────────────
@@ -76,3 +78,5 @@ export 'src/props/rock.dart';
 export 'src/props/building.dart';
 export 'src/props/water.dart';
 export 'src/props/ground.dart';
+export 'src/props/flora.dart';
+export 'src/props/terrain.dart';

@@ -28,6 +28,16 @@ class Chitinis extends Artist {
   @override
   Sex? get sex => null;
   @override
+  CharacterBuild get build => CharacterBuild(
+        archetype: Archetype.assassin,
+        beast: true,
+        palette: tintedPalette(const Color(0xFF8DFF4E), Rng(0xC417), monster: true),
+        weapon: WeaponKind.daggers,
+        armorHeaviness: 0.7,
+        muscle: 0.6,
+        glowRunes: true,
+      );
+  @override
   Color get accent => const Color(0xFF8DFF4E);
   @override
   LightRig get light => const LightRig(

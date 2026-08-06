@@ -2,7 +2,9 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import '../art/creature.dart';
+import '../core/noise.dart';
 import '../core/palette.dart';
+import '../core/rng.dart';
 import '../actor/humanoid_renderer.dart';
 import '../anim/animator.dart';
 import '../core/shading.dart';
@@ -101,10 +103,25 @@ void paintIsoActors(
   }
 }
 
-/// 아이소 지면 타일.
+/// 아이소 지면.
 ///
-/// 캐릭터가 서 있는 평면이 보여야 2.5D 로 읽힌다. 격자가 없으면 캐릭터가
+/// 캐릭터가 서 있는 평면이 보여야 2.5D 로 읽힌다. 지면이 없으면 캐릭터가
 /// 허공에 뜬 카드로 보인다.
+///
+/// ## 왜 체커 타일이 아닌가
+///
+/// 타일마다 명도를 번갈아 칠하면 지면이 **장판**이 된다. 격자는 개발 중
+/// 좌표를 확인하는 도구이지 땅이 아니다. 진짜 땅으로 보이려면 세 가지가
+/// 필요하다.
+///
+/// 1. **큰 얼룩 → 작은 얼룩의 층위.** 흙이 드러난 곳, 풀이 짙은 곳이 타일
+///    경계와 무관하게 번져야 한다. 한 겹만 있으면 노이즈 텍스처로 보인다.
+/// 2. **거리 감쇠.** 먼 쪽이 어두워지고 환경광으로 밀리면 평면에 깊이가 생긴다.
+/// 3. **가장자리의 흙 두께.** 맵 경계에서 지면이 그냥 끊기면 종이가 잘린
+///    것이지만, 흙 단면이 보이면 **두께를 가진 땅덩어리**가 된다. 비용 대비
+///    3D 감각 개선이 가장 큰 한 겹이다.
+///
+/// [lineAlpha] 를 0 으로 주면 격자선 없이 땅만 그린다 — 인게임 기본값이다.
 void paintIsoGround(
   Canvas c,
   IsoView iso,
@@ -113,36 +130,165 @@ void paintIsoGround(
   LightRig l, {
   Color? base,
   double lineAlpha = 0.10,
+  Color? soil,
+  int seed = 7,
+  double detail = 1.0,
+  double skirt = 0.55,
 }) {
-  final ground = base ?? l.ambient.lighten(0.06);
-  final fill = Paint()..isAntiAlias = true;
-  final line = Paint()
-    ..isAntiAlias = true
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 1
-    ..color = l.rim.fade(lineAlpha);
+  // 땅에는 땅의 고유색이 있다. 환경광을 베이스로 삼으면 지면이 그 시각의
+  // 하늘색을 뒤집어써 회보라 장판이 되고, 그 위에 선 모든 것이 떠 보인다.
+  // 고유색을 먼저 두고 환경광은 **위에 섞는다**.
+  final ground = base ??
+      const Color(0xFF5C6B3C).mix(l.ambient, 0.38).lighten(0.06 * l.intensity);
+  final dirt = soil ?? const Color(0xFF6A4E2E).mix(l.ambient, 0.34);
 
-  for (var y = 0; y < rows; y++) {
-    for (var x = 0; x < cols; x++) {
-      final p0 = iso.project(x.toDouble(), y.toDouble());
-      final p1 = iso.project(x + 1.0, y.toDouble());
-      final p2 = iso.project(x + 1.0, y + 1.0);
-      final p3 = iso.project(x.toDouble(), y + 1.0);
-      final tile = Path()
-        ..moveTo(p0.dx, p0.dy)
-        ..lineTo(p1.dx, p1.dy)
-        ..lineTo(p2.dx, p2.dy)
-        ..lineTo(p3.dx, p3.dy)
-        ..close();
+  final far = iso.project(0, 0);
+  final near = iso.project(cols.toDouble(), rows.toDouble());
+  final left = iso.project(0, rows.toDouble());
+  final right = iso.project(cols.toDouble(), 0);
 
-      // 체커 패턴에 거리 감쇠를 얹는다. 먼 타일이 어두워지면 깊이가 읽힌다.
-      final far = 1 - (x + y) / (cols + rows);
-      final checker = (x + y).isEven ? 0.0 : 0.045;
-      fill.color = ground.lighten(checker).fade(0.55 + 0.35 * far);
-      c.drawPath(tile, fill);
-      c.drawPath(tile, line);
+  final field = Path()
+    ..moveTo(far.dx, far.dy)
+    ..lineTo(right.dx, right.dy)
+    ..lineTo(near.dx, near.dy)
+    ..lineTo(left.dx, left.dy)
+    ..close();
+
+  // ── 가장자리 흙 두께. 지면보다 **먼저** 그려야 위에서 덮인다.
+  if (skirt > 0.01) {
+    final depth = iso.tileHeight * skirt;
+    final wall = Path()
+      ..moveTo(left.dx, left.dy)
+      ..lineTo(near.dx, near.dy)
+      ..lineTo(right.dx, right.dy)
+      ..lineTo(right.dx, right.dy + depth)
+      ..lineTo(near.dx, near.dy + depth)
+      ..lineTo(left.dx, left.dy + depth)
+      ..close();
+    final wb = wall.getBounds();
+    c.drawPath(
+      wall,
+      Paint()
+        ..isAntiAlias = true
+        ..shader = Gradient.linear(
+          Offset(wb.center.dx, wb.top),
+          Offset(wb.center.dx, wb.bottom),
+          [
+            dirt.darken(0.12),
+            dirt.darken(0.34).mix(l.ambient, 0.30),
+            dirt.darken(0.55).mix(l.ambient, 0.45),
+          ],
+          const [0.0, 0.5, 1.0],
+        ),
+    );
+    // 지층 두 줄 — 흙벽이 단조롭지 않게.
+    if (detail > 0.4) {
+      final n = Noise(seed * 13 + 3);
+      final line = Paint()
+        ..isAntiAlias = true
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = math.max(1.0, depth * 0.07);
+      for (var i = 1; i <= 2; i++) {
+        final v = i / 3;
+        line.color = dirt.darken(0.45).fade(0.4);
+        c.drawPath(
+          Path()
+            ..moveTo(left.dx, left.dy + depth * v)
+            ..lineTo(near.dx, near.dy + depth * v * (1 + 0.08 * n.signed1(i * 3.1)))
+            ..lineTo(right.dx, right.dy + depth * v),
+          line,
+        );
+      }
     }
   }
+
+  c.save();
+  c.clipPath(field);
+
+  // ── 베이스 + 거리 감쇠. 먼 쪽이 환경광으로 밀린다.
+  final fb = field.getBounds();
+  c.drawRect(
+    fb,
+    Paint()
+      ..isAntiAlias = true
+      ..shader = Gradient.linear(
+        Offset(fb.center.dx, fb.top),
+        Offset(fb.center.dx, fb.bottom),
+        [
+          ground.darken(0.20).mix(l.ambient, 0.40),
+          ground.darken(0.04).mix(l.ambient, 0.12),
+          ground.lighten(0.06),
+        ],
+        const [0.0, 0.55, 1.0],
+      ),
+  );
+
+  // ── 얼룩 두 층. 타일 경계와 무관하게 번져야 땅이 된다.
+  if (detail > 0.25) {
+    final r = Rng(seed * 31 + 5);
+    final paint = Paint()..isAntiAlias = true;
+    final span = math.max(fb.width, fb.height);
+    for (var i = 0; i < 9; i++) {
+      final p = Offset(
+        fb.left + r.unit * fb.width,
+        fb.top + r.unit * fb.height,
+      );
+      final s = span * r.range(0.10, 0.26);
+      paint
+        ..color = (r.chance(0.45) ? dirt : ground.darken(0.14))
+            .fade(r.range(0.10, 0.24))
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, s * 0.55);
+      c.drawOval(
+        Rect.fromCenter(center: p, width: s * 2.4, height: s * 1.2),
+        paint,
+      );
+    }
+    for (var i = 0; i < 14; i++) {
+      final p = Offset(
+        fb.left + r.unit * fb.width,
+        fb.top + r.unit * fb.height,
+      );
+      final s = span * r.range(0.02, 0.06);
+      paint
+        ..color = (r.chance(0.5) ? ground.lighten(0.14) : ground.darken(0.20))
+            .fade(0.18)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, s * 0.7);
+      c.drawOval(
+        Rect.fromCenter(center: p, width: s * 2.6, height: s * 1.3),
+        paint,
+      );
+    }
+  }
+  c.restore();
+
+  // ── 격자선. 0 이면 그리지 않는다.
+  if (lineAlpha > 0.001) {
+    final line = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = l.rim.fade(lineAlpha);
+    for (var x = 0; x <= cols; x++) {
+      final a = iso.project(x.toDouble(), 0);
+      final b = iso.project(x.toDouble(), rows.toDouble());
+      c.drawLine(a, b, line);
+    }
+    for (var y = 0; y <= rows; y++) {
+      final a = iso.project(0, y.toDouble());
+      final b = iso.project(cols.toDouble(), y.toDouble());
+      c.drawLine(a, b, line);
+    }
+  }
+
+  // ── 지면 가장자리의 밝은 선. 땅덩어리의 윤곽을 세운다.
+  c.drawPath(
+    field,
+    Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..color = ground.lighten(0.26).fade(0.35),
+  );
 }
 
 /// 씬 전체에 얹는 대기 원근(aerial perspective).

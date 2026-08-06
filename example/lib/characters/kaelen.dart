@@ -26,6 +26,24 @@ class Kaelen extends Artist {
   @override
   Sex get sex => Sex.male;
   @override
+  CharacterBuild get build => CharacterBuild(
+        archetype: Archetype.assassin,
+        sex: Sex.male,
+        palette: paletteOf(
+          skin: const Color(0xFFBFB6D6),
+          hair: const Color(0xFF221A2A),
+          cloth: const Color(0xFF3E3A56),
+          accent: const Color(0xFF9A6BFF),
+          metal: const Color(0xFF8C86A8),
+        ),
+        weapon: WeaponKind.daggers,
+        headGear: HeadGear.hood,
+        hasCape: true,
+        armorHeaviness: 0.35,
+        hairLength: 0.35,
+        glowRunes: true,
+      );
+  @override
   Color get accent => const Color(0xFF9A6BFF);
   @override
   LightRig get light => const LightRig(

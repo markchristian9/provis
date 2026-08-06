@@ -710,7 +710,8 @@ void _membrane(Canvas c, Rect b, Ramp r, LightRig l, Surface s) {
 void _foliage(
     Canvas c, Rect b, Ramp r, LightRig l, Surface s, double detail, int seed) {
   // ① 확산 — 잎 덩어리는 하늘을 위에서 받는다. 광원 쪽이 밝고 반대편 아래가
-  //    급격히 어두워져야 구(球)로 읽힌다.
+  //    급격히 어두워져야 구(球)로 읽힌다. 하이라이트는 **좁아야** 한다 —
+  //    넓히면 덩어리 전체가 하얗게 떠서 솜사탕이 된다.
   c.drawRect(
     b,
     _p()
@@ -718,8 +719,8 @@ void _foliage(
         b,
         l.keyAlign,
         [r.light, r.mid, r.shadow, r.deep],
-        const [0.0, 0.33, 0.74, 1.0],
-        radius: 1.12,
+        const [0.0, 0.24, 0.66, 1.0],
+        radius: 0.92,
       ),
   );
 
@@ -735,20 +736,35 @@ void _foliage(
       ..shader = _radial(
         b,
         Alignment(-l.dir.dx * 0.62, -l.dir.dy * 0.66),
-        [through.fade(0.0), through.fade(0.30), through.fade(0.0)],
-        const [0.10, 0.48, 0.95],
+        [through.fade(0.0), through.fade(0.17), through.fade(0.0)],
+        const [0.10, 0.52, 0.98],
         radius: 1.15,
       ),
   );
 
   // ③ 잎 사이 그늘과 반짝임. 매끈한 면은 풍선이므로 반드시 깨 준다.
-  if (detail > 0.35) _dapple(c, b, r, seed, 0.9 * detail);
+  if (detail > 0.35) _dapple(c, b, r, seed, 0.55 * detail);
 }
 
 void _bark(Canvas c, Rect b, Ramp r, LightRig l, double detail, int seed) {
-  // 줄기는 원통이므로 명암이 축을 가로질러 띠로 눕는다. 그 위에 세로로 갈라진
-  // 홈이 파이고, 홈의 광원 쪽 턱만 밝다 — 이 짝이 있어야 껍질로 읽힌다.
-  _diffuse(c, b, r, l, softness: 0.26);
+  // 줄기는 **원통**이다. 방사 그라디언트로 칠하면 구가 되어 밝은 파이프처럼
+  // 보이므로, 명암이 축을 가로질러 눕는 **선형 띠**여야 한다. 밝은 쪽이 좁고
+  // 어두운 쪽이 넓어야 둥근 면으로 읽힌다. 그 위에 세로로 갈라진 홈이 파이고,
+  // 홈의 광원 쪽 턱만 밝다 — 이 짝이 있어야 껍질이 된다.
+  final tall = b.height >= b.width;
+  final ax = tall ? (l.dir.dx >= 0 ? 1.0 : -1.0) : 0.0;
+  final ay = tall ? 0.0 : (l.dir.dy >= 0 ? 1.0 : -1.0);
+  c.drawRect(
+    b,
+    _p()
+      ..shader = _linear(
+        b,
+        Alignment(ax, ay),
+        Alignment(-ax, -ay),
+        [r.light, r.mid, r.mid, r.shadow, r.deep],
+        const [0.0, 0.22, 0.46, 0.78, 1.0],
+      ),
+  );
   if (detail <= 0.35) return;
 
   final n = Noise(seed * 53 + 19);
@@ -903,25 +919,41 @@ void _grain(Canvas c, Rect b, Ramp r, int seed, double alpha) {
 void _dapple(Canvas c, Rect b, Ramp r, int seed, double strength) {
   // 잎 덩어리 안쪽의 얼룩진 그늘과 반짝임. `_grain` 보다 덩어리가 크고
   // 흐릿하며, 밝은 점과 어두운 구멍이 섞여야 잎이 겹쳐 있는 것으로 읽힌다.
+  //
+  // 점을 하나씩 블러로 그리면 수관 하나에 블러가 수십 번 걸려 프레임이
+  // 무너진다. 밝은 것과 어두운 것을 **각각 하나의 Path 로 모아** 블러를 두
+  // 번만 태운다 — 결과는 같고 비용은 수십 분의 일이다.
   final n = Noise(seed * 269 + 41);
-  final step = math.max(4.0, b.shortestSide / 7);
-  final blur = MaskFilter.blur(BlurStyle.normal, step * 0.38);
-  final paint = _p()..maskFilter = blur;
+  final step = math.max(5.0, b.shortestSide / 5.5);
+  final lit = Path();
+  final dark = Path();
   for (var y = b.top; y < b.bottom; y += step) {
     for (var x = b.left; x < b.right; x += step) {
       final u = x / step, v = y / step;
       final k = n.at2(u * 1.6, v * 1.6);
       final jx = n.signed1(u * 3.1 + v) * step * 0.42;
       final jy = n.signed1(v * 2.7 - u) * step * 0.42;
+      final at = Offset(x + jx, y + jy);
       if (k > 0.63) {
-        paint.color = r.light.fade((k - 0.58) * 1.5 * strength);
-        c.drawCircle(Offset(x + jx, y + jy), step * 0.40, paint);
+        lit.addOval(Rect.fromCircle(center: at, radius: step * 0.38));
       } else if (k < 0.35) {
-        paint.color = r.deep.fade((0.40 - k) * 1.5 * strength);
-        c.drawCircle(Offset(x + jx, y + jy), step * 0.52, paint);
+        dark.addOval(Rect.fromCircle(center: at, radius: step * 0.50));
       }
     }
   }
+  final blur = MaskFilter.blur(BlurStyle.normal, step * 0.42);
+  c.drawPath(
+    dark,
+    _p()
+      ..color = r.deep.fade(0.30 * strength)
+      ..maskFilter = blur,
+  );
+  c.drawPath(
+    lit,
+    _p()
+      ..color = r.light.fade(0.24 * strength)
+      ..maskFilter = blur,
+  );
 }
 
 void _fiber(Canvas c, Rect b, Ramp r, int seed) {

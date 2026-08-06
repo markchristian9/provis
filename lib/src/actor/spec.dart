@@ -262,4 +262,66 @@ class HumanoidSpec {
       },
     );
   }
+
+  /// 선언된 항목만 갈아 끼운다.
+  ///
+  /// [CharacterBuild] 가 캐릭터의 정체성(색·장비)을 덮어쓸 때 쓴다. 지정하지
+  /// 않은 것은 원래 생성 결과가 그대로 남으므로, **필요한 것만 선언하면** 나머지
+  /// 는 원형에 맞게 유지된다.
+  HumanoidSpec copyWith({
+    Palette? palette,
+    WeaponKind? weapon,
+    HeadGear? headGear,
+    bool? hasCape,
+    bool? hasPauldrons,
+    bool? hasShield,
+    double? armorHeaviness,
+    double? muscle,
+    double? hairLength,
+    bool? glowRunes,
+    double heightScale = 1.0,
+  }) {
+    final k = heightScale;
+    return HumanoidSpec._(
+      seed: seed,
+      archetype: archetype,
+      palette: palette ?? this.palette,
+      height: height * k,
+      headHeight: headHeight * k,
+      shoulderWidth: shoulderWidth * k,
+      hipWidth: hipWidth * k,
+      chestWidth: chestWidth * k,
+      waistWidth: waistWidth * k,
+      neckWidth: neckWidth * k,
+      hipY: hipY * k,
+      kneeY: kneeY * k,
+      ankleY: ankleY * k,
+      waistY: waistY * k,
+      chestY: chestY * k,
+      shoulderY: shoulderY * k,
+      neckY: neckY * k,
+      chinY: chinY * k,
+      thigh: thigh * k,
+      shin: shin * k,
+      upperArm: upperArm * k,
+      foreArm: foreArm * k,
+      handLen: handLen * k,
+      footLen: footLen * k,
+      armThickness: armThickness * k,
+      legThickness: legThickness * k,
+      muscle: muscle ?? this.muscle,
+      depthOffset: depthOffset * k,
+      weapon: weapon ?? this.weapon,
+      headGear: headGear ?? this.headGear,
+      hasCape: hasCape ?? this.hasCape,
+      hasPauldrons: hasPauldrons ?? this.hasPauldrons,
+      pauldronScale: pauldronScale,
+      hasShield: hasShield ?? this.hasShield,
+      armorHeaviness: armorHeaviness ?? this.armorHeaviness,
+      hairLength: hairLength ?? this.hairLength,
+      capeLength: capeLength,
+      trimAccent: trimAccent,
+      glowRunes: glowRunes ?? this.glowRunes,
+    );
+  }
 }

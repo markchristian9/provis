@@ -32,6 +32,8 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+# 렌더 시트 테스트가 굽는 PNG 부산물.
+example/build/
 
 # Symbolication related
 app.*.symbols

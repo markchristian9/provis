@@ -1,11 +1,8 @@
 import 'dart:ui';
 
 import '../actor/humanoid_renderer.dart';
-import '../actor/spec.dart';
 import '../art/creature.dart';
-import '../core/palette.dart';
 import '../core/rng.dart';
-import '../core/scheme.dart';
 import '../rig/body.dart';
 import 'iso_stage.dart';
 
@@ -34,43 +31,20 @@ RiggedIsoActor riggedFromArtist(
   required Offset tile,
   double height = 200,
 }) {
-  final seed = Rng.fromString(a.id).intRange(1, 0x7FFFFFF);
-  final spec = HumanoidSpec.generate(seed);
-  final beast = a.camp == Camp.monster;
+  final build = a.build;
+  final fallback = Rng.fromString(a.id).intRange(1, 0x7FFFFFF);
+  final spec = build.toSpec(fallback);
+  final beast = build.beast;
 
   return RiggedIsoActor(
     renderer: HumanoidRenderer(
       spec,
       body: beast
-          ? Body.beast(Rng(seed ^ 0x5EED), height: spec.height * 1.1)
+          ? Body.beast(Rng(spec.seed ^ 0x5EED), height: spec.height * 1.1)
           : null,
-      palette: _tinted(a, Rng(seed ^ 0xC0107), beast: beast),
       beast: beast,
     ),
     tile: tile,
     height: height,
-  );
-}
-
-/// 캐릭터의 강조색으로 물들인 팔레트.
-///
-/// 옷·강조·발광·눈만 갈아 끼우고 피부·금속은 기본 생성기에 맡긴다. 전부
-/// 한 색으로 칠하면 단색 인형이 되므로, **색이 얹히는 자리를 한정하는 것**이
-/// 오히려 정체성을 살린다.
-Palette _tinted(Artist a, Rng r, {required bool beast}) {
-  final base = beast ? Palette.monster(r) : Palette.hero(r);
-  final c = a.accent;
-  return Palette(
-    skin: base.skin,
-    skinDeep: base.skinDeep,
-    hair: base.hair,
-    cloth: c.darken(0.42).desaturate(0.15),
-    clothShade: c.darken(0.66).desaturate(0.1),
-    accent: c,
-    leather: base.leather,
-    metal: base.metal,
-    metalWarm: base.metalWarm,
-    eye: c.lighten(0.34),
-    glow: c.lighten(0.12),
   );
 }

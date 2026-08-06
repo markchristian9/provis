@@ -28,6 +28,24 @@ class Lyra extends Artist {
   @override
   Sex get sex => Sex.female;
   @override
+  CharacterBuild get build => CharacterBuild(
+        archetype: Archetype.ranger,
+        sex: Sex.female,
+        palette: paletteOf(
+          skin: const Color(0xFFFFD9A0),
+          hair: const Color(0xFF6E3320),
+          cloth: const Color(0xFF3E6A34),
+          accent: const Color(0xFF8FE05A),
+          leather: const Color(0xFF6E4A28),
+        ),
+        weapon: WeaponKind.bow,
+        headGear: HeadGear.none,
+        hasCape: true,
+        armorHeaviness: 0.22,
+        hairLength: 0.6,
+        muscle: 0.5,
+      );
+  @override
   Color get accent => const Color(0xFF8FE05A);
   @override
   LightRig get light => const LightRig(

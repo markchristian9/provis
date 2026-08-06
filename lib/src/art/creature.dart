@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import '../actor/character_build.dart';
+import '../actor/spec.dart';
 import '../core/shading.dart';
 
 /// 모든 캐릭터가 그려지는 공통 좌표계.
@@ -15,7 +17,18 @@ const double kGround = 1332;
 
 enum Sex { male, female }
 
+extension SexLabel on Sex {
+  String get label => this == Sex.male ? 'Male' : 'Female';
+
+  /// 좁은 카드에는 이름을 적을 자리가 없다. 기호 하나로 대신한다.
+  String get symbol => this == Sex.male ? '♂' : '♀';
+}
+
 enum Camp { player, monster }
+
+extension CampLabel on Camp {
+  String get label => this == Camp.player ? 'Hero' : 'Monster';
+}
 
 /// 그릴 수 있는 존재 하나.
 ///
@@ -54,6 +67,18 @@ abstract class Artist {
 
   /// 캐릭터가 실제로 차지하는 세로 범위. 카드 크롭에 쓴다.
   Rect get framing => const Rect.fromLTWH(60, 40, 880, 1330);
+
+  /// 직업. 명부에 표시하고, 골격 액터의 체형·장비를 결정한다.
+  ///
+  /// 기본값은 [build] 에서 가져오므로, 대개는 `build` 만 선언하면 된다.
+  Archetype get job => build.archetype;
+
+  /// 이 캐릭터를 골격 액터로 옮길 때 쓸 정체성.
+  ///
+  /// **오버라이드하지 않으면 id 와 accent 로 추정한다** — 초상과 정확히 같지
+  /// 않다. 게임 맵에 세울 캐릭터라면 반드시 선언해서 머리색·옷색·장비를
+  /// 넘겨라. 그러지 않으면 명부에서 고른 인물과 맵에서 걷는 인물이 다르다.
+  CharacterBuild get build => CharacterBuild.guess(this);
 
   /// 포즈가 화면 왼쪽을 향하는가.
   ///

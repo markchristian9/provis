@@ -29,6 +29,23 @@ class Vesper extends Artist {
   @override
   Sex get sex => Sex.female;
   @override
+  CharacterBuild get build => CharacterBuild(
+        archetype: Archetype.knight,
+        sex: Sex.female,
+        palette: paletteOf(
+          skin: const Color(0xFFE0DAD6),
+          hair: const Color(0xFF4A3128),
+          cloth: const Color(0xFF16283E),
+          accent: const Color(0xFF44E0FF),
+          metal: const Color(0xFF9FB4C4),
+        ),
+        weapon: WeaponKind.spear,
+        headGear: HeadGear.fullHelm,
+        hasPauldrons: true,
+        armorHeaviness: 0.85,
+        glowRunes: true,
+      );
+  @override
   Color get accent => const Color(0xFF44E0FF);
 
   /// 우주의 조명은 극단적이다. 대기 산란이 없어 키라이트는 거의 순백으로

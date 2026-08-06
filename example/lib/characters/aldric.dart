@@ -24,6 +24,26 @@ class Aldric extends Artist {
   @override
   Sex get sex => Sex.male;
   @override
+  CharacterBuild get build => CharacterBuild(
+        archetype: Archetype.paladin,
+        sex: Sex.male,
+        palette: paletteOf(
+          skin: const Color(0xFFFFCF95),
+          hair: const Color(0xFF4A3220),
+          cloth: const Color(0xFF7A2620),
+          accent: const Color(0xFFE8B84B),
+          metal: const Color(0xFFC9B48A),
+        ),
+        weapon: WeaponKind.sword,
+        headGear: HeadGear.circlet,
+        hasShield: true,
+        hasCape: true,
+        hasPauldrons: true,
+        armorHeaviness: 1.0,
+        muscle: 0.75,
+        glowRunes: true,
+      );
+  @override
   Color get accent => const Color(0xFFE8B84B);
   @override
   LightRig get light => const LightRig(

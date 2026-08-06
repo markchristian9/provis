@@ -729,34 +729,40 @@ class BuildingProp extends Prop {
     final ridgeB = lerpO(mB, mA, shrink) + Offset(0, -ridgeH);
 
     // 화면 앞쪽 두 면. (뒤쪽 두 면은 마루에 가려 보이지 않는다.)
-    final (nearEaveA, nearEaveB) =
-        ridgeAlongX ? (eL, eF) : (eF, eR);
+    final (nearEaveA, nearEaveB) = ridgeAlongX ? (eL, eF) : (eF, eR);
     final (gableA, gableB) = ridgeAlongX ? (eF, eR) : (eL, eF);
+
+    // **처마 끝과 마루 끝의 짝을 정확히 맞춘다.** 어긋나면 지붕면이 자기를
+    // 가로질러 부채꼴로 뻗어 나간다 — 집이 아니라 찢어진 천이 된다.
+    // mA 는 언제나 박공벽(gableA-gableB) 쪽 마루 끝이므로 nearEaveB 와 짝이고,
+    // mB 는 그 반대쪽이라 nearEaveA 와 짝이다.
+    final ridgeNearA = ridgeAlongX ? ridgeB : ridgeA;
+    final ridgeNearB = ridgeAlongX ? ridgeA : ridgeB;
 
     final leftLit = l.dir.dx < 0;
     final slopeLit = ridgeAlongX ? leftLit : !leftLit;
 
     // ① 박공벽(또는 모임지붕의 측면) — 지붕보다 먼저, 벽 위에 얹는다.
+    //    박공의 꼭짓점은 언제나 mA 쪽 마루 끝이다.
     if (roof == RoofStyle.hip) {
       final hipFace = Path()
         ..moveTo(gableA.dx, gableA.dy)
         ..lineTo(gableB.dx, gableB.dy)
-        ..lineTo(ridgeAlongX ? ridgeA.dx : ridgeB.dx,
-            ridgeAlongX ? ridgeA.dy : ridgeB.dy)
+        ..lineTo(ridgeA.dx, ridgeA.dy)
         ..close();
-      _paintSlope(c, l, hipFace, gableA, gableB,
-          ridgeAlongX ? ridgeA : ridgeB, ridgeAlongX ? ridgeA : ridgeB,
-          !slopeLit, detail, seed + 21);
+      _paintSlope(c, l, hipFace, gableA, gableB, ridgeA, ridgeA, !slopeLit,
+          detail, seed + 21);
     } else {
-      _paintGableEnd(c, l, gableA, gableB, ridgeAlongX ? ridgeA : ridgeB,
-          top, detail);
+      _paintGableEnd(c, l, gableA, gableB, ridgeA, top, detail);
     }
 
     // ② 경사면 — 화면에서 가장 넓은 면. 여기 텍스처가 지붕의 인상을 정한다.
     if (roof == RoofStyle.gambrel) {
       // 두 번 꺾인 면. 아래쪽이 가파르고 위쪽이 완만하다.
-      final kneeA = lerpO(nearEaveA, ridgeA, 0.5) + Offset(0, -ridgeH * 0.22);
-      final kneeB = lerpO(nearEaveB, ridgeB, 0.5) + Offset(0, -ridgeH * 0.22);
+      final kneeA =
+          lerpO(nearEaveA, ridgeNearA, 0.5) + Offset(0, -ridgeH * 0.22);
+      final kneeB =
+          lerpO(nearEaveB, ridgeNearB, 0.5) + Offset(0, -ridgeH * 0.22);
       final lower = Path()
         ..moveTo(nearEaveA.dx, nearEaveA.dy)
         ..lineTo(nearEaveB.dx, nearEaveB.dy)
@@ -766,22 +772,22 @@ class BuildingProp extends Prop {
       final upper = Path()
         ..moveTo(kneeA.dx, kneeA.dy)
         ..lineTo(kneeB.dx, kneeB.dy)
-        ..lineTo(ridgeB.dx, ridgeB.dy)
-        ..lineTo(ridgeA.dx, ridgeA.dy)
+        ..lineTo(ridgeNearB.dx, ridgeNearB.dy)
+        ..lineTo(ridgeNearA.dx, ridgeNearA.dy)
         ..close();
       _paintSlope(c, l, lower, nearEaveA, nearEaveB, kneeB, kneeA, slopeLit,
           detail, seed + 13);
-      _paintSlope(c, l, upper, kneeA, kneeB, ridgeB, ridgeA, slopeLit, detail,
-          seed + 14, tone: _roofTone.lighten(0.06));
+      _paintSlope(c, l, upper, kneeA, kneeB, ridgeNearB, ridgeNearA, slopeLit,
+          detail, seed + 14, tone: _roofTone.lighten(0.06));
     } else {
       final slope = Path()
         ..moveTo(nearEaveA.dx, nearEaveA.dy)
         ..lineTo(nearEaveB.dx, nearEaveB.dy)
-        ..lineTo(ridgeB.dx, ridgeB.dy)
-        ..lineTo(ridgeA.dx, ridgeA.dy)
+        ..lineTo(ridgeNearB.dx, ridgeNearB.dy)
+        ..lineTo(ridgeNearA.dx, ridgeNearA.dy)
         ..close();
-      _paintSlope(c, l, slope, nearEaveA, nearEaveB, ridgeB, ridgeA, slopeLit,
-          detail, seed + 13);
+      _paintSlope(c, l, slope, nearEaveA, nearEaveB, ridgeNearB, ridgeNearA,
+          slopeLit, detail, seed + 13);
     }
 
     // ③ 처마 두께 — 지붕이 판때기가 아니라 **두께를 가진 구조**임을 알린다.

@@ -96,6 +96,32 @@ void main() {
         LavaProp(seed: 8),
         GroundPatch(seed: 9, blades: 12),
         PathPatch(seed: 10),
+        // 발치를 채우는 작은 것들 — 이것들이 화면의 밀도를 만든다.
+        GrassTuft(seed: 12),
+        FlowerBed(seed: 13),
+        StumpProp(seed: 14),
+        LogProp(seed: 15),
+        FenceProp(seed: 16),
+        MoundProp(seed: 17),
+        // 실루엣이 서로 다른 나무 전종.
+        TreeProp(seed: 18, kind: TreeKind.pine),
+        TreeProp(seed: 19, kind: TreeKind.bush),
+        TreeProp(seed: 20, kind: TreeKind.willow),
+        TreeProp(seed: 21, kind: TreeKind.dead),
+        TreeProp(seed: 22, kind: TreeKind.blossom),
+        // 지붕·벽 조합 — 마루 방향까지 바꿔 본다.
+        BuildingProp(seed: 23, roof: RoofStyle.hip, wall: WallStyle.brick),
+        BuildingProp(
+            seed: 24,
+            roof: RoofStyle.gambrel,
+            wall: WallStyle.plank,
+            ridgeAlongX: false),
+        BuildingProp(seed: 25, roof: RoofStyle.flat, wall: WallStyle.stone),
+        BuildingProp(
+            seed: 26,
+            roof: RoofStyle.cone,
+            wall: WallStyle.log,
+            skin: RoofSkin.thatch),
         _MyFence(11), // 소비자가 직접 만든 기물
       ];
       for (final p in props) {
@@ -118,7 +144,25 @@ void main() {
       expect(leafBlade(Offset.zero, 30, 0.5), isA<Path>());
       expect(coniferTier(Offset.zero, 40, 20), isA<Path>());
       expect(isoDiamond(1, 1, 75, 0.577), isA<Path>());
+      expect(grassBlade(Offset.zero, 30, 0.2), isA<Path>());
       expect(sway(1.0, 3), isA<double>());
+
+      // 칠하는 헬퍼들 — 시그니처가 바뀌면 여기서 잡힌다.
+      final c = scratch();
+      const light = LightRig.daylight;
+      paintFlower(c, Offset.zero, 8, const Color(0xFFFF7FB0),
+          const Color(0xFFFFE08A), light);
+      lobeLight(c, Offset.zero, 30, 24, const Color(0xFF4E7A3A), light);
+      scatterLeaves(c, Offset.zero, 30, 24, const Color(0xFF4E7A3A), light,
+          seed: 3, count: 6);
+      rootSkirt(c, 20, const Color(0xFF5A4630), light);
+      courseTexture(c, Offset.zero, const Offset(60, 30),
+          const Offset(0, -40), const Color(0xFF8A8478), light, seed: 5);
+      eaveShadow(c, Path()..addRect(const Rect.fromLTWH(0, 0, 60, 40)),
+          Offset.zero, const Offset(60, 0));
+      contactAO(c, 20);
+      translucentBand(c, Path()..addOval(const Rect.fromLTWH(0, 0, 40, 40)),
+          light);
     });
 
     test('아이소 — 투영·배치·정렬', () {
@@ -257,6 +301,50 @@ void main() {
 
       paintRiggedActor(scratch(), rigged,
           const IsoView(tileWidth: 150, tileHeight: 75), LightRig.daylight, 0.5);
+    });
+
+    test('선언형 캐릭터 — 초상과 게임 액터를 한 선언으로 얻는다', () {
+      // 캐릭터 하나를 만드는 데 필요한 것이 barrel 하나에 다 있어야 한다.
+      final build = CharacterBuild(
+        archetype: Archetype.ranger,
+        sex: Sex.female,
+        palette: paletteOf(
+          skin: const Color(0xFFD9A882),
+          hair: const Color(0xFF4E3A22),
+          cloth: const Color(0xFF3E5230),
+          accent: const Color(0xFF8FD44A),
+        ),
+        weapon: WeaponKind.bow,
+        headGear: HeadGear.hood,
+        hasCape: true,
+        armorHeaviness: 0.25,
+      );
+
+      final hero = BuiltArtist(
+        id: 'consumer_built',
+        name: 'Built',
+        title: 'Declared, not drawn',
+        blurb: '선언 하나로 만든 캐릭터.',
+        build: build,
+      );
+
+      // Artist 로 통하므로 명부·갤러리에 그대로 들어간다.
+      expect(hero, isA<Artist>());
+      expect(hero.job, Archetype.ranger);
+      expect(hero.sex, Sex.female);
+      expect(hero.sex!.symbol, '♀');
+      expect(hero.camp.label, 'Hero');
+      expect(hero.accent, const Color(0xFF8FD44A));
+
+      // 초상과 게임 액터가 같은 명세에서 나온다 — 이것이 어긋나지 않는 근거다.
+      hero.paint(scratch(), 0.4);
+      final actor = riggedFromArtist(hero, tile: Offset.zero, height: 180);
+      expect(actor.renderer.spec.weapon, WeaponKind.bow);
+      expect(actor.renderer.spec.palette.accent, hero.build.palette!.accent);
+
+      // 강조색만으로 물들이는 지름길도 열려 있어야 한다.
+      final tinted = tintedPalette(const Color(0xFFFF6A1E), Rng(3));
+      expect(tinted.accent, const Color(0xFFFF6A1E));
     });
   });
 }

@@ -20,7 +20,8 @@ provis/                      ← pub.dev 배포 패키지 (루트)
 │   ├── rig/ · anim/         body · pose · ik · verlet · clip · animator
 │   ├── actor/               spec(HumanoidSpec) · humanoid_renderer
 │   ├── iso/                 iso_view · iso_stage · iso_input
-│   ├── props/               prop · tree · rock · building · water · ground
+│   ├── props/               prop · prop_kit · tree · rock · building
+│   │                        water · ground · flora · terrain
 │   └── flame/               iso_scene (선택적 Flame 통합)
 └── example/                 실행 앱 (별도 패키지)
     ├── lib/main.dart        아이소 필드 — 기물 + 클릭 이동
@@ -104,25 +105,51 @@ done
 
 가장 자주 하는 작업이다. 맵이 비어 있으면 아무리 캐릭터가 좋아도 게임 화면이 안 된다.
 
+### 리얼함은 셰이딩이 아니라 이 넷에서 나온다
+
+기물이 클립아트로 보이는 이유는 거의 언제나 같다. **재질을 잘못 골라서가 아니라, 아래 넷 중 하나가 빠져서**다.
+
+1. **실루엣이 재질을 말하는가.** 잎 뭉치의 윤곽은 매끄러운 타원이 아니라 돌기가 반복되는 선이다(`leafCluster`). 이 신호 없이 초록을 칠하면 무슨 짓을 해도 풍선이다. 전나무는 각진 톱니(`coniferTier`), 바위는 직선으로 깨진 면, 잎은 가장자리에서 몇 장이 삐져나온다(`scatterLeaves`).
+2. **덩어리 안에 덩어리가 있는가.** 수관은 잎 뭉치 여럿(`lobeLight`), 벽은 돌 하나하나(`courseTexture`), 지붕은 기와 한 줄. **단위가 보여야 관객이 크기를 읽는다.** 단색 면은 스케일이 없다.
+3. **접지가 두 겹인가.** 넓고 옅은 `propShadow` 만 있으면 그림자 위에 얹힌 스티커다. 좁고 짙은 `contactAO` + 밑동을 감싸는 `rootSkirt` 가 함께 있어야 박힌다.
+4. **빛이 통과하는가.** 얇은 것(잎·꽃잎)은 그늘 쪽이 그냥 어두우면 플라스틱이다. `Finish.foliage` + `translucentBand` 가 광원 **반대쪽** 가장자리를 띄운다.
+
 ### 기존 기물 배치
 
 ```dart
-scene.addProps(plantForest(seed: 42, tiles: spots, kinds: [TreeKind.conifer]));
+scene.addProps(plantForest(seed: 42, tiles: spots,
+    kinds: [TreeKind.conifer, TreeKind.pine, TreeKind.bush]));
 scene.addProp(PropInstance(
   prop: BuildingProp(seed: 7, tiles: const Size(2, 2), storeys: 2,
+                     roof: RoofStyle.gable, ridgeAlongX: true,
                      tileWidth: iso.tileWidth, isoRatio: iso.elevationSin),
   tile: const Offset(5, 8),
 ));
 ```
 
-**건물·담장은 `tileWidth`·`isoRatio` 를 맵의 `IsoView` 와 맞춘다.** 안 맞으면 밑면 마름모가 타일 격자와 어긋나 건물이 공중에 뜬 것처럼 보인다.
+**건물·담장·그루터기·통나무·울타리·언덕은 `tileWidth`·`isoRatio` 를 맵의 `IsoView` 와 맞춘다.** 안 맞으면 밑면 마름모가 타일 격자와 어긋나 기물이 공중에 뜬 것처럼 보인다.
+
+### 무엇을 놓을 수 있는가
+
+| 파일 | 기물 |
+|---|---|
+| `tree.dart` | `TreeProp` 7종 — `broadleaf`·`conifer`·`pine`·`dead`·`blossom`·`willow`·`bush`, `plantForest` |
+| `building.dart` | `BuildingProp`(벽 5종 × 지붕 5종 × 표면 4종) · `WallProp` |
+| `rock.dart` | `RockProp` · `PebbleField` |
+| `water.dart` | `WaterProp`(갈대·물가 포함) · `LavaProp` |
+| `ground.dart` | `GroundPatch`(풀·꽃) · `PathPatch`(바퀴자국) |
+| `flora.dart` | `GrassTuft` · `FlowerBed` · `StumpProp` · `LogProp` · `FenceProp` |
+| `terrain.dart` | `MoundProp` — 지면에서 솟은 둔덕 |
+| `prop_kit.dart` | 공용 형상·텍스처 도구 |
+
+**큰 기물만 놓으면 그 사이가 빈 장판으로 남는다.** 화면의 밀도는 발치의 작은 것들이 만든다 — 풀 포기, 꽃, 그루터기, 쓰러진 통나무.
 
 ### 새 기물 타입 추가
 
 `Prop` 을 구현한다. **접지 중심이 원점, `-y` 가 위**인 국소 좌표에 그린다.
 
-- `grounded = true` → 지면에 눕는다(웅덩이·길·풀). 세로가 `iso.shadowRatio` 로 눌린다.
-- `grounded = false` → 세워진다(나무·바위·건물). 세로가 `iso.squash` 로 눌린다.
+- `grounded = true` → 지면에 눕는다(웅덩이·길·풀밭). 세로가 `iso.shadowRatio` 로 눌린다.
+- `grounded = false` → 세워진다(나무·바위·건물·풀 포기). 세로가 `iso.squash` 로 눌린다.
 - `walkable` 과 `footprint` 를 정확히 준다 — 경로탐색이 이 값을 쓴다.
 
 → 상세와 각 기물의 설계 근거: [props.md](references/props.md)
@@ -131,22 +158,67 @@ scene.addProp(PropInstance(
 
 ## 워크플로우 2 — 캐릭터 만들기
 
-### 1. 시각 논제를 한 문장으로 정한다
+**길이 둘이다. 먼저 어느 쪽인지 정한다.**
 
-**이 단계를 건너뛴 캐릭터는 반드시 평범해진다.** 참조 9종은 전부 논제가 먼저 있었다 — "판금의 반사 분할"(Aldric), "머리 2/3·어깨 5배의 압도"(Gorehide), "단일 스파인으로 흐르는 용"(Vaelmorth).
-→ [art-direction.md](references/art-direction.md)
+| | 선언형 — `BuiltArtist` | 손그림 — `Artist` 구현 |
+|---|---|---|
+| 분량 | **한 명 15~40줄** | 한 명 700~1300줄 |
+| 초상과 게임 액터 | **같은 렌더러 — 어긋날 수 없다** | 서로 다른 코드 — `build` 를 반드시 선언해야 한다 |
+| 개성의 상한 | 명세가 표현하는 범위 | 없음 |
+| 쓰는 곳 | **명부를 채우는 대다수** | 간판·보스 소수 |
 
-### 2. `Artist` 를 구현한다
+**기본은 선언형이다.** 손그림은 그 캐릭터가 게임의 얼굴이고 명세로 표현할 수 없는 형상이 있을 때만 고른다.
+→ 상세: [character-creation.md](references/character-creation.md)
 
-`id`·`name`·`camp`·`light`·`paint(Canvas, t, {detail})`. 좌표는 `kStage`(1000×1400), 발바닥은 `kGround`(1332).
+### 길 A — 선언형 (기본)
 
-### 3. 부위를 조립하고 칠한다
+```dart
+final garran = BuiltArtist(
+  id: 'garran',
+  name: 'Garran',
+  title: 'Shieldbearer of the Pass',
+  blurb: '고갯길을 혼자 막아선 방패병.',
+  build: CharacterBuild(
+    archetype: Archetype.knight,      // 체형·기본 장비의 대역
+    sex: Sex.male,
+    palette: paletteOf(               // 넷만 고르면 나머지 일곱은 파생된다
+      skin: Color(0xFFC08A66), hair: Color(0xFF3A2A1E),
+      cloth: Color(0xFF7A2E2E), accent: Color(0xFFD9A441),
+    ),
+    weapon: WeaponKind.sword,
+    headGear: HeadGear.halfHelm,
+    hasShield: true, hasPauldrons: true,
+    armorHeaviness: 0.9, muscle: 0.8,
+  ),
+);
+```
 
-`anatomy.dart` 의 `headShape`/`torsoShape`/`limb`/`handShape`/`hairStrand` + `drawEye`(6겹).
-`Surface(color, Finish.xxx)` + `paintSurface`. 마무리 4종이 품질을 결정한다 — `occlude`·`castShadow`·`rimBand`·`panelLine`.
-→ [artist-craft.md](references/artist-craft.md)
+**`accent` 가 그 캐릭터의 정체성이다** — 명부 카드 테두리, 눈, 발광, 역광이 전부 여기서 나온다. 직업마다 색 대역을 갈라 두면 멀리서도 역할이 읽힌다.
 
-### 4. 씬에 세운다 — 액터 종류를 먼저 고른다
+**`headGear` 와 `weapon` 은 명시하라.** 비워 두면 시드 생성기가 정하므로, 후드를 원하지 않은 마법사가 후드를 쓰고 나타난다.
+
+### 길 B — 손그림
+
+1. **시각 논제를 한 문장으로 정한다.** 이 단계를 건너뛴 캐릭터는 반드시 평범해진다. 참조 5종은 전부 논제가 먼저 있었다 — "판금의 반사 분할"(Aldric), "머리 2/3·어깨 5배의 압도"(Gorehide), "단일 스파인으로 흐르는 용"(Vaelmorth). → [art-direction.md](references/art-direction.md)
+2. **`Artist` 를 구현한다.** `id`·`name`·`camp`·`light`·`paint(Canvas, t, {detail})`. 좌표는 `kStage`(1000×1400), 발바닥은 `kGround`(1332).
+3. **부위를 조립하고 칠한다.** `anatomy.dart` 의 `headShape`/`torsoShape`/`limb`/`handShape`/`hairStrand` + `drawEye`(6겹). `Surface(color, Finish.xxx)` + `paintSurface`. 마무리 4종이 품질을 결정한다 — `occlude`·`castShadow`·`rimBand`·`panelLine`. → [artist-craft.md](references/artist-craft.md)
+4. **`build` 를 반드시 오버라이드한다.** 이것이 게임 맵의 골격 액터로 건너가는 유일한 다리다.
+
+```dart
+@override
+CharacterBuild get build => CharacterBuild(
+      archetype: Archetype.mage,
+      sex: Sex.female,
+      palette: paletteOf(skin: …, hair: …, cloth: …, accent: accent),
+      weapon: WeaponKind.staff,
+      headGear: HeadGear.none,   // 초상에 없으면 반드시 none 을 명시
+      hasCape: true, glowRunes: true,
+    );
+```
+
+**빠뜨리면 명부와 게임 화면이 다른 인물이 된다.** 실제로 은발 마법사를 골랐는데 맵에서는 금발 전사가 걸어 나온 적이 있다. `example/test/identity_sheet_test.dart` 가 이 회귀를 막는다 — 초상과 8방향을 한 줄에 나란히 뽑아 눈으로 대조하고, `build.palette` 가 비어 있으면 실패한다.
+
+### 씬에 세운다 — 액터 종류를 먼저 고른다
 
 | | `IsoActor` (Artist) | `RiggedIsoActor` (골격) |
 |---|---|---|
@@ -217,16 +289,23 @@ actor.facesLeft = hero.facesLeft;
 - [ ] 눈이 6겹인가 (`drawEye`)
 
 **맵 기물**
-- [ ] `propShadow` 로 지면에 붙였는가
+- [ ] 접지가 **두 겹**인가 — `propShadow`(넓고 옅다) + `contactAO`(좁고 짙다)
+- [ ] 실루엣이 재질을 말하는가 — 잎은 돌기, 전나무는 톱니, 바위는 직선 면
+- [ ] 면 안에 **반복 단위**가 보이는가 — 돌·널·기와 한 장이 크기를 알려 준다
+- [ ] 얇은 것에 투과광을 넣었는가 (`Finish.foliage`·`translucentBand`)
 - [ ] 같은 종류를 여러 개 놓을 때 시드·크기·`timeOffset` 이 개체마다 다른가
 - [ ] `footprint`·`walkable` 이 실제 형상과 맞는가
 - [ ] 건물의 `tileWidth`·`isoRatio` 가 맵의 `IsoView` 와 같은가
 - [ ] 세 면(좌벽·우벽·지붕)의 명도가 확실히 갈리는가
+- [ ] 지붕이 벽에 **처마 그림자**를 드리우는가 (`eaveShadow`)
+- [ ] 블러를 파츠마다 부르지 않았는가 — 점을 한 Path 로 모아 한 번에 태운다
 
 **아이소 씬**
 - [ ] 기물과 캐릭터가 **하나의 깊이 정렬**을 거치는가
 - [ ] 씬 전체가 같은 `LightRig` 를 쓰는가
 - [ ] 캐릭터 키가 타일 폭의 1.2~1.6배인가
+- [ ] 지면이 **체커 타일이 아닌가** — 얼룩 두 층 + 거리 감쇠 + 가장자리 흙 두께
+- [ ] 큰 기물 사이를 밑풀(`GrassTuft`·`FlowerBed`)로 메웠는가
 - [ ] `paintIsoHaze` 로 원경이 흐려지는가 — 비용 대비 효과가 가장 큰 한 겹
 
 **애니메이션**
@@ -245,7 +324,8 @@ actor.facesLeft = hero.facesLeft;
 
 | 문서 | 언제 읽는가 |
 |------|------------|
-| [props.md](references/props.md) | 맵 기물 — 6종의 설계 근거, `Prop` 계약, 새 기물 추가법 |
+| [character-creation.md](references/character-creation.md) | **캐릭터 만들기** — 선언형 vs 손그림, `CharacterBuild`, 팔레트, 직업별 대역표, 초상↔게임 액터 대조 검증, 흔한 실패, 파츠 렌더 순서 |
+| [props.md](references/props.md) | 맵 기물 — 리얼함의 네 조건, 전 기물의 설계 근거, `Prop` 계약, `prop_kit` API, 새 기물 추가법 |
 | [artist-craft.md](references/artist-craft.md) | 셰이딩 제1 원리, `Finish` 19종, `core/shading.dart` 전 API, `Artist` 계약, `anatomy.dart`, 얼굴 6겹 |
 | [art-direction.md](references/art-direction.md) | 시각 논제 설계, 비율 왜곡, 참조 9종의 실제 논제, 설계서 양식 |
 | [isometric.md](references/isometric.md) | 아이소 투영 수식, `Artist` 를 맵에 세우는 법, 클릭 이동, 8방향, y-sort |
@@ -260,9 +340,17 @@ actor.facesLeft = hero.facesLeft;
 
 ```bash
 cd example
-flutter run -t lib/main.dart      # 아이소 필드 — 기물 + 클릭 이동
-flutter run -t lib/gallery.dart   # 캐릭터 갤러리
-flutter run -t lib/viewer.dart    # 절차 액터 뷰어
+flutter run -t lib/main.dart              # 아이소 필드 — 기물 + 클릭 이동
+flutter run -t lib/gallery.dart           # 캐릭터 갤러리
+flutter run -t lib/viewer.dart            # 절차 액터 뷰어
+flutter run -t lib/create_character.dart  # 캐릭터 작업대 — 값을 바꾸며 만들고 코드를 복사
+```
+
+**캐릭터를 만들 때는 작업대부터 띄운다.** 왼쪽에서 값을 바꾸면 명부 초상과 게임 액터 8방향이 함께 갱신되고, 하단에 그대로 붙여 넣을 수 있는 `BuiltArtist` 선언이 나온다.
+
+```bash
+# 초상과 게임 액터가 같은 인물인지 시트로 대조
+flutter test test/identity_sheet_test.dart && open build/art/identity_*.png
 ```
 
 ---
@@ -278,6 +366,16 @@ flutter run -t lib/viewer.dart    # 절차 액터 뷰어
 | 건물이 공중에 뜬다 | `isoRatio` 불일치 | 맵의 `iso.elevationSin` 을 넘긴다 |
 | 지면 격자가 안 보인다 | 캐릭터·기물이 너무 큼 | 키를 타일 폭의 1.2~1.6배로 |
 | 숲이 한 몸처럼 흔들린다 | `timeOffset` 이 같음 | 개체마다 다르게 |
+| 나무가 초록 풍선이다 | 실루엣이 매끄러운 타원 | `leafCluster` + `scatterLeaves` |
+| 잎 그늘이 검게 죽는다 | 투과광 없음 | `Finish.foliage` + `translucentBand` |
+| 줄기가 흰 파이프다 | 좁은 형상에 `rim` 이 다 먹음 | 줄기·가지는 `rim: false` |
+| 전나무가 매끈한 삼각형이다 | 톱니를 스플라인에 통과시킴 | `coniferTier` 는 직선으로 그린다 |
+| 벽·지붕이 밋밋하다 | 반복 단위가 없음 | `courseTexture`, 기와 열 |
+| 지붕이 벽을 덮어 버섯이 된다 | 마루를 밑면 전체에 덮음 | 마루는 월드 축과 평행 (`ridgeAlongX`) |
+| 지붕이 종잇장이다 | 처마 두께·그림자 없음 | 처마 널 + `eaveShadow` |
+| 기물이 그림자 위에 얹혀 보인다 | 접지가 한 겹 | `contactAO` + `rootSkirt` 추가 |
+| 지면이 격자무늬 장판이다 | 체커 타일 | `paintIsoGround` — 얼룩·감쇠·가장자리 흙 |
+| 프레임이 무너진다 | 파츠마다 블러 | 점을 한 Path 로 모아 블러 한 번 |
 | 파츠가 종이처럼 겹쳐 보인다 | 접촉 그림자 없음 | `occlude` + `castShadow` |
 | 클릭했는데 반응이 없다 | 목표가 막힘 + 표식 없음 | `MoveMarker.ping`, A* 가 근처 타일로 대체 |
 | 클릭한 곳과 다른 데로 간다 | 카메라 오프셋 불일치 | `scene.tileAt()` 사용 |
@@ -286,4 +384,11 @@ flutter run -t lib/viewer.dart    # 절차 액터 뷰어
 | 여덟 방향이 전부 옆모습이다 | `solve` 에 `yaw` 미전달 | `solve(body, pose, yaw: facing.yaw)` |
 | 3/4 에서 얼굴이 갑자기 사라진다 | `toCamera` 로 이진 판정 | `faceVisible`·`bothEyes` 로 연속 알파 |
 | 공격 자세로 굳어 걸어 다닌다 | 한 번짜리 클립이 안 끝남 | `update` 가 자동 복귀시킨다 — `play()` 로만 전환 |
+| 명부와 게임 화면이 다른 인물 | `Artist.build` 미오버라이드 | `build` 에 실제 색·장비 선언 → [character-creation.md](references/character-creation.md) |
+| 마법사가 원치 않은 후드를 쓴다 | `headGear` 미지정 → 시드가 결정 | `headGear: HeadGear.none` 을 **명시** |
+| 게임 액터의 얼굴이 매끈한 공 | 머리카락·후드를 얼굴 **위에** 그림 | 뒤통수는 얼굴 전, 앞머리는 얼굴 후 (`_hairBack`/`_hairFront`) |
+| 어깨가 머리보다 크다 | 폴드론이 어깨 관절 중심에 과대 | 팔 방향으로 밀고 `r * 1.5` 로 |
+| 칼끝이 지면을 뚫는다 | 손목 각도를 그대로 따름 | 쉴 때 세우고 휘두를 때 손을 따름 |
+| 허벅지가 거대한 흰 캡슐 | 다리 전체를 판금 관 하나로 | 쿠이스·그리브 조각으로 분리 |
+| 팔이 몸통에 묻혀 사라진다 | 팔과 몸통이 같은 판금 재질 | 가까운 팔 밑에 어두운 윤곽 한 겹 |
 | `ambiguous_import: mix` | Flame 의 vector_math 충돌 | `hide mix` |

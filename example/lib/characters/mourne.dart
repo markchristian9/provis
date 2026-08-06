@@ -24,6 +24,17 @@ class Mourne extends Artist {
   @override
   Sex? get sex => null;
   @override
+  CharacterBuild get build => CharacterBuild(
+        archetype: Archetype.mage,
+        beast: true,
+        palette: tintedPalette(const Color(0xFF8FE4FF), Rng(0x3E11), monster: true),
+        weapon: WeaponKind.staff,
+        armorHeaviness: 0.0,
+        muscle: 0.15,
+        glowRunes: true,
+        heightScale: 1.1,
+      );
+  @override
   Color get accent => const Color(0xFF8FE4FF);
   @override
   LightRig get light => LightRig.spectral;

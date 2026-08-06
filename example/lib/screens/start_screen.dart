@@ -248,14 +248,32 @@ class _PickCardState extends State<_PickCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      a.name.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 14,
-                        letterSpacing: 2,
-                        fontWeight: FontWeight.w700,
-                        color: lit ? a.accent : Colors.white,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            a.name.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              letterSpacing: 2,
+                              fontWeight: FontWeight.w700,
+                              color: lit ? a.accent : Colors.white,
+                            ),
+                          ),
+                        ),
+                        // 성별은 이름 옆 기호 하나로 족하다. 카드가 좁다.
+                        if (a.sex != null)
+                          Text(
+                            a.sex!.symbol,
+                            style: TextStyle(
+                              fontSize: 15,
+                              height: 1.0,
+                              color: a.accent.withValues(alpha: 0.85),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -265,6 +283,29 @@ class _PickCardState extends State<_PickCard> {
                       style: TextStyle(
                         fontSize: 11,
                         color: Colors.white.withValues(alpha: 0.45),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // 직업 배지. 강조색을 옅게 깔아 두면 명부를 훑을 때 역할이
+                    // 이름보다 먼저 읽힌다.
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: a.accent.withValues(alpha: 0.13),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: a.accent.withValues(alpha: 0.32),
+                        ),
+                      ),
+                      child: Text(
+                        a.job.label.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 9,
+                          letterSpacing: 1.4,
+                          fontWeight: FontWeight.w600,
+                          color: a.accent.withValues(alpha: 0.95),
+                        ),
                       ),
                     ),
                   ],

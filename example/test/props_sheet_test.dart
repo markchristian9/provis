@@ -87,7 +87,51 @@ void main() {
             TreeProp(seed: 14, kind: TreeKind.dead, trunkHeight: 150)),
         ('tree · willow',
             TreeProp(seed: 15, kind: TreeKind.willow, trunkHeight: 150)),
-        ('bush', TreeProp(seed: 18, kind: TreeKind.bush, trunkHeight: 52)),
+        ('bush', TreeProp(seed: 18, kind: TreeKind.bush, trunkHeight: 60)),
+        ('grass tuft', GrassTuft(seed: 81, size: 44)),
+        ('flower bed', FlowerBed(seed: 82, size: 52)),
+        (
+          'stump',
+          StumpProp(seed: 83, size: 34, isoRatio: iso.elevationSin)
+        ),
+        (
+          'log',
+          LogProp(seed: 84, length: 150, isoRatio: iso.elevationSin)
+        ),
+        (
+          'fence',
+          FenceProp(
+              seed: 85,
+              tileWidth: iso.tileWidth,
+              isoRatio: iso.elevationSin)
+        ),
+        (
+          'mound',
+          MoundProp(
+              seed: 86, radius: 120, rise: 34, isoRatio: iso.elevationSin)
+        ),
+        (
+          'building · barn',
+          BuildingProp(
+              seed: 44,
+              tiles: const Size(2, 1),
+              wall: WallStyle.plank,
+              roof: RoofStyle.gambrel,
+              tileWidth: iso.tileWidth,
+              isoRatio: iso.elevationSin)
+        ),
+        (
+          'building · hip',
+          BuildingProp(
+              seed: 45,
+              tiles: const Size(2, 2),
+              storeys: 2,
+              wall: WallStyle.stone,
+              roof: RoofStyle.hip,
+              ridgeAlongX: false,
+              tileWidth: iso.tileWidth,
+              isoRatio: iso.elevationSin)
+        ),
         ('rock', RockProp(seed: 21, size: 58, mossy: true, shards: 3)),
         ('pebbles', PebbleField(seed: 22, radius: 90)),
         ('water', WaterProp(seed: 31, radius: 120)),
@@ -240,6 +284,39 @@ void main() {
             prop: GroundPatch(seed: 200 + i * 13, radius: 80, blades: 22),
             tile: Offset(1.0 + i * 1.4, 3.0 + (i % 3) * 1.7),
           ),
+        PropInstance(
+          prop: MoundProp(
+              seed: 11, radius: 130, rise: 46, isoRatio: iso.elevationSin),
+          tile: const Offset(1.8, 6.4),
+        ),
+        for (var i = 0; i < 3; i++)
+          PropInstance(
+            prop: FenceProp(
+                seed: 300 + i,
+                tileWidth: iso.tileWidth,
+                isoRatio: iso.elevationSin,
+                alongX: false),
+            tile: Offset(4.5, 1.5 + i),
+          ),
+        for (var i = 0; i < 14; i++)
+          PropInstance(
+            prop: GrassTuft(seed: 400 + i * 17, size: 30 + (i % 4) * 5),
+            tile: Offset(0.6 + (i % 5) * 1.7, 1.2 + (i ~/ 5) * 2.3),
+            timeOffset: i * 0.7,
+          ),
+        for (var i = 0; i < 5; i++)
+          PropInstance(
+            prop: FlowerBed(seed: 500 + i * 29, size: 40),
+            tile: Offset(2.2 + i * 1.3, 4.2 + (i % 2) * 2.0),
+          ),
+        PropInstance(
+          prop: StumpProp(seed: 61, size: 30, isoRatio: iso.elevationSin),
+          tile: const Offset(6.2, 6.6),
+        ),
+        PropInstance(
+          prop: LogProp(seed: 62, length: 130, isoRatio: iso.elevationSin),
+          tile: const Offset(3.4, 2.2),
+        ),
       ];
 
       paintProps(c, props, iso, light, 1.4);

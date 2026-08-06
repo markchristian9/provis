@@ -28,6 +28,16 @@ class Vaelmorth extends Artist {
   @override
   Sex? get sex => null;
   @override
+  CharacterBuild get build => CharacterBuild(
+        archetype: Archetype.berserker,
+        beast: true,
+        palette: tintedPalette(const Color(0xFFFF6A1E), Rng(0x7AE1), monster: true),
+        weapon: WeaponKind.greatsword,
+        muscle: 1.0,
+        glowRunes: true,
+        heightScale: 1.35,
+      );
+  @override
   Color get accent => const Color(0xFFFF6A1E);
   @override
   LightRig get light => LightRig.infernal;

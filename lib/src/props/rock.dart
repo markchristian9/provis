@@ -34,10 +34,16 @@ class RockProp extends Prop {
     final r = Rng(seed);
     _w = size * r.bell(0.9, 1.35);
     _h = size * r.bell(0.62, 0.95);
+    // 화강암(회청)과 사암(황갈) 두 대역. 한 대역만 쓰면 맵의 바위가 전부
+    // 같은 광물로 보인다.
     _tone = color ??
-        hsl(r.range(200, 240), r.range(0.03, 0.11), r.range(0.36, 0.48));
+        (r.chance(0.55)
+            ? hsl(r.range(196, 232), r.range(0.04, 0.10), r.range(0.36, 0.48))
+            : hsl(r.range(28, 46), r.range(0.08, 0.18), r.range(0.34, 0.46)));
     _noise = Noise(seed * 41 + 7);
-    _facets = _buildFacets(r.branch(3));
+    final fr = r.branch(3);
+    _ring = _buildRing(fr);
+    _facets = _buildFacets(fr);
     _outline = _buildOutline();
   }
 
@@ -61,6 +67,7 @@ class RockProp extends Prop {
   late final double _h;
   late final Color _tone;
   late final Noise _noise;
+  late final List<Offset> _ring;
 
   /// (형상, 바깥을 향한 방향, 위를 향한 정도)
   late final List<(Path, Offset, double)> _facets;
@@ -72,58 +79,55 @@ class RockProp extends Prop {
   @override
   bool get walkable => false;
 
-  /// 각진 다각형 하나. 광물은 곡선이 아니라 직선으로 깨진다.
-  Path _chunk(Offset at, double rx, double ry, int sides, Rng r) {
-    final path = Path();
-    final start = r.range(0, math.pi * 2);
-    for (var i = 0; i < sides; i++) {
-      final a = start + (i / sides) * math.pi * 2 + r.signed(0.28);
-      final m = 0.72 + r.unit * 0.44;
-      final p = at + Offset(math.cos(a) * rx * m, math.sin(a) * ry * m);
-      if (i == 0) {
-        path.moveTo(p.dx, p.dy);
-      } else {
-        path.lineTo(p.dx, p.dy);
-      }
-    }
-    path.close();
-    return path;
+  /// 실루엣 정점. 아래가 넓고 위가 좁아야 땅에 박힌 덩어리로 보인다.
+  List<Offset> _buildRing(Rng r) {
+    const n = 9;
+    return [
+      for (var i = 0; i < n; i++)
+        () {
+          final a = (i / n) * math.pi * 2;
+          final up = -math.sin(a); // +1 위
+          final rx = _w * (1.0 - 0.34 * math.max(0.0, up)) * r.range(0.84, 1.14);
+          final ry = _h * r.range(0.88, 1.12);
+          return Offset(math.cos(a) * rx, -math.sin(a) * ry - _h * 0.80);
+        }(),
+    ];
   }
 
-  /// 덩어리를 여러 면으로 조립한다.
+  /// 덩어리 하나를 면으로 쪼갠다.
   ///
-  /// 아래쪽에 넓은 베이스 면 몇 개, 그 위에 작은 면 몇 개. 이 위계가 있어야
-  /// 바위가 "쌓여서 깨진 것"으로 보이고, 크기가 같은 면을 늘어놓으면 자갈
-  /// 무더기가 된다.
+  /// 다각형 여럿을 흩어 놓고 합치면 실루엣이 들쭉날쭉해 **깨진 접시**가 된다.
+  /// 바위는 하나의 돌덩이고 면은 그 위에 새겨진 것이므로, 실루엣을 먼저 정하고
+  /// 그 안을 능선에서 뻗어 나온 면으로 **빈틈없이** 채운다.
   List<(Path, Offset, double)> _buildFacets(Rng r) {
+    final n = _ring.length;
+    final center = Offset(0, -_h * 0.80);
+    // 능선 두 점. 비대칭이라야 자연 암석으로 보인다.
+    final peakA = Offset(-_w * r.range(0.20, 0.34), -_h * r.range(1.5, 1.8));
+    final peakB = Offset(_w * r.range(0.14, 0.30), -_h * r.range(1.6, 1.95));
+    final split = (peakA.dx + peakB.dx) * 0.5;
+
     final out = <(Path, Offset, double)>[];
-    final baseY = -_h * 0.55;
+    for (var i = 0; i < n; i++) {
+      final p0 = _ring[i];
+      final p1 = _ring[(i + 1) % n];
+      final mid = lerpO(p0, p1, 0.5);
+      // 위쪽 정점 사이는 능선 자체가 지나므로 면을 만들지 않는다.
+      final peak = mid.dx < split ? peakA : peakB;
+      final other = mid.dx < split ? peakB : peakA;
+      final face = Path()
+        ..moveTo(p0.dx, p0.dy)
+        ..lineTo(p1.dx, p1.dy)
+        ..lineTo(peak.dx, peak.dy);
+      // 능선을 가로지르는 면은 사각형이 되어야 상단이 평평해진다.
+      if ((p0.dx - split).sign != (p1.dx - split).sign) {
+        face.lineTo(other.dx, other.dy);
+      }
+      face.close();
 
-    // 베이스 — 넓고 낮다.
-    final baseCount = r.intRange(2, 4);
-    for (var i = 0; i < baseCount; i++) {
-      final t = baseCount == 1 ? 0.5 : i / (baseCount - 1);
-      final at = Offset(
-        (t - 0.5) * _w * 1.05,
-        baseY + _h * r.range(-0.10, 0.22),
-      );
-      final rx = _w * r.range(0.52, 0.78);
-      final ry = _h * r.range(0.62, 0.92);
-      final dir = Offset(at.dx / _w, -0.35).normalized();
-      out.add((_chunk(at, rx, ry, r.intRange(5, 7), r), dir, 0.25));
-    }
-
-    // 상단 — 좁고 위를 향한다. 하늘을 받으므로 가장 밝다.
-    final topCount = r.intRange(2, 4);
-    for (var i = 0; i < topCount; i++) {
-      final at = Offset(
-        r.signed(_w * 0.46),
-        baseY - _h * r.range(0.42, 0.86),
-      );
-      final rx = _w * r.range(0.26, 0.46);
-      final ry = _h * r.range(0.32, 0.54);
-      final dir = Offset(at.dx / _w * 0.7, -1.0).normalized();
-      out.add((_chunk(at, rx, ry, r.intRange(4, 6), r), dir, 0.9));
+      final dir = (mid - center).normalized();
+      final up = (-dir.dy).clamp(0.0, 1.0);
+      out.add((face, dir, up));
     }
     return out;
   }
@@ -146,39 +150,77 @@ class RockProp extends Prop {
     }
     contactAO(c, _w * 0.72, alpha: 0.5);
 
-    // 면을 하나씩 칠한다. 밝기는 면이 향한 방향과 광원의 내적으로 정한다 —
-    // 반투명 오버레이로 흉내 내면 색이 탁해지고 경계가 흐려진다.
-    for (final (i, facet) in _facets.indexed) {
+    // ① 먼저 **덩어리 전체**를 한 번 칠한다. 면을 하나씩 불투명하게 칠하면
+    //    조각들이 서로 떨어져 부서진 접시처럼 보인다. 바위는 하나의 돌덩이고,
+    //    면은 그 위에 **새겨진** 것이다.
+    paintSurface(
+      c,
+      _outline,
+      Surface(_tone, Finish.stone, contrast: 1.2),
+      light,
+      detail: detail,
+      seed: seed,
+      rim: false,
+    );
+
+    // ② 그 위에 면마다 명도만 갈아 준다. 밝기는 면이 향한 방향과 광원의
+    //    내적이다 — 이것이 조약돌과 암석을 가른다.
+    c.save();
+    c.clipPath(_outline);
+    for (final facet in _facets) {
       final (shape, dir, up) = facet;
-      final ndl = (dir.dx * light.dir.dx + dir.dy * light.dir.dy).clamp(-1.0, 1.0);
-      final lit = (0.5 + 0.5 * ndl);
+      final ndl =
+          (dir.dx * light.dir.dx + dir.dy * light.dir.dy).clamp(-1.0, 1.0);
+      final lit = 0.5 + 0.5 * ndl;
       final tone = _tone
-          .lighten(0.20 * lit * (0.5 + 0.5 * up))
-          .darken(0.26 * (1 - lit))
+          .lighten(0.30 * lit * (0.5 + 0.5 * up))
+          .darken(0.32 * (1 - lit))
           .mix(light.ambient, 0.30 * (1 - lit));
-      paintSurface(
-        c,
+      final sb = shape.getBounds();
+      // 면 안에서도 광원 쪽이 조금 더 밝다. 완전 평면은 종이다.
+      c.drawPath(
         shape,
-        Surface(tone, Finish.stone, contrast: 1.25),
-        light,
-        detail: detail,
-        seed: seed + i * 13,
-        rim: false,
+        Paint()
+          ..isAntiAlias = true
+          ..shader = Gradient.linear(
+            sb.center + Offset(light.dir.dx, light.dir.dy) * sb.width * 0.5,
+            sb.center - Offset(light.dir.dx, light.dir.dy) * sb.width * 0.5,
+            [tone.lighten(0.08).fade(0.80), tone.darken(0.08).fade(0.80)],
+          ),
       );
       // 위를 향한 면만 하늘빛을 받는다.
       if (up > 0.5) {
         topPlane(c, shape, light, strength: 0.55 * up);
       }
-      // 면 경계 — 광물의 날카로움은 이 선에서 나온다.
+      // 면 경계 — 광물의 날카로움은 이 선에서 나온다. 다만 진하면 조각이 된다.
       c.drawPath(
         shape,
         Paint()
           ..isAntiAlias = true
           ..style = PaintingStyle.stroke
-          ..strokeWidth = math.max(0.9, _w * 0.012)
-          ..color = _tone.darken(0.42).fade(0.45),
+          ..strokeWidth = math.max(0.7, _w * 0.009)
+          ..color = _tone.darken(0.42).fade(0.22),
       );
     }
+    // ③ 아랫면은 하늘이 가려 어둡다. 덩어리를 하나로 묶는 마지막 한 겹.
+    final ob = _outline.getBounds();
+    c.drawRect(
+      ob,
+      Paint()
+        ..isAntiAlias = true
+        ..blendMode = BlendMode.multiply
+        ..shader = Gradient.linear(
+          Offset(ob.center.dx, ob.top),
+          Offset(ob.center.dx, ob.bottom),
+          [
+            const Color(0xFFFFFFFF),
+            const Color(0xFFFFFFFF),
+            light.ambient.mix(const Color(0xFF6A7590), 0.5),
+          ],
+          const [0.0, 0.55, 1.0],
+        ),
+    );
+    c.restore();
 
     // 균열 — 면을 가로지르는 깊은 금. 몇 줄이면 충분하다.
     if (detail > 0.45) {
@@ -225,7 +267,20 @@ class RockProp extends Prop {
       c.save();
       c.translate(sx, -ss * 0.16);
       contactAO(c, ss * 1.1, alpha: 0.34);
-      final shard = _chunk(Offset(0, -ss * 0.45), ss, ss * 0.7, 5, r);
+      final shard = Path();
+      for (var j = 0; j < 5; j++) {
+        final a = (j / 5) * math.pi * 2 + r.signed(0.3);
+        final q = Offset(
+          math.cos(a) * ss * r.range(0.7, 1.2),
+          math.sin(a) * ss * 0.7 * r.range(0.7, 1.2) - ss * 0.45,
+        );
+        if (j == 0) {
+          shard.moveTo(q.dx, q.dy);
+        } else {
+          shard.lineTo(q.dx, q.dy);
+        }
+      }
+      shard.close();
       final ndl = light.dir.dy * -1;
       paintSurface(
         c,
@@ -312,8 +367,8 @@ class PebbleField extends Prop {
           bb.center,
           bb.width * 0.5,
           [
-            tone.darken(0.35).fade(0.42),
-            tone.darken(0.30).fade(0.22),
+            tone.darken(0.38).fade(0.70),
+            tone.darken(0.32).fade(0.42),
             tone.fade(0.0),
           ],
           const [0.0, 0.6, 1.0],

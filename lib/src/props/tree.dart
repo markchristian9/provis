@@ -102,7 +102,7 @@ class TreeProp extends Prop {
     _leaf = canopyColor ??
         switch (kind) {
           TreeKind.blossom =>
-            hsl(cr.range(332, 352), cr.range(0.42, 0.62), cr.range(0.66, 0.80)),
+            hsl(cr.range(334, 352), cr.range(0.44, 0.62), cr.range(0.56, 0.68)),
           TreeKind.conifer =>
             hsl(cr.range(136, 162), cr.range(0.30, 0.46), cr.range(0.19, 0.28)),
           TreeKind.pine =>
@@ -223,8 +223,8 @@ class TreeProp extends Prop {
       samples: 20,
       capStart: false,
     );
-    paintSurface(c, trunk, Surface(_bark, Finish.bark, contrast: 1.15), l,
-        detail: detail, seed: seed);
+    paintSurface(c, trunk, Surface(_bark, Finish.bark, contrast: 1.05), l,
+        detail: detail, seed: seed, rim: false);
 
     // 뿌리 확장부 — 밑동에서 갈라져 나온 짧은 판. 접지를 단단하게 만든다.
     if (detail > 0.4) {
@@ -242,7 +242,7 @@ class TreeProp extends Prop {
           samples: 8,
         );
         paintSurface(c, root, Surface(_bark.darken(0.08), Finish.bark), l,
-            detail: detail * 0.5, seed: seed + i);
+            detail: detail * 0.5, seed: seed + i, rim: false);
       }
     }
 
@@ -287,7 +287,7 @@ class TreeProp extends Prop {
         samples: 12,
       );
       paintSurface(c, br, Surface(_bark.darken(0.12), Finish.bark), l,
-          detail: detail * 0.6, seed: seed + i * 3);
+          detail: detail * 0.6, seed: seed + i * 3, rim: false);
     }
   }
 
@@ -306,7 +306,10 @@ class TreeProp extends Prop {
         samples: 10,
       );
       paintSurface(c, br, Surface(_bark.darken(0.10 + depth * 0.05), Finish.bark),
-          l, detail: detail * 0.55, seed: seed + depth * 13 + len.round());
+          l,
+          detail: detail * 0.55,
+          seed: seed + depth * 13 + len.round(),
+          rim: false);
       if (depth >= 2 || len < _trunkR * 2.2) return;
       final n = r.intRange(2, 4);
       for (var i = 0; i < n; i++) {
@@ -416,7 +419,7 @@ class TreeProp extends Prop {
       Surface(
         tone,
         Finish.foliage,
-        contrast: 0.95 + 0.25 * lit,
+        contrast: 0.82 + 0.20 * lit,
         sss: _through.darken(0.20 * (1 - lit)),
       ),
       l,
@@ -433,20 +436,20 @@ class TreeProp extends Prop {
       c.restore();
     }
 
-    // 빛이 잎을 통과해 그늘 쪽 가장자리가 뜬다.
-    translucentBand(
-      c,
-      shape,
-      l,
-      width: rad * 0.14,
-      color: _through,
-      alpha: (0.16 + 0.20 * lit) * l.intensity,
-      blur: rad * 0.10,
-    );
-
-    // 앞쪽 덩어리 위에만 림을 얹어 수관이 하늘과 만나는 선을 살린다.
+    // 투과와 림은 **앞쪽 덩어리에만** 얹는다. Path.combine 은 복합 형상에서
+    // 비싸므로 덩어리마다 두 번씩 부르면 수관 하나에 열 번이 넘게 걸린다.
+    // 뒤쪽 덩어리에서는 어차피 보이지도 않는다.
     if (lit > 0.55 && detail > 0.45) {
-      rimBand(c, shape, l, width: rad * 0.09, alpha: 0.42 * lit, blur: rad * 0.05);
+      translucentBand(
+        c,
+        shape,
+        l,
+        width: rad * 0.14,
+        color: _through,
+        alpha: (0.09 + 0.13 * lit) * l.intensity,
+        blur: rad * 0.10,
+      );
+      rimBand(c, shape, l, width: rad * 0.07, alpha: 0.26 * lit, blur: rad * 0.05);
     }
   }
 
@@ -506,14 +509,15 @@ class TreeProp extends Prop {
         c.restore();
       }
 
-      translucentBand(c, shapes[i], l,
-          width: _canopyR * 0.06,
-          color: _through,
-          alpha: 0.14 * l.intensity,
-          blur: _canopyR * 0.05);
-      if (detail > 0.5) {
+      // 위쪽 층에만 투과·림을 얹는다. 아래층은 그늘에 잠겨 보이지 않는다.
+      if (detail > 0.5 && i >= tiers - 3) {
+        translucentBand(c, shapes[i], l,
+            width: _canopyR * 0.06,
+            color: _through,
+            alpha: 0.09 * l.intensity,
+            blur: _canopyR * 0.05);
         rimBand(c, shapes[i], l,
-            width: _canopyR * 0.035, alpha: 0.34, blur: 2);
+            width: _canopyR * 0.030, alpha: 0.22, blur: 2);
       }
     }
   }
@@ -540,7 +544,7 @@ class TreeProp extends Prop {
         samples: 12,
       );
       paintSurface(c, br, Surface(_bark.darken(0.10), Finish.bark), l,
-          detail: detail * 0.6, seed: seed + i * 5);
+          detail: detail * 0.6, seed: seed + i * 5, rim: false);
 
       tufts.add((to, _canopyR * r.range(0.36, 0.54), side));
     }
@@ -577,11 +581,13 @@ class TreeProp extends Prop {
             seed: seed + i, count: 2, strength: 0.7);
         c.restore();
       }
-      translucentBand(c, shape, l,
-          width: rad * 0.11,
-          color: _through,
-          alpha: 0.18 * l.intensity,
-          blur: rad * 0.09);
+      if (detail > 0.5 && lit > 0.55) {
+        translucentBand(c, shape, l,
+            width: rad * 0.11,
+            color: _through,
+            alpha: 0.11 * l.intensity,
+            blur: rad * 0.09);
+      }
       if (detail > 0.55) {
         scatterLeaves(c, at, rad * 1.35, rad * 0.58, tone.lighten(0.10), l,
             seed: seed + i * 29, count: (12 * detail).round(), size: 0.16);
@@ -616,7 +622,7 @@ class TreeProp extends Prop {
           samples: 6,
         );
         paintSurface(c, stem, Surface(_bark, Finish.bark), l,
-            detail: detail * 0.4, seed: seed + i);
+            detail: detail * 0.4, seed: seed + i, rim: false);
       }
     }
 
@@ -639,19 +645,21 @@ class TreeProp extends Prop {
     // 늘어지는 가닥은 선이 아니라 **잎이 달린 띠**여야 한다. 얇은 선으로
     // 그리면 국수 다발이 된다.
     final r = Rng(seed * 29 + 13);
-    final n = detail > 0.5 ? 12 : 6;
+    final n = detail > 0.5 ? 24 : 12;
     for (var i = 0; i < n; i++) {
       final a = r.range(-1.0, 1.0);
       final from = Offset(
-        topX + a * _canopyR * 0.88,
-        topY - _canopyR * 0.12 + r.range(-0.18, 0.22) * _canopyR,
+        topX + a * _canopyR * 1.15,
+        topY - _canopyR * 0.10 + r.range(-0.30, 0.30) * _canopyR,
       );
-      final len = _canopyR * r.range(0.9, 1.7);
-      final w = wind * sway(t, seed, phase: i * 0.8, speed: 1.0) * len * 0.10;
-      final lit = 0.35 + 0.65 * r.unit;
+      final len = _canopyR * r.range(1.0, 2.0);
+      final w = wind * sway(t, seed, phase: i * 0.8, speed: 1.0) * len * 0.14 +
+          a * len * 0.22;
+      final lit = 0.45 + 0.55 * r.unit;
       final tone = _leaf
-          .darken(0.20 * (1 - lit))
-          .mix(l.ambient, 0.24 * (1 - lit));
+          .lighten(0.10 * lit)
+          .darken(0.16 * (1 - lit))
+          .mix(l.ambient, 0.18 * (1 - lit));
 
       final strand = tube(
         [
@@ -659,7 +667,7 @@ class TreeProp extends Prop {
           from + Offset(w * 0.4, len * 0.45),
           from + Offset(w, len * 0.92),
         ],
-        [_canopyR * 0.10, _canopyR * 0.075, _canopyR * 0.012],
+        [_canopyR * 0.022, _canopyR * 0.016, _canopyR * 0.004],
         samples: 12,
       );
       paintSurface(

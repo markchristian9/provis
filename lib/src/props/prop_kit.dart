@@ -93,20 +93,21 @@ Path leafCluster(
 ///
 /// 수관을 아무리 잘 칠해도 윤곽선이 매끈하면 젤리로 보인다. 가장자리에 이것을
 /// 수십 장 흩뿌리는 것이 가장 값싸고 확실한 처방이다.
-Path leafBlade(Offset root, double length, double angle, {double width = 0.42}) {
+Path leafBlade(Offset root, double length, double angle, {double width = 0.30}) {
   final dir = Offset(math.cos(angle), math.sin(angle));
   final nrm = dir.perp;
   final w = length * width;
   final tip = root + dir * length;
-  final mid = root + dir * (length * 0.42);
+  final mid = root + dir * (length * 0.38);
+  // 뿌리와 끝이 뾰족하고 가운데가 볼록한 방추형. 끝이 뭉툭하면 사각 조각이 된다.
   return smoothClosedPath([
     root,
     mid + nrm * w,
-    root + dir * (length * 0.78) + nrm * w * 0.55,
+    root + dir * (length * 0.72) + nrm * w * 0.62,
     tip,
-    root + dir * (length * 0.78) - nrm * w * 0.55,
+    root + dir * (length * 0.72) - nrm * w * 0.62,
     mid - nrm * w,
-  ], tension: 0.85);
+  ], tension: 1.0);
 }
 
 /// 풀잎 하나. 뿌리가 넓고 끝이 뾰족하며 한쪽으로 휜다.
@@ -197,37 +198,56 @@ Path coniferTier(
   double sag = 0.34,
 }) {
   final n = Noise(seed * 71 + 13);
-  final pts = <Offset>[];
-  // 오른쪽 아래로 내려가며 톱니를 만든다.
-  for (var i = 0; i <= teeth; i++) {
-    final u = i / teeth;
-    final wob = 1.0 + 0.16 * n.signed1(u * 5.0 + seed);
-    final x = halfWidth * u * wob;
-    final y = drop * (u * u * 0.55 + u * 0.45);
-    // 바늘 다발의 끝 — 바깥 아래로 뾰족하게 뻗는다.
-    pts.add(apex + Offset(x, y + drop * sag * u * (0.55 + 0.5 * n.at1(u * 7.7))));
-    if (i < teeth) {
-      final u2 = (i + 0.5) / teeth;
-      pts.add(apex +
-          Offset(halfWidth * u2 * 0.94, drop * (u2 * u2 * 0.5 + u2 * 0.42)));
+  // **직선으로 그린다.** 스플라인을 통과시키면 톱니가 뭉개져 매끈한 삼각형이
+  // 되고, 그 순간 전나무는 크리스마스 장식이 된다. 바늘잎 다발은 각지다.
+  double profile(double u) => drop * (u * u * 0.52 + u * 0.48);
+
+  final path = Path()..moveTo(apex.dx, apex.dy);
+
+  void side(double dir) {
+    for (var i = 1; i <= teeth; i++) {
+      final u = i / teeth;
+      final inU = (i - 0.5) / teeth;
+      // 골 — 축 쪽으로 깊게 들어간다. 얕으면 톱니가 없는 것과 같다.
+      path.lineTo(
+        apex.dx + dir * halfWidth * inU * 0.38,
+        apex.dy + profile(inU) * 0.88,
+      );
+      // 끝 — 바깥 아래로 뾰족하게 뻗는다. 이 처짐이 전나무의 정체성이다.
+      final wob = 1.0 + 0.15 * n.signed1(u * 5.0 + seed + (dir > 0 ? 0 : 40));
+      path.lineTo(
+        apex.dx + dir * halfWidth * u * wob,
+        apex.dy +
+            profile(u) +
+            drop * sag * u * (0.55 + 0.5 * n.at1(u * 7.7 + (dir > 0 ? 0 : 9))),
+      );
     }
   }
-  // 밑변을 따라 왼쪽으로 돌아온다.
-  pts.add(apex + Offset(0, drop * 1.12));
-  for (var i = teeth; i >= 0; i--) {
-    final u = i / teeth;
-    final wob = 1.0 + 0.16 * n.signed1(u * 5.0 + seed * 1.7 + 40);
-    final x = -halfWidth * u * wob;
-    final y = drop * (u * u * 0.55 + u * 0.45);
-    if (i < teeth) {
-      final u2 = (i + 0.5) / teeth;
-      pts.add(apex +
-          Offset(-halfWidth * u2 * 0.94, drop * (u2 * u2 * 0.5 + u2 * 0.42)));
+
+  side(1.0);
+  path.lineTo(apex.dx, apex.dy + drop * 1.14);
+  // 왼쪽은 오른쪽의 역순으로 되짚어 올라간다.
+  final left = <Offset>[];
+  void collect(double dir) {
+    for (var i = 1; i <= teeth; i++) {
+      final u = i / teeth;
+      final inU = (i - 0.5) / teeth;
+      left.add(Offset(apex.dx + dir * halfWidth * inU * 0.38,
+          apex.dy + profile(inU) * 0.88));
+      final wob = 1.0 + 0.15 * n.signed1(u * 5.0 + seed + 40);
+      left.add(Offset(
+        apex.dx + dir * halfWidth * u * wob,
+        apex.dy + profile(u) + drop * sag * u * (0.55 + 0.5 * n.at1(u * 7.7 + 9)),
+      ));
     }
-    pts.add(
-        apex + Offset(x, y + drop * sag * u * (0.55 + 0.5 * n.at1(u * 6.1 + 9))));
   }
-  return smoothClosedPath(pts, tension: 0.55);
+
+  collect(-1.0);
+  for (final p in left.reversed) {
+    path.lineTo(p.dx, p.dy);
+  }
+  path.close();
+  return path;
 }
 
 /// 잎 덩어리에 내부 요철을 만드는 국소 광량.
@@ -274,8 +294,8 @@ void lobeLight(
           rect.width * 0.5,
           lit
               ? [
-                  tone.lighten(0.42).fade(0.30 * strength),
-                  tone.lighten(0.30).fade(0.0),
+                  tone.lighten(0.24).fade(0.17 * strength),
+                  tone.lighten(0.18).fade(0.0),
                 ]
               : [
                   l.ambient.mix(tone, 0.35).fade(0.55 * strength),
@@ -312,7 +332,7 @@ void scatterLeaves(
     final len = rx * size * r.range(0.6, 1.25);
     // 잎은 바깥을 향해 달린다. 중심에서 벌어지는 방향이 자연스럽다.
     final ang = a + r.signed(0.7) + sway;
-    final blade = leafBlade(at, len, ang, width: r.range(0.34, 0.55));
+    final blade = leafBlade(at, len, ang, width: r.range(0.22, 0.38));
     // 위쪽·광원 쪽 잎이 밝다. 아래로 갈수록 그늘로 잠긴다.
     final up = -math.sin(a);
     final lit = (0.5 + 0.5 * up).clamp(0.0, 1.0);

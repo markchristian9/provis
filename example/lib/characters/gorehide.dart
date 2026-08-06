@@ -26,6 +26,15 @@ class Gorehide extends Artist {
   @override
   Sex? get sex => null;
   @override
+  CharacterBuild get build => CharacterBuild(
+        archetype: Archetype.berserker,
+        beast: true,
+        palette: tintedPalette(const Color(0xFF8FA36B), Rng(0x60E), monster: true),
+        weapon: WeaponKind.axe,
+        muscle: 1.0,
+        heightScale: 1.22,
+      );
+  @override
   Color get accent => const Color(0xFF8FA36B);
   @override
   LightRig get light => const LightRig(

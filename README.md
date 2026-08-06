@@ -66,28 +66,61 @@ final scene = IsoSceneComponent(
   light: LightRig.dusk,
 )..marker = MoveMarker();
 
-// 숲 — 시드마다 종류·키·기울기가 흔들린다
+// 숲 — 시드마다 종류·키·기울기가 흔들린다.
+// 실루엣이 서로 다른 종을 섞어야 숲의 밀도가 올라간다.
 scene.addProps(plantForest(
   seed: 42,
   tiles: [for (var i = 0; i < 12; i++) Offset(i * 1.1 + 1, 2.0)],
-  kinds: [TreeKind.broadleaf, TreeKind.conifer],
+  kinds: [TreeKind.broadleaf, TreeKind.conifer, TreeKind.pine, TreeKind.bush],
 ));
 
-// 건물 — 아이소에서 왼쪽 벽·오른쪽 벽·지붕 3면이 보인다
+// 건물 — 아이소에서 왼쪽 벽·오른쪽 벽·지붕 3면이 보인다.
+// 마루 방향(ridgeAlongX)을 섞으면 마을이 한 방향으로 도열하지 않는다.
 scene.addProp(PropInstance(
-  prop: BuildingProp(seed: 7, tiles: const Size(2, 2), storeys: 2),
+  prop: BuildingProp(seed: 7, tiles: const Size(2, 2), storeys: 2,
+                     roof: RoofStyle.gable, wall: WallStyle.timber),
   tile: const Offset(5, 8),
 ));
 
-// 물웅덩이 — 지면 평면에 눕고 하늘을 비춘다
+// 물웅덩이 — 지면 평면에 눕고 하늘을 비춘다. 물가와 갈대가 함께 온다
 scene.addProp(PropInstance(
   prop: WaterProp(seed: 3, radius: 130),
   tile: const Offset(9, 5),
 ));
+
+// 언덕 — 지면 자체에 높이가 있다는 사실이 맵을 판에서 지형으로 바꾼다
+scene.addProp(PropInstance(
+  prop: MoundProp(seed: 5, radius: 150, rise: 48,
+                  isoRatio: iso.elevationSin),
+  tile: const Offset(2, 10),
+));
+
+// 발치의 작은 것들 — 화면의 밀도는 이것들이 만든다
+scene.addProp(PropInstance(prop: GrassTuft(seed: 9), tile: const Offset(4, 6)));
+scene.addProp(PropInstance(prop: FlowerBed(seed: 10), tile: const Offset(4, 7)));
 ```
 
 기물을 `addProp` 으로 넣으면 **통행 격자도 함께 막힙니다.** 화면에는 나무가
 있는데 캐릭터가 통과하는 일이 생기지 않습니다.
+
+<details>
+<summary>놓을 수 있는 기물 전부</summary>
+
+| 파일 | 기물 |
+|---|---|
+| `tree.dart` | `TreeProp` — `broadleaf`·`conifer`·`pine`·`dead`·`blossom`·`willow`·`bush` |
+| `building.dart` | `BuildingProp`(벽 5종 × 지붕 5종 × 표면 4종) · `WallProp` |
+| `rock.dart` | `RockProp` · `PebbleField` |
+| `water.dart` | `WaterProp` · `LavaProp` |
+| `ground.dart` | `GroundPatch` · `PathPatch` |
+| `flora.dart` | `GrassTuft` · `FlowerBed` · `StumpProp` · `LogProp` · `FenceProp` |
+| `terrain.dart` | `MoundProp` |
+
+**건물·담장·그루터기·통나무·울타리·언덕은 `isoRatio` 를 맵의
+`iso.elevationSin` 과 맞춥니다.** 지면과 평행한 면(밑면·지붕·절단면)이
+격자와 어긋나면 기물이 공중에 뜬 것처럼 보입니다.
+
+</details>
 
 ### 2. 클릭으로 움직인다
 
@@ -118,7 +151,48 @@ actor.follow(hero, dt);   // 위치·방향·클립(대기/걷기/달리기)을 
 
 ### 3. 캐릭터를 만든다
 
-`Artist` 를 구현하면 갤러리와 아이소 필드 양쪽에 그대로 섭니다.
+**선언 하나면 됩니다.** 명부 초상과 게임 맵의 액터가 같은 렌더러로 그려지므로
+두 화면이 어긋날 수 없습니다.
+
+```dart
+final garran = BuiltArtist(
+  id: 'garran',
+  name: 'Garran',
+  title: 'Shieldbearer of the Pass',
+  blurb: '고갯길을 혼자 막아선 방패병.',
+  build: CharacterBuild(
+    archetype: Archetype.knight,       // 체형·기본 장비의 대역
+    sex: Sex.male,
+    palette: paletteOf(                // 넷만 고르면 나머지 일곱은 파생됩니다
+      skin: Color(0xFFC08A66), hair: Color(0xFF3A2A1E),
+      cloth: Color(0xFF7A2E2E), accent: Color(0xFFD9A441),
+    ),
+    weapon: WeaponKind.sword,
+    headGear: HeadGear.halfHelm,
+    hasShield: true, hasPauldrons: true,
+    armorHeaviness: 0.9, muscle: 0.8,
+  ),
+);
+
+// 명부에도, 맵에도 그대로 들어갑니다.
+scene.rigged.add(riggedFromArtist(garran, tile: start, height: 195));
+```
+
+`accent` 가 그 캐릭터의 정체성입니다 — 눈, 발광, 트림, 역광이 전부 이 색에서
+나옵니다. `headGear` 와 `weapon` 은 명시하세요. 비워 두면 시드 생성기가 정하므로
+후드를 원하지 않은 마법사가 후드를 쓰고 나타납니다.
+
+값을 바꿔 가며 만들고 싶으면 작업대를 띄우세요. 하단에 그대로 붙여 넣을 수 있는
+선언이 나옵니다.
+
+```bash
+cd example && flutter run -t lib/create_character.dart
+```
+
+#### 손으로 그리기
+
+명세로 표현할 수 없는 형상이 필요하면 `Artist` 를 직접 구현합니다. 개성의
+상한이 없는 대신 한 명에 수백 줄이 듭니다.
 
 ```dart
 class MyHero extends Artist {
@@ -147,6 +221,20 @@ class MyHero extends Artist {
 
 좌표계는 `kStage`(1000×1400), 발바닥이 `kGround`(1332)입니다. 같은 `t` 에는
 언제나 같은 그림이 나와야 합니다(`math.Random` 대신 `Rng` 를 씁니다).
+
+손으로 그린 캐릭터는 **`build` 를 반드시 오버라이드하세요.** 그것이 초상의 색과
+장비를 게임 맵의 골격 액터로 넘기는 유일한 다리입니다. 빠뜨리면 명부에서 고른
+인물과 맵에서 걷는 인물이 달라집니다.
+
+```dart
+@override
+CharacterBuild get build => CharacterBuild(
+      archetype: Archetype.mage,
+      palette: paletteOf(skin: …, hair: …, cloth: …, accent: accent),
+      weapon: WeaponKind.staff,
+      headGear: HeadGear.none,   // 초상에 없으면 none 을 명시합니다
+    );
+```
 
 ### 4. 시드로 찍어낸다
 
@@ -214,14 +302,25 @@ paintScene(canvas, [
 
 ```bash
 cd example
-flutter run -t lib/main.dart      # 아이소 필드 — 기물 + 클릭 이동
-flutter run -t lib/gallery.dart   # 캐릭터 갤러리 (참조 구현 9종)
-flutter run -t lib/viewer.dart    # 절차 액터 뷰어 (시드·클립·8방향)
+flutter run -t lib/main.dart              # 아이소 필드 — 기물 + 클릭 이동
+flutter run -t lib/gallery.dart           # 캐릭터 갤러리
+flutter run -t lib/viewer.dart            # 절차 액터 뷰어 (시드·클립·8방향)
+flutter run -t lib/create_character.dart  # 캐릭터 작업대 — 만들고 코드를 복사
 ```
 
-`example/lib/characters/` 에는 손으로 만든 참조 캐릭터 9종이 들어 있습니다.
-각 파일 첫머리의 **시각 논제** 주석이 그 캐릭터를 무엇으로 읽히게 할지
-한 문단으로 적어 둔 것으로, 새 캐릭터를 만들 때의 본보기입니다.
+`example/lib/characters/` 가 두 방식을 나란히 보여 줍니다.
+
+- `aldric.dart` 등 **손으로 그린 5종** — 각 파일 첫머리의 **시각 논제** 주석이
+  그 캐릭터를 무엇으로 읽히게 할지 한 문단으로 적어 둔 것입니다.
+- `recruits.dart` 의 **선언형 20종** — 전사·마법사·궁수·군인·사이보그가 남녀로
+  들어 있고, 한 명이 15줄입니다.
+
+초상과 게임 액터가 같은 인물로 보이는지는 시트로 대조합니다.
+
+```bash
+cd example && flutter test test/identity_sheet_test.dart
+open build/art/identity_*.png
+```
 
 ## 라이선스
 

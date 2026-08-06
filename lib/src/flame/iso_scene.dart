@@ -98,6 +98,9 @@ class IsoSceneComponent extends Component {
   /// 대기 원근 세기. 먼 곳이 환경광으로 흐려지면 평면에 깊이가 생긴다.
   double haze;
 
+  /// 지면 얼룩의 시드. 맵을 다시 생성할 때 함께 바꾸면 땅도 새로 깔린다.
+  int groundSeed = 7;
+
   final List<PropInstance> props = [];
 
   /// 수작업 캐릭터 — 고정 3/4 초상. 연출·전시용.
@@ -146,10 +149,19 @@ class IsoSceneComponent extends Component {
     canvas.save();
     canvas.translate(cameraOffset.dx, cameraOffset.dy);
 
-    if (showGrid) {
-      final g = grid;
-      paintIsoGround(canvas, iso, g?.cols ?? 8, g?.rows ?? 8, light);
-    }
+    // 지면은 언제나 그린다. [showGrid] 는 **격자선만** 껐다 켠다 — 격자는
+    // 좌표를 확인하는 개발 도구이지 땅이 아니며, 그것을 껐다고 캐릭터가
+    // 허공에 뜨면 안 된다.
+    final g = grid;
+    paintIsoGround(
+      canvas,
+      iso,
+      g?.cols ?? 8,
+      g?.rows ?? 8,
+      light,
+      lineAlpha: showGrid ? 0.10 : 0.0,
+      seed: groundSeed,
+    );
     marker?.paint(canvas, iso);
 
     paintScene(
