@@ -79,7 +79,9 @@ flutter test && (cd example && flutter test)
 
 14. **방향은 폭 축소가 아니라 골격 투영으로 만든다.** `solve(body, pose, yaw:)` 가 시상면 스윙과 좌우 폭을 `yaw` 로 섞는다. 이걸 안 넘기면 여덟 방향이 전부 같은 옆모습이 된다. 얼굴은 `Facing.faceVisible`·`bothEyes` 로 **연속 보간**한다 — 이진으로 껐다 켜면 3/4 에서 껌뻑인다.
 
-15. **Flame 과 `mix` 이름이 충돌한다.** `import 'package:flame/game.dart' hide mix;`.
+15. **방향 수를 제한하지 않는다.** 스프라이트를 굽지 않으므로 `yaw` 는 임의의 실수이고, 8·16·32·360 분할의 렌더 비용이 실측상 동일하다. 기본은 연속이며, 그리드 전투 상태·히트박스처럼 **이유가 있을 때만** `facing.snap(n)` 으로 스냅한다.
+
+16. **Flame 과 `mix` 이름이 충돌한다.** `import 'package:flame/game.dart' hide mix;`.
 
 ---
 

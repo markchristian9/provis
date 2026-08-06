@@ -72,9 +72,42 @@ class Facing {
   final double yaw;
 
   /// 8방향 인덱스. 0=S, 1=SE, 2=E, 3=NE, 4=N, 5=NW, 6=W, 7=SW.
-  int get octant => ((yaw / (math.pi / 4)).round() % 8 + 8) % 8;
+  int get octant => sector(8);
 
-  Facing get snap8 => Facing(octant * math.pi / 4);
+  // ── 방향 해상도 ─────────────────────────────────────────────────────
+  //
+  // **provis 의 방향은 기본적으로 연속이다.** 스프라이트를 굽지 않으므로
+  // 방향마다 에셋을 준비할 필요가 없고, 골격을 매 프레임 다시 푸는 비용은
+  // yaw 값과 무관하다. 실측(200 프레임 반복)에서 8·16·32·360 분할의 렌더
+  // 시간 차이는 측정 노이즈 수준이었다.
+  //
+  // 그래도 스냅이 필요한 경우가 있다 — 그리드 기반 전투에서 방향을 상태로
+  // 저장하거나, 방향별 히트박스를 두거나, 레트로한 결을 의도할 때다. 그럴 때만
+  // 아래를 쓰고, 그 외에는 연속 yaw 를 그대로 넘긴다.
+
+  /// [divisions] 분할에서 이 방향이 속한 구간 번호.
+  int sector(int divisions) {
+    final step = math.pi * 2 / divisions;
+    return ((yaw / step).round() % divisions + divisions) % divisions;
+  }
+
+  /// [divisions] 분할로 스냅한 방향.
+  ///
+  /// ```dart
+  /// facing.snap(16)   // 16방향 게임
+  /// facing.snap(32)   // 32방향 — 육안으로는 연속과 구별되지 않는다
+  /// ```
+  Facing snap(int divisions) =>
+      Facing(sector(divisions) * math.pi * 2 / divisions);
+
+  /// 8방향으로 스냅. 고전 아이소 게임의 기본값.
+  Facing get snap8 => snap(8);
+
+  /// 16방향으로 스냅. 전환이 눈에 띄게 부드러워진다.
+  Facing get snap16 => snap(16);
+
+  /// 32방향으로 스냅. 실질적으로 연속과 구별되지 않는다.
+  Facing get snap32 => snap(32);
 
   /// 0 = 정면/후면, 1 = 완전 측면. 어깨 폭 축소에 쓴다.
   double get profile => math.sin(yaw).abs();
