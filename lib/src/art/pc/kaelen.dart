@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/painting.dart';
 
@@ -27,6 +26,8 @@ class Kaelen extends Artist {
   String get blurb => '그림자를 걸치고 숨소리마저 지운 이중 단검의 처형자.';
   @override
   Camp get camp => Camp.player;
+  @override
+  bool get facesLeft => true;
   @override
   Sex get sex => Sex.male;
   @override
@@ -232,18 +233,18 @@ class Kaelen extends Artist {
 
   void _legBack(Canvas c, LightRig l, double detail) {
     _leg(c, l, detail,
-        hip: const Offset(556, 866),
-        knee: const Offset(664, 1084),
-        ankle: const Offset(676, 1288),
+        hip: const Offset(550, 864),
+        knee: const Offset(628, 1078),
+        ankle: const Offset(648, 1286),
         toe: 1,
         dim: true);
   }
 
   void _legFront(Canvas c, LightRig l, double detail) {
     _leg(c, l, detail,
-        hip: const Offset(460, 870),
-        knee: const Offset(388, 1100),
-        ankle: const Offset(376, 1300),
+        hip: const Offset(464, 868),
+        knee: const Offset(412, 1090),
+        ankle: const Offset(400, 1296),
         toe: -1,
         dim: false);
   }
@@ -415,7 +416,7 @@ class Kaelen extends Artist {
     _bracer(c, l, elbow, wrist, detail, 343);
 
     // 역수로 쥔 단검이 팔뚝을 따라 아래로 뻗는다.
-    _dagger(c, l, t, wrist + const Offset(-4, 8), 2.5, 0.95, detail);
+    _dagger(c, l, t, wrist + const Offset(-4, 8), 2.5, 1.18, detail);
     final hand = handShape(wrist, 1.9, 52, grip: 1.0, mirrored: true);
     paintSurface(c, hand, _sWrap, l, detail: detail, seed: 345);
     _shoulderPlate(c, l, shoulder, 1, detail);
@@ -430,7 +431,7 @@ class Kaelen extends Artist {
     paintSurface(c, arm, _sLeatherLit, l, detail: detail, seed: 351);
     _bracer(c, l, elbow, wrist, detail, 353);
 
-    _dagger(c, l, t, wrist + const Offset(4, 10), 1.62, 1.0, detail);
+    _dagger(c, l, t, wrist + const Offset(4, 10), 1.62, 1.28, detail);
     final hand = handShape(wrist, 0.9, 54, grip: 1.0);
     paintSurface(c, hand, _sWrap, l, detail: detail, seed: 355);
     c.save();
@@ -532,7 +533,7 @@ class Kaelen extends Artist {
       ..lineTo(120, 10)
       ..lineTo(10, 16)
       ..close();
-    paintSurface(c, blade, const Surface(Color(0xFF6E7A92), Finish.metal, contrast: 1.45),
+    paintSurface(c, blade, const Surface(Color(0xFF95A2BC), Finish.metal, contrast: 1.5),
         l, detail: detail, seed: 375);
     c.save();
     c.clipPath(blade);
@@ -574,6 +575,9 @@ class Kaelen extends Artist {
     );
     paintSurface(c, neck, _sSkin, l, detail: detail, seed: 381);
     occlude(c, neck, const Offset(0, -1), depth: 0.6, alpha: 0.7);
+
+    drawJawShadow(c, hc + const Offset(8, 92), hw * 1.5, hh * 0.48, _rSkin,
+        alpha: 0.55);
 
     final head = headShape(hc, hw, hh, jaw: 0.72, chin: 0.28, turn: -0.25);
     paintSurface(c, head, _sSkin, l, detail: detail, seed: 383);

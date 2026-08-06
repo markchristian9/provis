@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/painting.dart';
 
@@ -381,9 +380,22 @@ void drawNose(
     ]),
     Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.30
+      ..strokeWidth = w * 0.34
       ..strokeCap = StrokeCap.round
-      ..color = skin.shadow.fade(0.55),
+      ..color = skin.shadow.darken(0.18).fade(0.78),
+  );
+  // 콧방울에서 입꼬리로 내려가는 골. 이 선 하나가 코를 얼굴에서 떼어 놓는다.
+  c.drawPath(
+    smoothOpenPath([
+      tip + Offset(-w * 0.44, h * 0.10),
+      tip + Offset(-w * 0.58, h * 0.42),
+    ]),
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.20
+      ..strokeCap = StrokeCap.round
+      ..color = skin.shadow.fade(0.40)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.16),
   );
   // 콧대 위 하이라이트.
   c.drawPath(
@@ -394,10 +406,21 @@ void drawNose(
     ]),
     Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.26
+      ..strokeWidth = w * 0.30
       ..strokeCap = StrokeCap.round
-      ..color = skin.light.fade(0.5)
+      ..color = skin.light.lighten(0.15).fade(0.68)
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.18),
+  );
+  // 코끝 아래 그림자. 코가 앞으로 튀어나왔다는 유일한 증거다.
+  c.drawOval(
+    Rect.fromCenter(
+      center: tip + Offset(0, h * 0.20),
+      width: w * 1.15,
+      height: h * 0.30,
+    ),
+    Paint()
+      ..color = skin.deep.fade(0.34)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.28),
   );
   // 콧구멍 그림자.
   c.drawOval(
@@ -452,9 +475,25 @@ void drawMouth(
     line,
     Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.16
+      ..strokeWidth = w * 0.20
       ..strokeCap = StrokeCap.round
-      ..color = skin.deep.fade(0.8),
+      ..color = skin.deep.darken(0.25).fade(0.9),
+  );
+  // 윗입술. 아랫입술보다 그늘져 있어야 입이 두 겹으로 읽힌다.
+  c.drawPath(
+    smoothOpenPath([
+      Offset(cx - w * 0.72, at.dy - w * 0.02),
+      Offset(cx - w * 0.22, at.dy - w * 0.16),
+      Offset(cx, at.dy - w * 0.06),
+      Offset(cx + w * 0.22, at.dy - w * 0.16),
+      Offset(cx + w * 0.72, at.dy - w * 0.02),
+    ]),
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.22
+      ..strokeCap = StrokeCap.round
+      ..color = l.darken(0.30).fade(0.55)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.12),
   );
   // 아랫입술: 빛을 받아 도톰하게 튀어나온다.
   c.drawPath(
@@ -609,6 +648,20 @@ Path hairStrand(
   );
   return tube(spine, [thick, thick * 0.95, thick * 0.7, thick * 0.35, 0.5],
       samples: 18);
+}
+
+/// 턱이 목에 드리우는 그림자.
+///
+/// 머리와 목을 따로 그리면 반드시 목이 얼굴만큼 밝아져 마네킹처럼 보인다.
+/// 목을 칠한 직후, 머리를 얹기 전에 이 한 겹을 넣는다.
+void drawJawShadow(Canvas c, Offset chin, double w, double h, Ramp skin,
+    {double alpha = 0.55}) {
+  c.drawOval(
+    Rect.fromCenter(center: chin, width: w, height: h),
+    Paint()
+      ..color = skin.deep.fade(alpha)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.5),
+  );
 }
 
 /// 호흡. 정지 포즈를 살아 있게 만드는 최소한의 움직임.

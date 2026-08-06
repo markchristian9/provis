@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:flutter/painting.dart';
 
@@ -77,10 +76,11 @@ class Aldric extends Artist {
     _halo(c, t, detail);
     _cloak_(c, t, l, detail);
     _legs(c, l, bob, detail);
-    _sword(c, l, t, detail);
     _torso(c, l, bob, sway, detail);
     _arms(c, l, bob, detail);
     _head(c, l, t, bob, sway, detail);
+    // 검은 몸통보다 앞이다. 뒤에 두면 다리 사이로 사라져 버린다.
+    _sword(c, l, t, detail);
     _hands(c, l, bob);
 
     if (detail > 0.5) {
@@ -544,11 +544,11 @@ class Aldric extends Artist {
     // 위쪽 손(캐릭터의 오른손)이 자루 머리를, 아래쪽 손이 그립을 잡는다.
     final upper = handShape(const Offset(556, 792), math.pi * 0.86, 62,
         grip: 1.0, mirrored: true);
-    final lower = handShape(const Offset(450, 872), math.pi * 0.12, 60,
+    final lower = handShape(const Offset(452, 858), math.pi * 0.12, 60,
         grip: 1.0);
     for (final rec in [
       (upper, const Offset(556, 792), math.pi * 0.86, true),
-      (lower, const Offset(450, 872), math.pi * 0.12, false),
+      (lower, const Offset(452, 858), math.pi * 0.12, false),
     ]) {
       paintSurface(c, rec.$1, _sSteel, l, seed: 151);
       c.save();
@@ -558,7 +558,7 @@ class Aldric extends Artist {
       inkOutline(c, rec.$1, _rSteel.deep.darken(0.4), 2.2, alpha: 0.5);
     }
     // 손목 이음쇠.
-    for (final p in const [Offset(556, 792), Offset(450, 872)]) {
+    for (final p in const [Offset(556, 792), Offset(452, 858)]) {
       c.drawCircle(p, 20, Paint()..color = _rGold.shadow.fade(0.8));
       c.drawCircle(
         p,
@@ -575,11 +575,11 @@ class Aldric extends Artist {
     const axis = 500.0;
     // 날. 중앙 풀러(홈) 때문에 하이라이트가 두 줄로 갈라진다.
     final blade = Path()
-      ..moveTo(axis - 34, 906)
-      ..lineTo(axis - 27, 1230)
-      ..lineTo(axis, 1338)
-      ..lineTo(axis + 27, 1230)
-      ..lineTo(axis + 34, 906)
+      ..moveTo(axis - 44, 906)
+      ..lineTo(axis - 34, 1232)
+      ..lineTo(axis, 1344)
+      ..lineTo(axis + 34, 1232)
+      ..lineTo(axis + 44, 906)
       ..close();
     castShadow(c, blade, offset: const Offset(14, 8), blur: 16, alpha: 0.4);
     paintSurface(c, blade, const Surface(Color(0xFFC3CEE0), Finish.metal, contrast: 1.35),
@@ -596,10 +596,10 @@ class Aldric extends Artist {
         ).createShader(const Rect.fromLTRB(axis - 12, 900, axis + 12, 1340)),
     );
     c.drawRect(
-      const Rect.fromLTRB(axis - 40, 900, axis - 20, 1340),
+      const Rect.fromLTRB(axis - 48, 900, axis - 24, 1344),
       Paint()
         ..blendMode = BlendMode.plus
-        ..color = const Color(0xFFFFF6E0).fade(0.35),
+        ..color = const Color(0xFFFFF6E0).fade(0.40),
     );
     // 날에 새겨진 신성 룬.
     if (detail > 0.5) {
@@ -674,20 +674,38 @@ class Aldric extends Artist {
 
   void _head(Canvas c, LightRig l, double t, double bob, double sway,
       double detail) {
-    final hc = Offset(500 + sway, 352 + bob * 1.2);
-    const hw = 74.0;
-    const hh = 96.0;
+    final hc = Offset(500 + sway, 358 + bob * 1.2);
+    const hw = 80.0;
+    const hh = 102.0;
 
     // 목.
     final neck = tube(
-      [hc + const Offset(2, 60), hc + const Offset(0, 130)],
-      const [34, 40],
+      [hc + const Offset(2, 66), hc + const Offset(0, 124)],
+      const [36, 44],
       samples: 10,
     );
     paintSurface(c, neck, _sSkin, l, detail: detail, seed: 201);
     occlude(c, neck, const Offset(0, -1), depth: 0.5, alpha: 0.6);
+    drawJawShadow(c, hc + const Offset(2, 112), hw * 1.6, hh * 0.52, _rSkin,
+        alpha: 0.62);
+    // 승모근. 목이 어깨에서 솟았다는 연결을 만든다.
+    for (final s in const [-1.0, 1.0]) {
+      c.drawPath(
+        smoothOpenPath([
+          hc + Offset(s * 30, 108),
+          hc + Offset(s * 68, 132),
+          hc + Offset(s * 104, 152),
+        ]),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 20
+          ..strokeCap = StrokeCap.round
+          ..color = _rSkin.shadow.fade(0.45)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+      );
+    }
 
-    final head = headShape(hc, hw, hh, jaw: 0.80, chin: 0.34, turn: 0.12);
+    final head = headShape(hc, hw, hh, jaw: 0.82, chin: 0.36, turn: 0.12);
     paintSurface(c, head, _sSkin, l, detail: detail, seed: 211);
 
     c.save();
@@ -697,15 +715,15 @@ class Aldric extends Artist {
       c,
       [hc + const Offset(-62, 4), hc + const Offset(-40, 42), hc + const Offset(-16, 58)],
       _rSkin,
-      width: 16,
-      alpha: 0.32,
+      width: 18,
+      alpha: 0.46,
     );
     drawMuscleLine(
       c,
       [hc + const Offset(62, 4), hc + const Offset(42, 44), hc + const Offset(18, 60)],
       _rSkin,
-      width: 16,
-      alpha: 0.28,
+      width: 18,
+      alpha: 0.40,
     );
     // 수염 자국.
     c.drawPath(
@@ -733,14 +751,14 @@ class Aldric extends Artist {
         look: 0.12,
         tilt: -0.05,
         mirrored: true);
-    drawBrow(c, Offset(hc.dx - 36, eyeY - 30), 32, 5.4,
-        const Color(0xFF3F2A19), arch: 0.28, angle: 0.10);
-    drawBrow(c, Offset(hc.dx + 38, eyeY - 31), 31, 5.2,
-        const Color(0xFF3F2A19), arch: 0.28, angle: -0.10, mirrored: true);
+    drawBrow(c, Offset(hc.dx - 36, eyeY - 32), 33, 4.4,
+        const Color(0xFF4A3220), arch: 0.30, angle: 0.10);
+    drawBrow(c, Offset(hc.dx + 38, eyeY - 33), 32, 4.2,
+        const Color(0xFF4A3220), arch: 0.30, angle: -0.10, mirrored: true);
 
-    drawNose(c, Offset(hc.dx + 2, eyeY + 6), 26, 42, _rSkin, l, turn: 0.15);
-    drawMouth(c, Offset(hc.dx + 2, hc.dy + 64), 27,
-        skin: _rSkin, smile: -0.15, turn: 0.15);
+    drawNose(c, Offset(hc.dx + 2, eyeY + 8), 30, 48, _rSkin, l, turn: 0.15);
+    drawMouth(c, Offset(hc.dx + 2, hc.dy + 68), 30,
+        skin: _rSkin, smile: -0.12, turn: 0.15);
 
     // 귀.
     for (final s in const [-1.0, 1.0]) {
@@ -769,16 +787,17 @@ class Aldric extends Artist {
     if (detail > 0.4) {
       for (var i = 0; i < 7; i++) {
         final u = i / 6;
-        final root = hc + Offset(lerpD(-70, 70, u), lerpD(-30, -34, math.sin(u * math.pi)));
+        final root = hc +
+            Offset(lerpD(-58, 58, u), -56 - math.sin(u * math.pi) * 30);
         final strand = hairStrand(
           root,
-          Offset(lerpD(-0.5, 0.5, u), -0.85),
-          40 + math.sin(u * math.pi) * 26,
-          6.5,
+          Offset(lerpD(-0.92, 0.92, u), 0.62 + math.sin(u * math.pi) * 0.30),
+          46 + math.sin(u * math.pi) * 26,
+          8.5,
           t,
           phase: i * 1.4,
-          curl: 0.4,
-          flutter: 0.35,
+          curl: 0.22,
+          flutter: 0.22,
         );
         paintSurface(
             c, strand, Surface(_hair.lighten(0.08), Finish.hair), l,

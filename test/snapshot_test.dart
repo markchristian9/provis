@@ -82,7 +82,8 @@ void main() {
   }
 
   testWidgets('영웅 애니메이션 시트', (tester) async {
-    await bake('hero', HumanoidRenderer(HumanoidSpec.generate(7)), 1);
+    await bake('hero', HumanoidRenderer(HumanoidSpec.generate(7)), 0);
+    await bake('knight', HumanoidRenderer(HumanoidSpec.generate(3, forceArchetype: Archetype.knight)), 0);
   });
 
   testWidgets('짐승 애니메이션 시트', (tester) async {

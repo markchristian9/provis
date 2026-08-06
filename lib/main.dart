@@ -48,7 +48,7 @@ class ViewerModel extends ChangeNotifier {
 
   int seed = 7;
   bool beast = false;
-  int lightPreset = 1;
+  int lightPreset = 0;
   double yaw = math.pi * 0.30;
 
   /// 현재 재생 중인 클립 이름. AUTO 가 넘길 때도 갱신되어 버튼 강조가 따라간다.

@@ -88,8 +88,10 @@ class HumanoidRenderer {
 
   /// 갑옷 비중에 따라 사지를 덮는 재질이 달라진다. 이 한 값이 실루엣의
   /// 인상(무거운 판금 기사 ↔ 가벼운 암살자)을 결정한다.
+  // 짐승형의 살은 몸통과 사지가 같은 재질이어야 한 마리로 읽힌다. chitin 은
+  // rim 이 1.3 이라 던전 조명(청록 역광) 아래에서 사지만 형광으로 떠오른다.
   Surface get _limbArmor => beast
-      ? Surface.chitin(pal.skinDeep)
+      ? Surface.flesh(pal.skin)
       : spec.armorHeaviness > 0.52
           ? Surface.metal(pal.metal, polish: 0.5 + 0.42 * spec.armorHeaviness)
           : spec.armorHeaviness > 0.26
@@ -376,13 +378,14 @@ class HumanoidRenderer {
     // 읽힌다.
     if (beast) {
       for (var i = 0; i < 5; i++) {
-        final t = 0.12 + i * 0.19;
+        // 등 위쪽에 몰아준다. 골반까지 깔면 다리와 겹쳐 실루엣이 뭉갠다.
+        final t = 0.30 + i * 0.16;
         final at = lerpO(sk.pelvis, sk.chest, t);
         final back = (sk.pelvis - sk.chest).normalized().perp;
-        final size = _chestW * (0.30 + 0.34 * math.sin(t * math.pi));
+        final size = _chestW * (0.14 + 0.18 * math.sin(t * math.pi));
         final spike = tube(
-          [at, at - back * size * 1.5 - Offset(0, size * 0.5)],
-          [size * 0.34, size * 0.02],
+          [at, at + back * size * 1.25 - Offset(0, size * 0.8)],
+          [size * 0.30, size * 0.02],
           samples: 8,
         );
         paintSurface(canvas, spike, Surface.bone(pal.metal), light,
@@ -431,21 +434,21 @@ class HumanoidRenderer {
   void _tail(Canvas canvas, Skeleton sk, LightRig light, Quality q, double time) {
     final len = _h * 0.52;
     final back = (sk.pelvis - sk.chest).normalized().perp;
-    final root = sk.pelvis - back * _hipW * 0.30;
+    final root = sk.pelvis + back * _hipW * 0.30;
     final drift = wobble(time * 2.1, spec.seed * 0.31);
     final lift = sk.pose.capeFlow * 0.6 + 0.2;
 
     final tail = tube(
       [
         root,
-        root - back * len * 0.36 + Offset(0, len * (0.10 - lift * 0.18)),
-        root - back * len * 0.72 + Offset(0, len * (0.22 - lift * 0.34) + drift * len * 0.10),
-        root - back * len * 1.02 + Offset(0, len * (0.30 - lift * 0.50) + drift * len * 0.20),
+        root + back * len * 0.36 + Offset(0, len * (0.10 - lift * 0.18)),
+        root + back * len * 0.72 + Offset(0, len * (0.22 - lift * 0.34) + drift * len * 0.10),
+        root + back * len * 1.02 + Offset(0, len * (0.30 - lift * 0.50) + drift * len * 0.20),
       ],
       [_hipW * 0.30, _hipW * 0.22, _hipW * 0.13, _hipW * 0.03],
       samples: 24,
     );
-    paintSurface(canvas, tail, Surface.chitin(pal.skinDeep), light,
+    paintSurface(canvas, tail, Surface.flesh(pal.skin), light,
         quality: q, occlusion: 0.34, detailSeed: spec.seed + 21, unitScale: _hipW);
   }
 
@@ -465,7 +468,7 @@ class HumanoidRenderer {
       [_neckW * 0.52, _neckW * 0.46],
       samples: 8,
     );
-    paintSurface(canvas, neck, beast ? Surface.chitin(pal.skinDeep) : Surface.skin(pal.skin),
+    paintSurface(canvas, neck, beast ? Surface.flesh(pal.skin) : Surface.skin(pal.skin),
         light,
         quality: q, occlusion: 0.45, unitScale: _neckW);
 
@@ -493,7 +496,7 @@ class HumanoidRenderer {
             0.05 * _noise.signed1(a * 2 + spec.seed * 0.01);
       },
     );
-    paintSurface(canvas, skull, beast ? Surface.chitin(pal.skin) : Surface.skin(pal.skin),
+    paintSurface(canvas, skull, beast ? Surface.flesh(pal.skin) : Surface.skin(pal.skin),
         hLight,
         quality: q, occlusion: 0.12, detailSeed: spec.seed + 3, unitScale: hl);
     paintTopPlane(canvas, skull, hLight, iso, strength: 0.34);
@@ -510,7 +513,7 @@ class HumanoidRenderer {
         [hl * 0.22, hl * 0.17, hl * 0.07],
         samples: 14,
       );
-      paintSurface(canvas, jaw, Surface.chitin(pal.skinDeep), hLight,
+      paintSurface(canvas, jaw, Surface.flesh(pal.skinDeep), hLight,
           quality: q, occlusion: 0.3, unitScale: hl * 0.5);
       // 이빨.
       for (var i = 0; i < 4; i++) {
@@ -744,12 +747,13 @@ class HumanoidRenderer {
         tail,
       ],
       [
-        _shoulderW * 0.30,
-        _shoulderW * 0.40,
-        _shoulderW * 0.46,
-        _shoulderW * 0.34,
+        _shoulderW * 0.28,
+        _shoulderW * 0.36,
+        _shoulderW * (0.34 - 0.10 * flow),
+        _shoulderW * (0.18 - 0.13 * flow),
       ],
       samples: 26,
+      capEnd: false,
     );
     paintSurface(canvas, cape, Surface.cloth(pal.cloth), light,
         quality: q, occlusion: 0.26, detailSeed: spec.seed + 11, unitScale: _shoulderW);
@@ -769,6 +773,9 @@ class HumanoidRenderer {
     Quality q, {
     required bool ranged,
   }) {
+    // 짐승형의 무기는 발톱과 이빨이다. 명세의 무기 항목은 무시한다.
+    if (beast) return;
+
     final s = spec;
     final hand = sk.armNear;
     final grip = lerpO(hand.c, hand.d, 0.5);

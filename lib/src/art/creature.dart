@@ -54,4 +54,11 @@ abstract class Artist {
 
   /// 캐릭터가 실제로 차지하는 세로 범위. 카드 크롭에 쓴다.
   Rect get framing => const Rect.fromLTWH(60, 40, 880, 1330);
+
+  /// 포즈가 화면 왼쪽을 향하는가.
+  ///
+  /// 대치 화면에서 플레이어는 오른쪽의 적을, 몬스터는 왼쪽의 플레이어를
+  /// 봐야 한다. 이 값이 맞지 않는 캐릭터만 좌우를 뒤집는다.
+  bool get facesLeft => false;
+
 }
