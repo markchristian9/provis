@@ -125,6 +125,18 @@ class LightRig {
     }
   }
 
+  /// 리그 전체를 같은 각도로 회전한다.
+  ///
+  /// 캔버스를 회전시켜 파츠를 그릴 때(머리·무기처럼 로컬 좌표가 편한 파츠)
+  /// 조명까지 함께 돌아가면 죽음 애니메이션처럼 몸이 크게 기운 순간 광원이
+  /// 캐릭터를 따라 도는 모순이 생긴다. 캔버스 회전각의 역수로 리그를 돌려
+  /// 넘기면 조명이 월드에 고정된 채 유지된다.
+  LightRig rotated(double radians) {
+    final c = math.cos(radians), s = math.sin(radians);
+    Offset rot(Offset v) => Offset(v.dx * c - v.dy * s, v.dx * s + v.dy * c);
+    return copyWith(keyDir: rot(keyDir), rimDir: rot(rimDir));
+  }
+
   /// 키라이트를 각도로 회전한 리그. UI 슬라이더가 이걸 호출한다.
   LightRig rotatedKey(double radians) {
     final a = math.atan2(keyDir.dy, keyDir.dx) + radians;
