@@ -74,6 +74,55 @@ export 'src/props/tree.dart';   // 새 기물을 만들었으면 이 줄을 추�
 - 내부 헬퍼(`_MinHeap`, `_Ramp` 같은 private)
 - 예제 전용 코드
 
+### export 누락은 조용히 일어난다
+
+**라이브러리가 컴파일된다는 것과 남이 쓸 수 있다는 것은 다른 문제다.** barrel 에
+`export` 한 줄을 빠뜨리면 라이브러리는 멀쩡히 빌드되지만 소비자는 그 기능에 닿을
+수 없다. 실제로 `prop_kit.dart`(442줄의 형상 헬퍼)가 그렇게 새어 나갔다.
+
+**`example/test/public_api_test.dart` 가 이것을 잡는다.** barrel 하나만 import
+해서 소비자가 하려는 일을 전부 시도하는 9개 시나리오다 — 재질 19종, `Artist`
+구현, 기물(라이브러리 것 + 직접 만든 것), `prop_kit` 헬퍼, 아이소 투영·정렬,
+경로탐색·이동, 방향 스냅, 시드 결정론, 골격 액터.
+
+새 공개 API 를 추가했으면 **이 테스트에 한 줄 넣는다.** 넣지 않으면 export 를
+빠뜨려도 아무도 모른다.
+
+```bash
+# 누락 자동 점검
+for f in $(find lib/src -name '*.dart' | sed 's|lib/||'); do
+  grep -q "export '$f'" lib/provis.dart || echo "누락: $f"
+done
+```
+
+### 문서 예제도 컴파일되어야 한다
+
+README 는 새 사용자가 처음 만나는 코드다. 시그니처가 바뀌면 문서는 조용히 낡고,
+복사해 붙인 사람은 컴파일 오류부터 만난다. `torsoShape` 이 `top`/`bottom` 에서
+`chest`/`pelvis` 로 바뀌었을 때 실제로 그랬다.
+
+`public_api_test.dart` 는 README 예제와 **같은 API** 를 쓰므로, 문서가 낡으면
+이 테스트가 먼저 깨진다.
+
+### 진짜 소비자로 검증하기
+
+의심스러우면 임시 패키지를 만들어 확인한다. 저장소 안에서는 상대 경로 때문에
+문제가 가려질 수 있다.
+
+```bash
+mkdir -p /tmp/consumer/lib && cd /tmp/consumer
+cat > pubspec.yaml <<'YAML'
+name: consumer
+environment: {sdk: ^3.12.2}
+dependencies:
+  flutter: {sdk: flutter}
+  flame: ^1.38.0
+  provis: {path: /경로/provis}
+YAML
+# lib/main.dart 에 barrel 하나만 import 하고 대표 API 를 써 본다
+flutter pub get && flutter analyze
+```
+
 ### 이름 충돌 주의
 
 barrel 은 모든 export 를 한 네임스페이스에 합친다. 새 최상위 함수를 만들 때는

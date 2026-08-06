@@ -6,7 +6,7 @@
 
 > **폐기됨**: `render/surface.dart`(`SurfaceKind` 10종, 9패스)와 `render/light.dart`(`keyDir` 규약)는
 > 삭제됐다. 옛 문서나 코드에서 `SurfaceKind`·`Quality`·`paintTopPlane(…, iso)`·`paintContactShadow`
-> 를 보면 낡은 것이다. 지금은 `Finish` 16종과 `detail`(0..1) 하나뿐이다.
+> 를 보면 낡은 것이다. 지금은 `Finish` 19종과 `detail`(0..1) 하나뿐이다.
 
 ## 목차
 
@@ -15,7 +15,7 @@
 2. [Artist 계약 (전체 소스)](#artist-계약)
 3. [좌표계 — kStage / kGround](#좌표계--kstage--kground)
 4. [LightRig (트랙 B) — 부호 규약이 트랙 A 와 반대](#lightrig-트랙-b)
-5. [Finish 16종과 재질별 기법](#finish-16종과-재질별-기법)
+5. [Finish 19종과 재질별 기법](#finish-19종과-재질별-기법)
 6. [Surface · paintSurface (전체 소스)](#surface--paintsurface)
 7. [마무리 함수 — 품질을 결정하는 네 가지](#마무리-함수)
 8. [독립 효과 — 발광·그림자·윤곽](#독립-효과)
@@ -210,7 +210,7 @@ LightRig get light => const LightRig(
 
 ---
 
-## Finish 16종과 재질별 기법
+## Finish 19종과 재질별 기법
 
 ```dart
 enum Finish {
@@ -239,6 +239,9 @@ enum Finish {
 | `energy` | 중심이 **흰색으로 포화** → 바깥으로 고유색. `BlendMode.plus` 필수. AO·rim 건너뜀 | 발광체는 센서를 날린다 |
 | `slime` | 반투명 — 가장자리가 두꺼워 진하고 중심이 밝음 + 젖은 하이라이트 | |
 | `stone` | 확산(0.5) + 강한 grain(0.16) | |
+| `bark` | 세로로 갈라진 홈 + 거친 요철 | `wood`(대패질한 판재)와 다르다. 줄기·기둥·통나무 |
+| `foliage` | **빛이 잎을 통과해** 반대편이 밝은 황록으로 뜬다 | 이것 없이 `fur` 로 칠하면 초록 풍선이 된다 |
+| `soil` | 확산이 전부, 스펙큘러 없음 | 지면·둔덕·길 |
 | `membrane` | **조명 방향과 무관하게 전체가 은은히 빛남**, 뼈대 근처만 어두움 | 얇은 막은 빛을 투과시킨다 |
 
 **공통 후처리**: `paintSurface` 는 재질 분기 후 `_ambientOcclusion`(아랫면 어둡게 + 바닥 반사광)과
@@ -592,5 +595,5 @@ class NewChar extends Artist {
 - [ ] `detail < 0.5` 에서 미세 텍스처가 꺼지는가
 - [ ] `roster.dart` 에 등록했는가
 - [ ] 같은 `t` 에 같은 그림이 나오는가 (`math.Random` 미사용)
-- [ ] `Finish` 를 재질에 맞게 골랐는가 — 애매하면 [Finish 표](#finish-16종과-재질별-기법) 재확인
+- [ ] `Finish` 를 재질에 맞게 골랐는가 — 애매하면 [Finish 표](#finish-19종과-재질별-기법) 재확인
 - [ ] 48px 로 축소해도 정체가 읽히는가

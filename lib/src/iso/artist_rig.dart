@@ -1,6 +1,13 @@
 import 'dart:ui';
 
-import 'package:provis/provis.dart';
+import '../actor/humanoid_renderer.dart';
+import '../actor/spec.dart';
+import '../art/creature.dart';
+import '../core/palette.dart';
+import '../core/rng.dart';
+import '../core/scheme.dart';
+import '../rig/body.dart';
+import 'iso_stage.dart';
 
 /// 초상용 [Artist] 를 게임 맵에서 걷는 액터로 바꾼다.
 ///

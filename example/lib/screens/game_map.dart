@@ -5,7 +5,6 @@ import 'package:flutter/material.dart' as m show Colors;
 import 'package:provis/provis.dart';
 
 import '../characters/roster.dart';
-import '../rigged.dart';
 
 /// 게임 맵 — 선택한 캐릭터로 입장하고, 명부의 모든 몬스터가 한 마리씩 나온다.
 ///

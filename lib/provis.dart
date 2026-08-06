@@ -62,6 +62,7 @@ export 'src/actor/humanoid_renderer.dart';
 export 'src/iso/iso_view.dart';
 export 'src/iso/iso_stage.dart';
 export 'src/iso/iso_input.dart';
+export 'src/iso/artist_rig.dart';
 
 // ── Flame 통합 (선택) ────────────────────────────────────────────────────
 // 핵심 렌더는 dart:ui 만으로 동작한다. 이 파일만 Flame 에 의존한다.
@@ -69,6 +70,7 @@ export 'src/flame/iso_scene.dart';
 
 // ── 맵 기물 ──────────────────────────────────────────────────────────────
 export 'src/props/prop.dart';
+export 'src/props/prop_kit.dart';
 export 'src/props/tree.dart';
 export 'src/props/rock.dart';
 export 'src/props/building.dart';

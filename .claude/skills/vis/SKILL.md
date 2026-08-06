@@ -47,11 +47,26 @@ flutter analyze && (cd example && flutter analyze)
 flutter test && (cd example && flutter test)
 ```
 
+**공개 API 를 추가했으면 세 가지를 한다.**
+
+1. `lib/provis.dart` 에 `export` 추가 — 빠뜨리면 라이브러리는 빌드되지만
+   소비자는 그 기능에 닿을 수 없다.
+2. `example/test/public_api_test.dart` 에 호출 한 줄 추가 — 이 테스트가 barrel
+   하나만 import 해서 소비자 시나리오를 돌린다.
+3. README 예제가 여전히 컴파일되는지 확인 — 새 사용자가 처음 만나는 코드다.
+
+```bash
+# export 누락 자동 점검
+for f in $(find lib/src -name '*.dart' | sed 's|lib/||'); do
+  grep -q "export '$f'" lib/provis.dart || echo "누락: $f"
+done
+```
+
 ---
 
 ## 절대 규칙
 
-1. **셰이딩 계보는 `core/shading.dart` 하나뿐이다.** `SurfaceKind`·`Quality`·`paintContactShadow`·`LightRig.keyDir` 은 폐기됐다. 지금은 `Finish` 16종과 `detail`(0..1) 이다.
+1. **셰이딩 계보는 `core/shading.dart` 하나뿐이다.** `SurfaceKind`·`Quality`·`paintContactShadow`·`LightRig.keyDir` 은 폐기됐다. 지금은 `Finish` 19종과 `detail`(0..1) 이다.
 
 2. **`LightRig.dir` 은 피사체가 광원을 바라보는 방향이다.** 빛이 나아가는 방향이 아니다. 부호를 뒤집으면 명암이 통째로 반전된다.
 
@@ -196,7 +211,7 @@ actor.facesLeft = hero.facesLeft;
 - [ ] 큰 도형 1 + 중간 2~3 + 작은 여럿의 크기 위계가 있는가
 
 **셰이딩**
-- [ ] `Finish` 를 재질에 맞게 골랐는가 (16종 중)
+- [ ] `Finish` 를 재질에 맞게 골랐는가 (19종 중)
 - [ ] 겹친 파츠에 `occlude`/`castShadow` 를 넣었는가 — 없으면 종이처럼 겹쳐 보인다
 - [ ] 시선이 머무는 곳에 `rimBand` 를 썼는가
 - [ ] 눈이 6겹인가 (`drawEye`)
@@ -231,7 +246,7 @@ actor.facesLeft = hero.facesLeft;
 | 문서 | 언제 읽는가 |
 |------|------------|
 | [props.md](references/props.md) | 맵 기물 — 6종의 설계 근거, `Prop` 계약, 새 기물 추가법 |
-| [artist-craft.md](references/artist-craft.md) | 셰이딩 제1 원리, `Finish` 16종, `core/shading.dart` 전 API, `Artist` 계약, `anatomy.dart`, 얼굴 6겹 |
+| [artist-craft.md](references/artist-craft.md) | 셰이딩 제1 원리, `Finish` 19종, `core/shading.dart` 전 API, `Artist` 계약, `anatomy.dart`, 얼굴 6겹 |
 | [art-direction.md](references/art-direction.md) | 시각 논제 설계, 비율 왜곡, 참조 9종의 실제 논제, 설계서 양식 |
 | [isometric.md](references/isometric.md) | 아이소 투영 수식, `Artist` 를 맵에 세우는 법, 클릭 이동, 8방향, y-sort |
 | [architecture.md](references/architecture.md) | 레이어 규약, 좌표계, 폐기 API 대조표, Flame 이름 충돌 |
@@ -256,7 +271,7 @@ flutter run -t lib/viewer.dart    # 절차 액터 뷰어
 
 | 증상 | 원인 | 처방 |
 |------|------|------|
-| `SurfaceKind`·`Quality` 가 없다 | 폐기된 API | `Finish` 16종 + `detail`(0..1) |
+| `SurfaceKind`·`Quality` 가 없다 | 폐기된 API | `Finish` 19종 + `detail`(0..1) |
 | 명암이 통째로 뒤집힘 | `dir` 을 빛의 진행 방향으로 착각 | `dir` = 피사체 → 광원 |
 | 나무 뒤 캐릭터가 나무 앞에 보인다 | 기물·캐릭터를 따로 그림 | `paintScene` 하나로 |
 | 캐릭터가 나무를 통과한다 | 격자를 안 막음 | `scene.addProp` 사용 |

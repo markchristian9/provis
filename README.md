@@ -22,18 +22,18 @@ import 'package:provis/provis.dart';
 
 ## 핵심 개념
 
-### 재질은 16가지 `Finish`
+### 재질은 19가지 `Finish`
 
 각 재질이 **전용 알고리즘**을 갖습니다. 금속은 하늘·지평선·지면이 비치는 3단
 환경 밴딩으로, 피부는 명암 경계에 배어나는 붉은 산란으로, 머리카락은 점이 아닌
-띠 모양 광택으로 그립니다. 하나의 범용 그라디언트를 16번 재활용하지 않습니다.
+띠 모양 광택으로 그립니다. 하나의 범용 그라디언트를 19번 재활용하지 않습니다.
 
 ```dart
 paintSurface(canvas, path, Surface(color, Finish.metal), light, detail: 1.0);
 ```
 
 `skin · metal · gold · cloth · leather · scale · chitin · fur · hair · bone ·
-wood · gem · energy · slime · stone · membrane`
+wood · bark · foliage · soil · gem · energy · slime · stone · membrane`
 
 ### 조명은 씬이 공유
 
@@ -107,8 +107,7 @@ void onTapDown(Offset localPosition) {
 
 // 매 프레임
 hero.update(dt);
-actor.tile = hero.tile;
-actor.facesLeft = hero.facesLeft;
+actor.follow(hero, dt);   // 위치·방향·클립(대기/걷기/달리기)을 한 번에
 ```
 
 목표가 벽이면 **가장 가까운 통행 가능한 타일**로 갑니다 — 벽을 눌렀다고 아무
@@ -134,7 +133,8 @@ class MyHero extends Artist {
     groundShadow(c, const Offset(500, kGround), 240, 42);
 
     final torso = torsoShape(
-      top: kGround - 900 + bob, bottom: kGround - 480,
+      chest: Offset(500, kGround - 900 + bob),
+      pelvis: Offset(500, kGround - 480),
       shoulderW: 150, chestW: 130, waistW: 96, hipW: 118,
     );
     paintSurface(c, torso, Surface(const Color(0xFF7A8AA8), Finish.metal), light,
@@ -159,6 +159,33 @@ final spec = HumanoidSpec.generate(seed);   // 원형 → 체형 → 장비 → 
 원형(knight/berserker/ranger/mage/assassin/paladin)을 먼저 뽑고 **그 원형의
 겹치지 않는 대역 안에서만** 변주합니다. 파라미터를 각각 독립 무작위화하면
 "특징 없는 평균"만 나옵니다.
+
+## 방향은 연속이다
+
+스프라이트 게임이 8방향에 묶이는 이유는 방향마다 이미지를 굽기 때문입니다.
+provis는 매 프레임 골격을 다시 풀므로 `yaw` 가 임의의 실수이고, **방향 수에
+따른 비용 증가가 없습니다.**
+
+같은 캐릭터 200프레임 반복 렌더 실측:
+
+| 분할 | 프레임당 |
+|---|---|
+| 8 | 418 µs |
+| 16 | 295 µs |
+| 32 | 260 µs |
+| 360 | 284 µs |
+
+차이는 측정 노이즈입니다. 그래서 기본은 스냅하지 않습니다 — `IsoController` 가
+내는 연속 `yaw` 가 렌더러까지 그대로 갑니다.
+
+```dart
+facing.snap(16)   // 그리드 전투처럼 방향을 상태로 저장할 때만
+facing.snap8 / snap16 / snap32
+```
+
+정면에서는 팔이 몸 옆으로 내려가고 다리가 좌우로 벌어지며, 측면에서는 코와 턱이
+실루엣 밖으로 나옵니다. `solve(body, pose, yaw:)` 가 관절을 시상면·좌우·수직
+세 성분으로 나눠 투영하기 때문입니다.
 
 ## 결정론
 

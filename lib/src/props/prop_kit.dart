@@ -109,6 +109,81 @@ Path leafBlade(Offset root, double length, double angle, {double width = 0.42}) 
   ], tension: 0.85);
 }
 
+/// 풀잎 하나. 뿌리가 넓고 끝이 뾰족하며 한쪽으로 휜다.
+///
+/// 선(stroke)으로 그은 풀은 굵기가 일정해 철사로 보인다. 채워진 형상이라야
+/// 풀이 된다 — 뿌리에서 끝으로 가늘어지는 테이퍼가 핵심이다.
+Path grassBlade(Offset root, double height, double lean, {double width = 0.14}) {
+  final w = height * width;
+  final tip = root + Offset(lean * height, -height);
+  final mid = root + Offset(lean * height * 0.30, -height * 0.55);
+  return smoothClosedPath([
+    root + Offset(-w, 0),
+    mid + Offset(-w * 0.45, 0),
+    tip,
+    mid + Offset(w * 0.52, 0),
+    root + Offset(w, 0),
+  ], tension: 0.85);
+}
+
+/// 꽃 한 송이. 꽃잎 [petals] 장 + 꽃술.
+///
+/// 점 하나로 찍은 꽃은 색 얼룩이다. 꽃잎이 갈라져 있어야 꽃으로 읽힌다.
+void paintFlower(
+  Canvas c,
+  Offset at,
+  double radius,
+  Color petal,
+  Color heart,
+  LightRig l, {
+  int petals = 5,
+  double rotation = 0,
+  double squash = 0.55,
+}) {
+  final paint = Paint()..isAntiAlias = true;
+  for (var i = 0; i < petals; i++) {
+    final a = rotation + (i / petals) * math.pi * 2;
+    final at2 = at + Offset(math.cos(a) * radius * 0.52,
+        math.sin(a) * radius * 0.52 * squash);
+    // 위쪽 꽃잎이 빛을 더 받는다.
+    final up = (-math.sin(a) * 0.5 + 0.5).clamp(0.0, 1.0);
+    paint.color = petal.lighten(0.14 * up).darken(0.16 * (1 - up)).fade(0.95);
+    c.save();
+    c.translate(at2.dx, at2.dy);
+    c.rotate(a);
+    c.drawOval(
+      Rect.fromCenter(
+        center: Offset.zero,
+        width: radius * 1.15,
+        height: radius * 0.72 * (0.7 + 0.5 * squash),
+      ),
+      paint,
+    );
+    c.restore();
+  }
+  paint.color = heart.fade(0.95);
+  c.drawOval(
+    Rect.fromCenter(
+      center: at,
+      width: radius * 0.52,
+      height: radius * 0.52 * (0.6 + 0.5 * squash),
+    ),
+    paint,
+  );
+  // 꽃술의 반짝임 — 작아도 시선을 붙잡는다.
+  paint
+    ..color = l.key.fade(0.35)
+    ..blendMode = BlendMode.plus;
+  c.drawOval(
+    Rect.fromCenter(
+      center: at + Offset(l.dir.dx, l.dir.dy) * radius * 0.14,
+      width: radius * 0.26,
+      height: radius * 0.20,
+    ),
+    paint,
+  );
+}
+
 /// 침엽수 가지 한 단. 아래로 처지고 끝이 뾰족한 톱니 실루엣.
 ///
 /// 침엽수를 매끈한 삼각형으로 그리면 크리스마스 장식이 된다. 바늘잎 다발이

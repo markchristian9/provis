@@ -47,7 +47,7 @@ lib/
     │   ├── noise.dart         Noise — 값 노이즈·fbm, wobble()
     │   ├── spline.dart        Offset2 확장, tube()/blob()/web(), smoothClosedPath()
     │   ├── palette.dart       ColorTune 확장, Ramp, Pal (세계관 공기색)
-    │   └── shading.dart       **유일한 셰이딩 계보** — LightRig, Finish 16종, Surface, paintSurface
+    │   └── shading.dart       **유일한 셰이딩 계보** — LightRig, Finish 19종, Surface, paintSurface
     ├── rig/                   치수와 관절. Canvas 를 모른다
     │   ├── body.dart          Body — 골격 치수 (humanoid/beast 팩토리)
     │   ├── pose.dart          Pose/ArmPose/LegPose, Limb, Skeleton, solve()
@@ -78,12 +78,12 @@ lib/
 ### 주의 ① — 셰이딩 계보는 하나다 (2026-08-06 통합)
 
 한때 `render/surface.dart`(계보 A)와 `core/shading.dart`(계보 B)가 공존했다. **계보 A 는 삭제됐다.**
-`Finish` 16종이 각각 전용 알고리즘을 갖는 계보 B 가 품질에서 앞섰고, 완성 캐릭터 전원이 그쪽을
+`Finish` 19종이 각각 전용 알고리즘을 갖는 계보 B 가 품질에서 앞섰고, 완성 캐릭터 전원이 그쪽을
 쓰고 있었기 때문이다.
 
 | 사라진 것 (계보 A) | 지금 (`core/shading.dart`) |
 |---|---|
-| `SurfaceKind` 10종 | `Finish` **16종** |
+| `SurfaceKind` 10종 | `Finish` **19종** |
 | `Quality` enum | `detail` 0..1 |
 | `Surface(albedo:, roughness:, metalness:…)` | `Surface(base, finish, {contrast, sss, glow, alpha})` |
 | `LightRig.keyDir`(빛의 진행 방향) | `LightRig.dir`(**피사체 → 광원**) |
