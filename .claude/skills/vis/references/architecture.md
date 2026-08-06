@@ -383,9 +383,9 @@ class HumanoidSpec {
 ### 트랙 B — 이름 있는 작품 캐릭터 (완성 9종이 전부 이 방식)
 
 1. **시각 논제를 한 문장으로 정한다** → [art-direction.md](art-direction.md)
-2. **`lib/src/art/pc/<name>.dart`** 또는 **`art/mob/<name>.dart`** 에 `Artist` 상속 클래스를 만든다.
+2. **`example/lib/characters/<name>.dart`** 또는 **`art/mob/<name>.dart`** 에 `Artist` 상속 클래스를 만든다.
 3. `art/anatomy.dart` 헬퍼로 부위를 조립하고 `core/shading.dart` 로 칠한다 → [artist-craft.md](artist-craft.md)
-4. **`lib/src/art/roster.dart`** 의 `heroes` / `monsters` 리스트에 등록한다. **이걸 빠뜨리면 갤러리에 안 뜬다.**
+4. **`example/lib/characters/roster.dart`** 의 `heroes` / `monsters` 리스트에 등록한다. **이걸 빠뜨리면 갤러리에 안 뜬다.**
 5. `test/render_sheet_test.dart` 로 시트를 뽑아 확인한다.
 
 ### 트랙 A — 시드 기반 인게임 액터

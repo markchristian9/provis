@@ -1,5 +1,5 @@
 import '../core/rng.dart';
-import '../render/palette.dart';
+import '../core/scheme.dart';
 
 /// 영웅 원형. 비율·장비·색을 한꺼번에 결정하는 상위 다이얼이다.
 ///

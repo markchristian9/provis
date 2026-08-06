@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vis/src/core/rng.dart';
+import 'package:provis/provis.dart';
 
 /// 절차적 생성기의 토대는 "같은 시드 → 같은 결과" 하나다. 그 성질이 조용히
 /// 깨지면 캐릭터가 왜 바뀌었는지 아무도 재현할 수 없으므로, 여기서 불변식을

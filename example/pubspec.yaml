@@ -1,0 +1,23 @@
+name: provis_example
+description: "provis 예제 — 아이소 필드, 캐릭터 갤러리, 절차 액터 뷰어."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flame: ^1.38.0
+  provis:
+    path: ../
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

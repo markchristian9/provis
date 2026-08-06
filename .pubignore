@@ -1,0 +1,11 @@
+# 배포 아카이브에서 제외 — 소비자에게 필요 없고 용량만 키운다.
+build/
+example/build/
+example/macos/
+example/web/
+example/.dart_tool/
+.dart_tool/
+.cowork/
+.claude/
+.idea/
+CLAUDE.md

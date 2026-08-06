@@ -2,7 +2,7 @@
 
 **이 저장소의 유일한 셰이딩 계보이자, AAA 품질이 나오는 경로다.** 완성 9종(PC 5 · Mob 4)이 전부 이 방식이며, 2026-08-06 계보 통합 이후 아이소 액터(`humanoid_renderer`)도 같은 API를 쓴다.
 
-`lib/src/core/shading.dart`, `lib/src/art/creature.dart`, `lib/src/art/anatomy.dart`, `lib/src/art/roster.dart` 의 완전한 참조.
+`lib/src/core/shading.dart`, `lib/src/art/creature.dart`, `lib/src/art/anatomy.dart`, `example/lib/characters/roster.dart` 의 완전한 참조.
 
 > **폐기됨**: `render/surface.dart`(`SurfaceKind` 10종, 9패스)와 `render/light.dart`(`keyDir` 규약)는
 > 삭제됐다. 옛 문서나 코드에서 `SurfaceKind`·`Quality`·`paintTopPlane(…, iso)`·`paintContactShadow`
@@ -497,7 +497,7 @@ void drawEye(Canvas c, Offset at, double w, double h, {
 
 ## 로스터 등록
 
-**파일: `lib/src/art/roster.dart`**
+**파일: `example/lib/characters/roster.dart`**
 
 ```dart
 final List<Artist> heroes = List<Artist>.unmodifiable([

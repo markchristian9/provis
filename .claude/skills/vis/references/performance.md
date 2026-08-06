@@ -167,7 +167,7 @@ double detailFor(double screenHeightPx, {bool isPlayer = false, bool isBoss = fa
 
 ```dart
 /// 아주 작거나(<32px) 아주 많은 액터. 실루엣 + 그림자 + 색 하나.
-/// 구현체는 `lib/src/render/iso.dart` 의 `paintImposter` 다.
+/// 구현체는 `lib/src/iso/iso_view.dart` 의 `paintImposter` 다.
 void paintImposter(Canvas canvas, Path silhouette, Color tint, LightRig light) {
   canvas.drawPath(silhouette, Paint()..color = tint);
   canvas.drawPath(silhouette, Paint()      // 림만 남긴다 — 이것만으로 형태가 산다

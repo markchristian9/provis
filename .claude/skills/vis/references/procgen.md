@@ -1,6 +1,6 @@
 # 절차적 생성 — 시드·원형·팔레트
 
-`lib/src/core/rng.dart`, `lib/src/core/noise.dart`, `lib/src/render/palette.dart`, `lib/src/actor/spec.dart` 의 완전한 참조.
+`lib/src/core/rng.dart`, `lib/src/core/noise.dart`, `lib/src/core/scheme.dart`, `lib/src/actor/spec.dart` 의 완전한 참조.
 
 ## 목차
 
@@ -186,7 +186,7 @@ double wobble(double t, double seed) =>
 
 ## Palette — 조화로운 색을 유도하기
 
-**파일: `lib/src/render/palette.dart`**
+**파일: `lib/src/core/scheme.dart`**
 
 > **개별 색을 독립적으로 뽑으면 조화가 깨진다.** 하나의 기준 색상환 각도에서 유사색/보색 관계로 파생시켜야 "디자이너가 고른 색"처럼 보인다.
 

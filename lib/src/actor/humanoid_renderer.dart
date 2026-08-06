@@ -5,8 +5,8 @@ import 'package:flutter/painting.dart' show RadialGradient;
 
 import '../core/noise.dart';
 import '../core/spline.dart';
-import '../render/iso.dart';
-import '../render/palette.dart';
+import '../iso/iso_view.dart';
+import '../core/scheme.dart';
 import '../core/shading.dart';
 import '../rig/body.dart';
 import '../rig/pose.dart';

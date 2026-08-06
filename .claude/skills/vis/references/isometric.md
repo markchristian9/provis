@@ -50,7 +50,7 @@
 
 여기서 `tileHeight / tileWidth = sin(고도각)` 이라는 관계가 나온다. 2:1 이면 `sin θ = 0.5` → `θ = 30°`, 수직 단축 `cos 30° = 0.866`.
 
-**신설 파일: `lib/src/render/iso.dart`**
+**파일: `lib/src/iso/iso_view.dart`**
 
 ```dart
 import 'dart:math' as math;
@@ -123,7 +123,7 @@ void renderActor(Canvas canvas, IsoView iso, Offset worldTile, void Function(Can
 
 ## 작품 캐릭터를 아이소 맵에 세우기
 
-**`lib/src/iso/iso_stage.dart`** — 이 저장소에서 AAA 품질이 나오는 손수 만든 `Artist` 를 아이소 필드에 그대로 세우는 다리다. 실행: `flutter run -t lib/iso_game.dart`
+**`lib/src/iso/iso_stage.dart`** — 이 저장소에서 AAA 품질이 나오는 손수 만든 `Artist` 를 아이소 필드에 그대로 세우는 다리다. 실행: `cd example && flutter run -t lib/main.dart`
 
 ### 왜 다리 하나로 충분한가
 
@@ -178,11 +178,77 @@ List<Offset> scatterTiles(int count, int cols, int rows, int seed);
 1. **`paintIsoGround`** — 체커 패턴 + 거리 감쇠. 격자가 없으면 캐릭터가 허공의 카드로 보인다.
 2. **`paintIsoHaze`** — 대기 원근. 먼 곳이 환경광 쪽으로 흐려지면 평면이던 화면에 깊이가 생긴다. **2D 에서 비용 대비 효과가 가장 큰 한 겹이다.**
 
-### 이 방식의 한계
+### 이 방식의 한계 — 그리고 게임플레이 액터를 무엇으로 쓸 것인가
 
-`Artist` 는 고정된 3/4 시점으로 그려지므로 **연속 8방향 회전이 되지 않는다.** 좌우 반전(`facesLeft`)으로 실질 2방향이다. 많은 2.5D 게임이 채택하는 빌보드 방식이며 정당한 선택이지만, 진짜 8방향이 필요하면 캐릭터마다 측면·후면 파츠를 추가로 저작해야 한다. 그 비용을 치를지는 게임플레이가 결정할 문제다.
+`Artist` 는 고정된 3/4 시점 **초상**이다. 그래서 아이소 맵에 세우면 두 가지가 안 된다.
 
-연속 회전이 필요한 군중·잡몹은 `HumanoidSpec` + `humanoid_renderer` 경로를 쓴다 — 아래 [8방향 페이싱](#8방향-페이싱) 참조.
+1. **걸어도 자세가 그대로다.** `paint(c, t, {detail})` 에는 이동 상태가 없으므로 정지 자세로 미끄러진다.
+2. **방향이 없다.** 좌우 반전(`facesLeft`)뿐이라 북쪽으로 가도 뒷모습이 안 나온다.
+
+**게임플레이 캐릭터는 [RiggedIsoActor](#riggedisoactor--8방향-보행-액터) 를 쓴다.** `Artist` 는 갤러리·대치 연출·컷신처럼 **정지 상태에서 품질이 최우선**인 곳에 남긴다.
+
+---
+
+## RiggedIsoActor — 8방향 보행 액터
+
+`HumanoidRenderer` 를 매 프레임 [Pose] 로 풀어 그린다. 그래서 **다리가 실제로 교차하고**, [Facing] 에 따라 어깨 폭·사지 앞뒤·얼굴 표시가 바뀐다 — 북쪽을 보면 뒷모습, 남쪽이면 앞모습, 동서면 옆모습이 나온다.
+
+```dart
+final hero = RiggedIsoActor(
+  renderer: HumanoidRenderer(HumanoidSpec.generate(seed)),
+  tile: const Offset(6.5, 9.5),
+  height: 195,
+);
+scene.rigged.add(hero);
+
+// 매 프레임 — 위치·방향·클립을 한 번에 맞춘다
+hero.follow(controller, dt);
+```
+
+`follow` 가 하는 일:
+
+| 컨트롤러 상태 | 재생 클립 |
+|---|---|
+| 정지 | `idle` |
+| 이동, `speed < runThreshold`(4.2) | `walk` |
+| 이동, `speed >= runThreshold` | `run` |
+
+공격·피격처럼 이동과 무관한 동작은 `play('attack')` 로 끼워 넣는다. **한 번짜리 클립(attack·hit·shoot·dash)은 끝나면 자동으로 `idle` 로 돌아간다** — 이게 없으면 공격 자세로 굳은 채 걸어 다닌다.
+
+### 짐승형 몬스터
+
+같은 골격 코드에 비율과 색만 갈아 끼운다. **같은 걷기 클립이 전혀 다른 걸음걸이로 읽힌다** — 다리가 짧고 팔이 길며 구부정하기 때문이다.
+
+```dart
+RiggedIsoActor(
+  renderer: HumanoidRenderer(
+    spec,
+    body: Body.beast(Rng(seed ^ 0x5EED), height: spec.height * 1.12),
+    palette: Palette.monster(Rng(seed ^ 0xB0A5)),
+    beast: true,     // 뿔·꼬리·발톱을 켠다
+  ),
+  tile: tile,
+  height: 215,
+)
+```
+
+### 배회하는 NPC
+
+컨트롤러를 하나 더 두고 목적지가 없으면 새로 고른다.
+
+```dart
+if (!ctrl.isMoving) ctrl.moveTo(randomTile());
+ctrl.update(dt);
+actor.follow(ctrl, dt);
+```
+
+### 두 액터를 한 씬에 섞기
+
+`IsoSceneComponent` 는 `actors`(Artist)와 `rigged`(골격) 목록을 따로 들고 있지만, **깊이 정렬은 기물까지 포함해 하나로** 처리한다. 섞어 놓아도 앞뒤가 맞는다.
+
+---
+
+### 연속 회전이 필요 없다면
 
 ---
 

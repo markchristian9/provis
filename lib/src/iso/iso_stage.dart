@@ -3,8 +3,11 @@ import 'dart:ui';
 
 import '../art/creature.dart';
 import '../core/palette.dart';
+import '../actor/humanoid_renderer.dart';
+import '../anim/animator.dart';
 import '../core/shading.dart';
-import '../render/iso.dart';
+import 'iso_input.dart';
+import 'iso_view.dart';
 
 /// 손으로 그린 [Artist] 를 2.5D 아이소 맵 위에 세우는 다리.
 ///
@@ -216,4 +219,137 @@ Offset isoCameraOffset(IsoView iso, int cols, int rows, Size view) {
     view.width / 2 - (minX + maxX) / 2,
     view.height / 2 - (minY + maxY) / 2,
   );
+}
+
+// ---------------------------------------------------------------------------
+// 골격 구동 액터 — 8방향 회전과 보행 애니메이션
+// ---------------------------------------------------------------------------
+
+/// 관절이 움직이고 방향에 따라 몸이 도는 액터.
+///
+/// ## [IsoActor] 와 무엇이 다른가
+///
+/// [IsoActor] 는 손으로 그린 [Artist] 를 그대로 세운다 — 품질은 가장 높지만
+/// **고정된 3/4 초상**이라 걸어도 자세가 그대로고, 좌우 반전 말고는 방향이
+/// 없다. 게임플레이 캐릭터로 쓰면 정지 자세로 미끄러진다.
+///
+/// 이쪽은 [HumanoidRenderer] 를 쓴다. 매 프레임 [Pose] 를 풀어 그리므로
+/// **다리가 실제로 교차하고**, [Facing] 에 따라 어깨 폭·사지 앞뒤·얼굴 표시가
+/// 바뀌어 북쪽을 보면 뒷모습이, 남쪽을 보면 앞모습이, 동서로는 옆모습이 나온다.
+///
+/// ```dart
+/// final hero = RiggedIsoActor(
+///   renderer: HumanoidRenderer(HumanoidSpec.generate(7)),
+///   tile: const Offset(6.5, 9.5),
+///   height: 200,
+/// );
+/// // 매 프레임 — 컨트롤러의 위치·방향·이동 여부를 그대로 따른다
+/// hero.follow(controller, dt);
+/// ```
+class RiggedIsoActor {
+  RiggedIsoActor({
+    required this.renderer,
+    required this.tile,
+    this.height = 200,
+    Animator? animator,
+    this.yaw = 0,
+    this.runThreshold = 4.2,
+  }) : animator = animator ?? Animator();
+
+  final HumanoidRenderer renderer;
+
+  /// 클립 재생기. 기본값은 [Anims.all] 전체를 들고 있다.
+  final Animator animator;
+
+  /// 월드 타일 좌표.
+  Offset tile;
+
+  /// 화면상 키(px). 타일 폭의 1.2~1.6배가 표준이다.
+  double height;
+
+  /// 이 속도(타일/초)를 넘으면 걷기 대신 달리기 클립을 쓴다.
+  double runThreshold;
+
+  /// 바라보는 각도(라디안). 0 이 카메라 정면(남).
+  double yaw;
+
+  double get depth => tile.dx + tile.dy;
+
+  /// 지면에서 뜬 높이(월드 단위).
+  double airborne = 0;
+
+  /// 원거리 무기 자세로 그린다.
+  bool ranged = false;
+
+  String _state = 'idle';
+
+  /// 현재 재생 중인 상태 이름.
+  String get state => _state;
+
+  /// 이동 컨트롤러를 그대로 따라간다 — 위치·방향·클립을 한 번에 맞춘다.
+  ///
+  /// 이동 여부에 따라 걷기/달리기/대기로 자동 전환하므로, 게임 쪽에서는
+  /// 컨트롤러만 조작하면 된다. 공격·피격처럼 이동과 무관한 동작은
+  /// [play] 로 끼워 넣는다.
+  void follow(IsoController c, double dt) {
+    tile = c.tile;
+    yaw = c.yaw;
+    final want = !c.isMoving
+        ? 'idle'
+        : (c.speed >= runThreshold ? 'run' : 'walk');
+    if (want != _state && !_isOneShot(_state)) {
+      play(want);
+    }
+    update(dt);
+  }
+
+  /// 클립을 이름으로 재생한다. `idle`·`wait`·`walk`·`run`·`dash`·`attack`·
+  /// `shoot`·`hit`·`death`.
+  void play(String name) {
+    _state = name;
+    animator.playByName(name);
+  }
+
+  void update(double dt) {
+    animator.update(dt);
+    // 한 번짜리 동작이 끝나면 대기로 돌아간다. 이게 없으면 공격 자세로
+    // 굳은 채 걸어 다닌다.
+    if (_isOneShot(_state) && animator.progress >= 1.0) {
+      play('idle');
+    }
+  }
+
+  bool _isOneShot(String name) =>
+      name == 'attack' || name == 'hit' || name == 'shoot' || name == 'dash';
+}
+
+/// [RiggedIsoActor] 하나를 그린다.
+///
+/// [HumanoidRenderer] 가 내부에서 세로 단축과 좌우 미러를 처리하므로, 여기서는
+/// 접지점으로 옮기고 원하는 키로 스케일하기만 한다.
+void paintRiggedActor(
+  Canvas c,
+  RiggedIsoActor a,
+  IsoView iso,
+  LightRig light,
+  double time, {
+  double detail = 1.0,
+}) {
+  final anchor = iso.project(a.tile.dx, a.tile.dy, a.airborne);
+  final s = a.height / a.renderer.body.height;
+
+  c.save();
+  c.translate(anchor.dx, anchor.dy);
+  c.scale(s);
+  a.renderer.paint(
+    c,
+    pose: a.animator.pose,
+    light: light,
+    facing: Facing(a.yaw),
+    iso: iso,
+    time: time,
+    detail: detail,
+    ranged: a.ranged,
+  );
+  c.restore();
 }
