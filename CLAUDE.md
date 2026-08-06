@@ -4,6 +4,7 @@
 ## Workflow
 
 - [ ] Use English on your reply.
+- [ ] Git commit after work.
 
 ## Tech Stack
 
