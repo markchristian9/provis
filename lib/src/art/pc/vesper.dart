@@ -57,7 +57,7 @@ class Vesper extends Artist {
       ];
 
   static const _suit = Color(0xFFE2E8F1); // 상체 외피 — 값 위계의 맨 위
-  static const _suitLow = Color(0xFF8E9BAF); // 하체 외피 — 중간 값
+  static const _suitLow = Color(0xFF7C8AA0); // 하체 외피 — 중간 값
   static const _suitDeep = Color(0xFF586375); // 주름 관절과 그늘 패널
   static const _hard = Color(0xFFF0F4F9); // 하드셸 — 헬멧·어깨·무릎
   static const _hull = Color(0xFF2C333F); // 생명유지 장치 — 값의 맨 아래
@@ -77,7 +77,6 @@ class Vesper extends Artist {
   Surface get _sLimb => const Surface(_suit, Finish.leather, contrast: 0.92);
   Surface get _sLimbLow =>
       const Surface(_suitLow, Finish.leather, contrast: 1.0);
-  Surface get _sSuitLow => const Surface(_suitLow, Finish.cloth, contrast: 1.0);
   Surface get _sFlex => const Surface(_suitDeep, Finish.cloth, contrast: 1.1);
   Surface get _sShell => const Surface(_hard, Finish.scale, contrast: 0.95);
   Surface get _sHull => const Surface(_hull, Finish.metal, contrast: 1.3);
@@ -133,10 +132,12 @@ class Vesper extends Artist {
     _chestModule(c, l, t, bob, detail);
     _helmet(c, l, t, bob, sway, detail);
     _flareRod(c, l, bob);
+    // 조명탄을 든 팔. 팔꿈치를 등의 장비 바깥까지 벌려야 상완과 전완이
+    // 또렷한 V 를 이룬다 — 몸에 붙이면 팔 전체가 백팩에 먹힌다.
     _arm(c, l, detail,
-        shoulder: Offset(620 + sway * 0.5, 562 + bob * 0.8),
-        elbow: Offset(704 + sway * 0.8, 654 + bob * 0.4),
-        wrist: Offset(742 + sway, 468 + bob * 0.2),
+        shoulder: Offset(618 + sway * 0.5, 566 + bob * 0.8),
+        elbow: Offset(744 + sway * 0.8, 638 + bob * 0.4),
+        wrist: Offset(744 + sway, 452 + bob * 0.2),
         gripAngle: -math.pi * 0.44,
         capAngle: 0.3,
         grip: 1.0,
@@ -1095,15 +1096,15 @@ class Vesper extends Artist {
     }
     // 측면 통신 패널.
     final commPanel = smoothClosedPath([
-      hc + const Offset(-110, -16),
-      hc + const Offset(-80, -30),
-      hc + const Offset(-70, 18),
-      hc + const Offset(-100, 30),
+      hc + const Offset(-106, -12),
+      hc + const Offset(-82, -24),
+      hc + const Offset(-74, 12),
+      hc + const Offset(-98, 22),
     ], tension: 0.7);
     paintSurface(c, commPanel, _sHull, l, detail: detail, seed: 647);
     c.drawCircle(
-      hc + const Offset(-90, 2),
-      5.5,
+      hc + const Offset(-90, 0),
+      5,
       Paint()
         ..blendMode = BlendMode.plus
         ..color = _hud.fade(0.85),
@@ -1128,9 +1129,26 @@ class Vesper extends Artist {
     paintSurface(c, neck, _sSkin.tinted(const Color(0xFF0E1B2E), 0.4), inner,
         detail: 0.3, rim: false, ao: false, seed: 653);
 
-    final head = headShape(fc, 52, 64,
-        jaw: 0.56, chin: 0.22, turn: 0.5, cheek: 0.95);
-    paintSurface(c, head, _sSkin.tinted(const Color(0xFF16283E), 0.14), inner,
+    // 옆머리는 얼굴보다 **먼저** 그린다. 위에 얹으면 볼 안쪽으로 한 겹만
+    // 들어와도 그늘진 바이저 안에서 그림자와 구분되지 않아 얼굴이 더러워진다.
+    final hairShade = _sHair.tinted(const Color(0xFF16283E), 0.2);
+    for (final s in const [-1.0, 1.0]) {
+      final side = tube(
+        [
+          fc + Offset(s * 50, -56),
+          fc + Offset(s * 64, -12),
+          fc + Offset(s * 56, 34),
+        ],
+        s < 0 ? const [14, 16, 7] : const [12, 14, 6],
+        samples: 14,
+      );
+      paintSurface(c, side, hairShade, inner,
+          detail: detail, rim: false, seed: 657 + s.toInt());
+    }
+
+    final head = headShape(fc, 54, 60,
+        jaw: 0.58, chin: 0.24, turn: 0.5, cheek: 0.96);
+    paintSurface(c, head, _sSkin.tinted(const Color(0xFF16283E), 0.07), inner,
         detail: detail, rim: false, seed: 651);
     occlude(c, head, const Offset(0, -1), depth: 0.2, alpha: 0.3);
 
@@ -1153,55 +1171,42 @@ class Vesper extends Artist {
         scleraTint: const Color(0xFFE0DAD6));
     // 눈썹은 얇고 높게. 굵게 깔면 그늘진 바이저 안에서 눈과 뭉쳐 인상이
     // 통째로 굳어 버린다 — 이 얼굴에서 가장 예민한 두 획이다.
-    drawBrow(c, Offset(fc.dx - 25, eyeY - 26), 21, 2.2,
-        const Color(0xFF4A3128), arch: 0.55, angle: -0.12);
-    drawBrow(c, Offset(fc.dx + 23, eyeY - 24), 17, 1.9,
-        const Color(0xFF4A3128), arch: 0.52, angle: 0.1, mirrored: true);
+    drawBrow(c, Offset(fc.dx - 25, eyeY - 32), 21, 2.5,
+        const Color(0xFF4A3128), arch: 1.25, angle: -0.14);
+    drawBrow(c, Offset(fc.dx + 23, eyeY - 30), 17, 2.1,
+        const Color(0xFF4A3128), arch: 1.2, angle: 0.12, mirrored: true);
 
-    drawNose(c, Offset(fc.dx + 4, eyeY + 7), 14, 24, _rSkin, inner, turn: 0.45);
-    drawMouth(c, Offset(fc.dx + 6, fc.dy + 40), 16,
-        skin: _rSkin, lip: const Color(0xFFC0736E), smile: 0.08, turn: 0.45);
+    drawNose(c, Offset(fc.dx + 4, eyeY + 6), 13, 20, _rSkin, inner, turn: 0.45);
+    drawMouth(c, Offset(fc.dx + 6, fc.dy + 36), 18,
+        skin: _rSkin, lip: const Color(0xFFB85F5C), smile: 0.12, turn: 0.45);
 
     // 헬멧 안이라 머리카락은 이마와 관자놀이에만 남는다. 눈썹까지 내려오면
     // 바이저 그늘과 겹쳐 두 획이 하나의 검은 띠가 되고 인상이 죽는다.
-    final hairShade = _sHair.tinted(const Color(0xFF16283E), 0.2);
-    for (final s in const [-1.0, 1.0]) {
-      final side = tube(
-        [
-          fc + Offset(s * 48, -46),
-          fc + Offset(s * 58, -8),
-          fc + Offset(s * 52, 32),
-        ],
-        s < 0 ? const [13, 15, 7] : const [11, 13, 6],
-        samples: 14,
-      );
-      paintSurface(c, side, hairShade, inner,
-          detail: detail, rim: false, seed: 657 + s.toInt());
-    }
+    // 앞머리는 이마 위쪽만. 안쪽 윤곽을 눈썹에서 30px 이상 띄운다.
     final fringe = smoothClosedPath([
-      fc + const Offset(-50, -46),
-      fc + const Offset(-56, -68),
-      fc + const Offset(-24, -84),
-      fc + const Offset(24, -84),
-      fc + const Offset(56, -66),
-      fc + const Offset(56, -44),
-      fc + const Offset(36, -58),
-      fc + const Offset(-2, -64),
-      fc + const Offset(-30, -56),
+      fc + const Offset(-52, -50),
+      fc + const Offset(-58, -70),
+      fc + const Offset(-24, -86),
+      fc + const Offset(24, -86),
+      fc + const Offset(58, -68),
+      fc + const Offset(56, -48),
+      fc + const Offset(32, -62),
+      fc + const Offset(-2, -68),
+      fc + const Offset(-30, -60),
     ], tension: 0.88);
     paintSurface(c, fringe, hairShade, inner,
         detail: detail, rim: false, seed: 655);
     if (detail > 0.4) {
-      for (var i = 0; i < 3; i++) {
-        final u = i / 2;
+      // 흘러내린 잔머리는 양 끝에서만, 그것도 바깥으로 흐르게 한다.
+      for (final s in const [-1.0, 1.0]) {
         final strand = hairStrand(
-          fc + Offset(lerpD(-48, 46, u), lerpD(-52, -56, math.sin(u * math.pi))),
-          Offset(lerpD(-0.7, 0.7, u), 0.62),
-          26 + math.sin(u * math.pi) * 14,
+          fc + Offset(s * 46, -60),
+          Offset(s * 0.8, 0.6),
+          34,
           5,
           t,
-          phase: i * 1.9,
-          curl: 0.24,
+          phase: s * 1.9,
+          curl: 0.22,
           flutter: 0.12,
         );
         paintSurface(c, strand, hairShade, inner,
@@ -1236,8 +1241,8 @@ class Vesper extends Artist {
 
   /// 조명탄의 몸체. 손보다 먼저 그려야 손가락이 봉을 감아쥔 것으로 읽힌다.
   void _flareRod(Canvas c, LightRig l, double bob) {
-    final grip = Offset(744, 468 + bob * 0.2);
-    final tip = Offset(770, 314 + bob * 0.2);
+    final grip = Offset(746, 452 + bob * 0.2);
+    final tip = Offset(772, 296 + bob * 0.2);
     final rod = tube(
       [grip + const Offset(-6, 40), grip, lerpO(grip, tip, 0.6), tip],
       const [9, 10, 8, 7],
@@ -1264,8 +1269,8 @@ class Vesper extends Artist {
   /// 광원을 그려 놓고 피사체가 반응하지 않으면 조명탄은 화면에 붙은 스티커가
   /// 된다. 그래서 발광 직후 오른쪽 상반신에 따뜻한 되비침을 얹어 둘을 잇는다.
   void _flareLight(Canvas c, double t, double flick, double bob) {
-    final grip = Offset(744, 468 + bob * 0.2);
-    final tip = Offset(770, 314 + bob * 0.2);
+    final grip = Offset(746, 452 + bob * 0.2);
+    final tip = Offset(772, 296 + bob * 0.2);
 
     final core = tube(
       [lerpO(grip, tip, 0.72), tip + const Offset(4, -16)],
