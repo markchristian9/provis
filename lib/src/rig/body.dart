@@ -62,6 +62,29 @@ class Body {
   /// 측면뷰에서 몸의 앞뒤 두께 비율. 가슴 판·골반 판의 폭을 만든다.
   final double depth;
 
+  /// 어깨 폭·골반 폭만 바꾼 사본. 페이싱에 따라 좌우 폭이 화면에서
+  /// 줄어드는 것을 반영할 때 쓴다 — 치수 자체를 건드리지 않으므로 IK 와
+  /// 사지 길이는 그대로 유지된다.
+  Body scaledWidth(double k) => Body(
+        height: height,
+        hipHeight: hipHeight,
+        torso: torso,
+        neck: neck,
+        headLen: headLen,
+        headWidth: headWidth,
+        shoulderHalf: shoulderHalf * k,
+        hipHalf: hipHalf * k,
+        upperArm: upperArm,
+        foreArm: foreArm,
+        hand: hand,
+        thigh: thigh,
+        shin: shin,
+        foot: foot,
+        bulk: bulk,
+        hunch: hunch,
+        depth: depth,
+      );
+
   double get shoulderY => -(hipHeight + torso);
 
   double get armLength => upperArm + foreArm;
