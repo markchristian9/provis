@@ -8,39 +8,49 @@ import '../core/rng.dart';
 import '../core/shading.dart';
 import '../core/spline.dart';
 import 'prop.dart';
+import 'prop_kit.dart';
 
 /// 나무의 종류. 실루엣이 근본적으로 달라지므로 색이 아니라 형상이 갈린다.
 enum TreeKind {
-  /// 활엽수 — 둥근 관목 덩어리. 가장 흔한 배경 나무.
+  /// 활엽수 — 잎 뭉치가 겹친 둥근 수관. 가장 흔한 배경 나무.
   broadleaf,
 
-  /// 침엽수 — 위로 갈수록 좁아지는 원뿔. 수직선을 만들어 화면을 잡아 준다.
+  /// 전나무 — 처진 바늘잎 층이 위로 좁아진다. 수직선을 만들어 화면을 잡아 준다.
   conifer,
+
+  /// 소나무 — 굽은 줄기가 길게 드러나고 수관이 우산처럼 위에만 얹힌다.
+  /// 전나무와 실루엣이 정반대라 둘을 섞어 심으면 숲의 밀도가 단번에 올라간다.
+  pine,
 
   /// 고사목 — 잎이 없고 가지만 남았다. 실루엣 자체가 이야기를 한다.
   dead,
 
-  /// 꽃나무 — 잎 대신 꽃. 색으로 시선을 끄는 강조용.
+  /// 꽃나무(벚꽃) — 잎 대신 꽃. 색으로 시선을 끄는 강조용이며 꽃잎이 흩날린다.
   blossom,
 
-  /// 수양버들 — 아래로 늘어지는 가지. 물가에 세운다.
+  /// 수양버들 — 아래로 늘어지는 잎 가닥. 물가에 세운다.
   willow,
+
+  /// 관목·풀나무 — 줄기가 거의 없는 낮은 덤불. 나무 밑동과 담장 아래를 메운다.
+  bush,
 }
 
 /// 절차적으로 자라는 나무.
 ///
-/// ## 왜 이렇게 그리는가
+/// ## 나무가 나무로 읽히는 네 가지
 ///
-/// 나무를 "기둥 + 초록 원"으로 그리면 즉시 클립아트가 된다. 진짜 나무로
-/// 읽히게 하는 것은 세 가지다.
-///
-/// 1. **잎 덩어리를 여러 겹으로 나눈다.** 뒤쪽 덩어리를 어둡고 차갑게, 앞쪽을
-///    밝고 따뜻하게 칠하면 평면이던 수관에 부피가 생긴다. 한 덩어리로 그리면
-///    아무리 잘 칠해도 종잇장이다.
-/// 2. **가지가 잎 사이로 비친다.** 수관 안쪽에 가지 끝이 몇 개 보이면 잎이
-///    가지에 달려 있다는 사실이 전달된다.
-/// 3. **바람이 위상차를 갖는다.** 잎 덩어리마다 흔들림의 위상을 어긋나게 주면
-///    나무가 살아 있는 것으로 보인다. 통째로 흔들면 판때기가 흔들린다.
+/// 1. **실루엣이 잎을 말한다.** 매끄러운 타원에 초록을 칠하면 어떤 셰이딩을
+///    얹어도 풍선이다. 수관 윤곽은 잎 뭉치가 만드는 울퉁불퉁한 선이어야 하고
+///    ([leafCluster]), 가장자리에서 잎 몇 장이 삐져나와야 한다
+///    ([scatterLeaves]).
+/// 2. **빛이 잎을 통과한다.** 광원 반대쪽 잎이 그냥 어두우면 플라스틱이다.
+///    얇은 잎은 빛을 투과시켜 그늘 쪽이 밝은 황록으로 뜬다 — [Finish.foliage]
+///    와 [translucentBand] 가 이 한 겹을 담당한다.
+/// 3. **덩어리 안에 덩어리가 있다.** 수관은 잎 뭉치 여럿이 겹친 것이라 단일
+///    그라디언트로는 나오지 않는 뭉치 단위의 밝기 차가 있다([lobeLight]).
+///    그리고 수관은 자기 줄기에 그림자를 드리운다.
+/// 4. **바람에 위상차가 있다.** 덩어리마다 흔들림의 위상을 어긋나게 준다.
+///    통째로 흔들면 판때기가 흔들린다.
 class TreeProp extends Prop {
   TreeProp({
     required this.seed,
@@ -51,18 +61,28 @@ class TreeProp extends Prop {
     this.wind = 1.0,
   }) {
     final r = Rng(seed);
-    _lean = r.signed(0.10);
-    _trunkR = trunkHeight * r.range(0.055, 0.085);
-    _canopyR = trunkHeight * switch (kind) {
-      TreeKind.conifer => r.range(0.42, 0.52),
-      TreeKind.dead => r.range(0.30, 0.40),
-      TreeKind.willow => r.range(0.52, 0.64),
-      _ => r.range(0.55, 0.70),
-    };
+    _lean = r.signed(0.09);
+    _trunkR = trunkHeight *
+        switch (kind) {
+          TreeKind.pine => r.range(0.048, 0.070),
+          TreeKind.bush => r.range(0.030, 0.045),
+          _ => r.range(0.052, 0.080),
+        };
+    _canopyR = trunkHeight *
+        switch (kind) {
+          TreeKind.conifer => r.range(0.40, 0.50),
+          TreeKind.pine => r.range(0.52, 0.66),
+          TreeKind.dead => r.range(0.30, 0.40),
+          TreeKind.willow => r.range(0.52, 0.64),
+          TreeKind.bush => r.range(0.62, 0.86),
+          _ => r.range(0.56, 0.72),
+        };
     _blobCount = switch (kind) {
-      TreeKind.conifer => r.intRange(4, 7),
+      TreeKind.conifer => r.intRange(6, 9),
+      TreeKind.pine => r.intRange(3, 5),
       TreeKind.dead => 0,
-      _ => r.intRange(4, 7),
+      TreeKind.bush => r.intRange(3, 5),
+      _ => r.intRange(5, 7),
     };
     _branchCount = r.intRange(3, 6);
     _noise = Noise(seed * 31 + 7);
@@ -71,17 +91,33 @@ class TreeProp extends Prop {
     // 숲 전체가 "같은 계절"로 읽힌다.
     final cr = r.branch(11);
     _bark = barkColor ??
-        hsl(cr.range(20, 34), cr.range(0.18, 0.34), cr.range(0.16, 0.26));
+        switch (kind) {
+          // 자작·벚나무 계열은 껍질이 밝고 회색기가 돈다.
+          TreeKind.blossom =>
+            hsl(cr.range(22, 34), cr.range(0.08, 0.16), cr.range(0.24, 0.34)),
+          TreeKind.pine =>
+            hsl(cr.range(14, 26), cr.range(0.24, 0.40), cr.range(0.18, 0.27)),
+          _ => hsl(cr.range(20, 34), cr.range(0.16, 0.32), cr.range(0.15, 0.24)),
+        };
     _leaf = canopyColor ??
         switch (kind) {
           TreeKind.blossom =>
-            hsl(cr.range(330, 355), cr.range(0.45, 0.68), cr.range(0.62, 0.76)),
+            hsl(cr.range(332, 352), cr.range(0.42, 0.62), cr.range(0.66, 0.80)),
           TreeKind.conifer =>
-            hsl(cr.range(140, 165), cr.range(0.32, 0.48), cr.range(0.20, 0.30)),
+            hsl(cr.range(136, 162), cr.range(0.30, 0.46), cr.range(0.19, 0.28)),
+          TreeKind.pine =>
+            hsl(cr.range(118, 142), cr.range(0.26, 0.42), cr.range(0.22, 0.31)),
           TreeKind.willow =>
-            hsl(cr.range(75, 95), cr.range(0.30, 0.45), cr.range(0.34, 0.44)),
-          _ => hsl(cr.range(88, 122), cr.range(0.30, 0.50), cr.range(0.28, 0.40)),
+            hsl(cr.range(72, 94), cr.range(0.30, 0.46), cr.range(0.32, 0.42)),
+          TreeKind.bush =>
+            hsl(cr.range(84, 116), cr.range(0.30, 0.48), cr.range(0.24, 0.34)),
+          _ => hsl(cr.range(84, 124), cr.range(0.28, 0.48), cr.range(0.26, 0.38)),
         };
+    // 투과광 — 잎을 통과해 나오는 빛은 언제나 원색보다 노랗고 밝다.
+    _through = _leaf.shiftHue(kind == TreeKind.blossom ? 6 : -14)
+        .saturate(0.30)
+        .lighten(kind == TreeKind.blossom ? 0.20 : 0.34);
+    _litter = _bark.mix(_leaf, 0.30).darken(0.18);
   }
 
   final int seed;
@@ -103,130 +139,200 @@ class TreeProp extends Prop {
   late final int _branchCount;
   late final Color _bark;
   late final Color _leaf;
+  late final Color _through;
+  late final Color _litter;
   late final Noise _noise;
 
   @override
-  double get height => trunkHeight + _canopyR * 1.6;
+  double get height => switch (kind) {
+        TreeKind.bush => _canopyR * 1.5,
+        _ => trunkHeight + _canopyR * 1.6,
+      };
 
   @override
   Size get footprint => _canopyR > 130 ? const Size(2, 2) : const Size(1, 1);
 
   @override
-  bool get walkable => false;
+  bool get walkable => kind == TreeKind.bush;
 
   @override
   void paint(Canvas c, double t, LightRig light, {double detail = 1.0}) {
-    final sway = wind * math.sin(t * 0.9 + seed * 0.37) * 0.028;
-    final topX = (_lean + sway) * trunkHeight;
+    final s = wind * sway(t, seed, speed: 0.85) * 0.030;
+    final topX = (_lean + s) * trunkHeight;
     final topY = -trunkHeight;
 
-    propShadow(c, _canopyR * 0.62, light, alpha: 0.40);
-
-    _paintTrunk(c, light, topX, topY, detail);
-
-    if (kind == TreeKind.dead) {
-      _paintBareBranches(c, light, topX, topY, sway, detail);
-      return;
+    // ── 접지 세 겹 ──────────────────────────────────────────────────────
+    // 드리운 그림자(넓고 옅다) → 밑동 흙(솟아 있다) → 접촉 코어(짙다).
+    // 셋이 다 있어야 나무가 지면에 박힌 것으로 보인다.
+    propShadow(c, _canopyR * 0.66, light, alpha: 0.38);
+    if (detail > 0.3 && kind != TreeKind.bush) {
+      rootSkirt(c, _trunkR * 3.4, _litter, light, seed: seed, alpha: 0.55);
     }
-    if (kind == TreeKind.conifer) {
-      _paintConiferTiers(c, light, topX, topY, sway, detail);
-      return;
-    }
-    _paintBranches(c, light, topX, topY, sway, detail);
-    _paintCanopy(c, light, topX, topY, t, detail);
-    if (kind == TreeKind.willow) {
-      _paintWillowFall(c, light, topX, topY, t, detail);
+    contactAO(c, _trunkR * 1.9, alpha: 0.5);
+
+    switch (kind) {
+      case TreeKind.dead:
+        _paintTrunk(c, light, topX, topY, detail);
+        _paintBareBranches(c, light, topX, topY, s, detail);
+      case TreeKind.conifer:
+        _paintTrunk(c, light, topX, topY * 1.06, detail, taper: 0.30);
+        _paintConiferTiers(c, light, topX, topY, t, detail);
+      case TreeKind.pine:
+        _paintTrunk(c, light, topX, topY, detail, curved: true);
+        _paintPineCrown(c, light, topX, topY, t, detail);
+      case TreeKind.bush:
+        _paintBush(c, light, t, detail);
+      case TreeKind.willow:
+        _paintTrunk(c, light, topX, topY, detail);
+        _paintBranches(c, light, topX, topY, s, detail);
+        _paintCanopy(c, light, topX, topY, t, detail);
+        _paintWillowFall(c, light, topX, topY, t, detail);
+      case TreeKind.broadleaf:
+      case TreeKind.blossom:
+        _paintTrunk(c, light, topX, topY, detail);
+        _paintBranches(c, light, topX, topY, s, detail);
+        _paintCanopy(c, light, topX, topY, t, detail);
+        if (kind == TreeKind.blossom && detail > 0.5) {
+          _paintFallingPetals(c, t, detail);
+        }
     }
   }
 
   // ── 줄기 ────────────────────────────────────────────────────────────────
-  void _paintTrunk(Canvas c, LightRig l, double topX, double topY, double detail) {
-    // 밑동이 굵고 위가 가는 테이퍼. 뿌리 쪽이 살짝 벌어져야 땅에 박힌 것으로
+  void _paintTrunk(
+    Canvas c,
+    LightRig l,
+    double topX,
+    double topY,
+    double detail, {
+    double taper = 0.52,
+    bool curved = false,
+  }) {
+    // 밑동이 굵고 위가 가는 테이퍼. 뿌리 쪽이 벌어져야 땅에 박힌 것으로
     // 보인다. 직선 원기둥으로 그리면 전봇대가 된다.
+    final bend = curved ? _noise.signed1(seed * 0.7) * 0.22 : 0.0;
     final spine = [
       Offset(0, 0),
-      Offset(topX * 0.18, topY * 0.32),
-      Offset(topX * 0.58, topY * 0.68),
+      Offset(topX * 0.18 + trunkHeight * bend * 0.35, topY * 0.32),
+      Offset(topX * 0.58 + trunkHeight * bend * 0.55, topY * 0.68),
       Offset(topX, topY),
     ];
     final trunk = tube(
       spine,
-      [_trunkR * 1.55, _trunkR * 1.0, _trunkR * 0.78, _trunkR * 0.52],
-      samples: 18,
+      [_trunkR * 1.70, _trunkR * 1.02, _trunkR * 0.78, _trunkR * taper],
+      samples: 20,
       capStart: false,
     );
-    paintSurface(c, trunk, Surface(_bark, Finish.wood, contrast: 1.05), l,
+    paintSurface(c, trunk, Surface(_bark, Finish.bark, contrast: 1.15), l,
         detail: detail, seed: seed);
 
     // 뿌리 확장부 — 밑동에서 갈라져 나온 짧은 판. 접지를 단단하게 만든다.
     if (detail > 0.4) {
       final rr = Rng(seed * 7 + 3);
-      for (var i = 0; i < 3; i++) {
-        final a = rr.range(-2.6, -0.5);
-        final len = _trunkR * rr.range(1.2, 2.0);
+      for (var i = 0; i < 4; i++) {
+        final a = rr.range(-2.9, -0.25);
+        final len = _trunkR * rr.range(1.4, 2.4);
         final root = tube(
-          [Offset.zero, Offset(math.cos(a) * len * 0.6, -math.sin(a).abs() * len * 0.2),
-           Offset(math.cos(a) * len, -math.sin(a).abs() * len * 0.28)],
-          [_trunkR * 0.9, _trunkR * 0.5, _trunkR * 0.16],
+          [
+            Offset(0, -_trunkR * 0.35),
+            Offset(math.cos(a) * len * 0.6, -math.sin(a).abs() * len * 0.16),
+            Offset(math.cos(a) * len, -math.sin(a).abs() * len * 0.22),
+          ],
+          [_trunkR * 1.0, _trunkR * 0.52, _trunkR * 0.14],
           samples: 8,
         );
-        paintSurface(c, root, Surface(_bark.darken(0.06), Finish.wood), l,
-            detail: detail * 0.6, seed: seed + i);
+        paintSurface(c, root, Surface(_bark.darken(0.08), Finish.bark), l,
+            detail: detail * 0.5, seed: seed + i);
       }
+    }
+
+    // 수관이 줄기에 드리우는 그림자. 잎 밑이 밝으면 수관이 떠 보인다.
+    if (kind != TreeKind.dead) {
+      c.save();
+      c.clipPath(trunk);
+      final top = topY * 0.55;
+      c.drawRect(
+        Rect.fromLTRB(-_trunkR * 3, topY * 1.2, _trunkR * 3, top),
+        Paint()
+          ..isAntiAlias = true
+          ..blendMode = BlendMode.multiply
+          ..shader = Gradient.linear(
+            Offset(0, topY),
+            Offset(0, top),
+            [
+              l.ambient.mix(const Color(0xFF000000), 0.30),
+              const Color(0xFFFFFFFF),
+            ],
+          ),
+      );
+      c.restore();
     }
   }
 
   // ── 가지 ────────────────────────────────────────────────────────────────
-  void _paintBranches(
-      Canvas c, LightRig l, double topX, double topY, double sway, double detail) {
+  void _paintBranches(Canvas c, LightRig l, double topX, double topY,
+      double swayAmt, double detail) {
     final r = Rng(seed * 13 + 5);
     for (var i = 0; i < _branchCount; i++) {
       final up = r.range(0.45, 0.92);
       final side = r.chance(0.5) ? 1.0 : -1.0;
       final from = Offset(topX * up, topY * up);
       final len = _canopyR * r.range(0.55, 0.95);
-      final ang = side * r.range(0.5, 1.25) + sway * 2;
-      final to = from + Offset(math.cos(-ang) * len * side.abs() * side,
-                               -math.sin(ang.abs()) * len * 0.72);
+      final lift = r.range(0.35, 0.85);
+      final mid = from + Offset(side * len * 0.45, -len * lift * 0.30);
+      final to = mid + Offset(side * len * 0.55, -len * lift * 0.48);
       final br = tube(
-        [from, lerpO(from, to, 0.55) + Offset(0, -len * 0.10), to],
-        [_trunkR * 0.55, _trunkR * 0.30, _trunkR * 0.10],
-        samples: 10,
+        [from, mid, to],
+        [_trunkR * 0.62, _trunkR * 0.32, _trunkR * 0.10],
+        samples: 12,
       );
-      paintSurface(c, br, Surface(_bark.darken(0.1), Finish.wood), l,
-          detail: detail * 0.7, seed: seed + i * 3);
+      paintSurface(c, br, Surface(_bark.darken(0.12), Finish.bark), l,
+          detail: detail * 0.6, seed: seed + i * 3);
     }
   }
 
-  void _paintBareBranches(
-      Canvas c, LightRig l, double topX, double topY, double sway, double detail) {
-    // 고사목은 가지가 곧 실루엣이다. 더 많이, 더 멀리, 더 날카롭게 뻗는다.
+  void _paintBareBranches(Canvas c, LightRig l, double topX, double topY,
+      double swayAmt, double detail) {
+    // 고사목은 가지가 곧 실루엣이다. 굵기 위계를 확실히 줘야 침 다발이 아니라
+    // 나무로 읽힌다 — 굵은 주지 몇 개에서 잔가지가 갈라진다.
     final r = Rng(seed * 17 + 11);
-    for (var i = 0; i < 9; i++) {
-      final up = r.range(0.35, 1.0);
-      final side = r.chance(0.5) ? 1.0 : -1.0;
-      final from = Offset(topX * up, topY * up);
-      final len = _canopyR * r.range(0.7, 1.5);
-      final lift = r.range(0.3, 1.1);
-      final mid = from + Offset(side * len * 0.45, -len * lift * 0.35);
-      final to = mid + Offset(side * len * 0.5, -len * lift * 0.5);
+    void limb(Offset from, Offset dir, double len, double thick, int depth) {
+      final side = dir.dx.sign == 0 ? 1.0 : dir.dx.sign;
+      final mid = from + dir * (len * 0.5) + Offset(0, -len * 0.12);
+      final to = from + dir * len;
       final br = tube(
         [from, mid, to],
-        [_trunkR * 0.48, _trunkR * 0.22, _trunkR * 0.03],
-        samples: 12,
+        [thick, thick * 0.55, thick * 0.14],
+        samples: 10,
       );
-      paintSurface(c, br, Surface(_bark.darken(0.14), Finish.wood), l,
-          detail: detail * 0.6, seed: seed + i);
-      // 잔가지
-      if (detail > 0.5 && r.chance(0.7)) {
-        final tw = tube(
-          [mid, lerpO(mid, to, 0.6) + Offset(side * len * 0.18, -len * 0.14)],
-          [_trunkR * 0.16, _trunkR * 0.02],
-          samples: 6,
+      paintSurface(c, br, Surface(_bark.darken(0.10 + depth * 0.05), Finish.bark),
+          l, detail: detail * 0.55, seed: seed + depth * 13 + len.round());
+      if (depth >= 2 || len < _trunkR * 2.2) return;
+      final n = r.intRange(2, 4);
+      for (var i = 0; i < n; i++) {
+        final a = dir.angle + side * r.range(-0.85, 0.85) - 0.25;
+        limb(
+          lerpO(mid, to, r.range(0.35, 0.9)),
+          Offset(math.cos(a), math.sin(a)),
+          len * r.range(0.42, 0.62),
+          thick * 0.5,
+          depth + 1,
         );
-        paintSurface(c, tw, Surface(_bark.darken(0.2), Finish.wood), l,
-            detail: 0.3, seed: seed + i * 5);
       }
+    }
+
+    for (var i = 0; i < 5; i++) {
+      final up = r.range(0.42, 1.0);
+      final side = r.chance(0.5) ? 1.0 : -1.0;
+      final from = Offset(topX * up, topY * up);
+      final a = -math.pi * 0.5 + side * r.range(0.35, 1.1);
+      limb(
+        from,
+        Offset(math.cos(a), math.sin(a)),
+        _canopyR * r.range(0.8, 1.4),
+        _trunkR * 0.5,
+        0,
+      );
     }
   }
 
@@ -234,18 +340,19 @@ class TreeProp extends Prop {
   void _paintCanopy(
       Canvas c, LightRig l, double topX, double topY, double t, double detail) {
     final r = Rng(seed * 23 + 9);
-    final center = Offset(topX, topY - _canopyR * 0.30);
+    final center = Offset(topX, topY - _canopyR * 0.34);
 
-    // 덩어리를 뒤 → 앞 순서로 그린다. 뒤쪽은 어둡고 차갑게, 앞쪽은 밝고
-    // 따뜻하게. 이 대비 하나가 수관에 부피를 만든다.
+    // 덩어리를 뒤 → 앞 순서로 그린다. 크기에 위계를 줘야(큰 것 하나, 중간
+    // 둘셋, 작은 여럿) 실루엣이 읽힌다 — 같은 크기를 늘어놓으면 포도송이다.
     final clumps = <(Offset, double, double)>[];
     for (var i = 0; i < _blobCount; i++) {
-      final a = (i / _blobCount) * math.pi * 2 + r.signed(0.4);
-      final dist = _canopyR * r.range(0.20, 0.52);
-      final rad = _canopyR * r.range(0.46, 0.72);
+      final a = (i / _blobCount) * math.pi * 2 + r.signed(0.42);
+      final dist = _canopyR * r.range(0.18, 0.50);
+      // 첫 덩어리를 크게 잡아 주역으로 삼는다.
+      final rad = _canopyR * (i == 0 ? r.range(0.72, 0.86) : r.range(0.40, 0.66));
       final depth = math.sin(a); // -1 뒤 … +1 앞
       clumps.add((
-        center + Offset(math.cos(a) * dist, -math.sin(a) * dist * 0.55),
+        center + Offset(math.cos(a) * dist, -math.sin(a) * dist * 0.52),
         rad,
         depth,
       ));
@@ -255,94 +362,346 @@ class TreeProp extends Prop {
     for (final (i, clump) in clumps.indexed) {
       final (pos, rad, depth) = clump;
       // 잎 덩어리마다 위상이 다른 바람.
-      final w = wind * math.sin(t * 1.4 + i * 1.7 + seed * 0.29) * rad * 0.035;
-      final wobbled = pos + Offset(w, w * 0.35);
-
-      final lit = (depth + 1) * 0.5; // 0 뒤 … 1 앞
-      final tone = _leaf
-          .darken(0.22 * (1 - lit))
-          .mix(l.ambient, 0.30 * (1 - lit))
-          .lighten(0.08 * lit);
-
-      final shape = blob(
-        wobbled,
+      final w = wind * sway(t, seed, phase: i * 1.7, speed: 1.35) * rad * 0.038;
+      _paintLeafMass(
+        c,
+        l,
+        pos + Offset(w, w * 0.3),
         rad,
-        rad * 0.88,
-        points: 13,
-        warp: (angle, u) => 1.0 + 0.16 * _noise.signed1(u * 5.0 + i * 3.1),
+        (depth + 1) * 0.5,
+        seed + i * 11,
+        detail,
       );
+    }
+
+    // 수관 가장자리에서 삐져나온 잎. 매끈한 윤곽을 깨뜨리는 마지막 한 겹이며,
+    // 비용 대비 실루엣 개선 효과가 가장 크다.
+    if (detail > 0.55) {
+      scatterLeaves(
+        c,
+        center,
+        _canopyR * 1.02,
+        _canopyR * 0.86,
+        kind == TreeKind.blossom ? _leaf.lighten(0.06) : _leaf.lighten(0.10),
+        l,
+        seed: seed * 3 + 5,
+        count: (30 * detail).round(),
+        size: kind == TreeKind.blossom ? 0.13 : 0.17,
+        sway: wind * sway(t, seed, speed: 1.2) * 0.12,
+      );
+    }
+  }
+
+  /// 잎 뭉치 하나. 실루엣 → 재질 → 내부 요철 → 투과 → 림 순서로 쌓는다.
+  void _paintLeafMass(Canvas c, LightRig l, Offset at, double rad, double lit,
+      int massSeed, double detail) {
+    final shape = leafCluster(
+      at,
+      rad,
+      rad * 0.88,
+      lobes: detail > 0.5 ? 8 : 5,
+      lobeSize: 0.46,
+      seed: massSeed,
+    );
+
+    // 뒤쪽은 어둡고 차갑게, 앞쪽은 밝고 따뜻하게. 이 대비가 부피를 만든다.
+    final tone = _leaf
+        .darken(0.26 * (1 - lit))
+        .mix(l.ambient, 0.32 * (1 - lit))
+        .lighten(0.07 * lit);
+
+    paintSurface(
+      c,
+      shape,
+      Surface(
+        tone,
+        Finish.foliage,
+        contrast: 0.95 + 0.25 * lit,
+        sss: _through.darken(0.20 * (1 - lit)),
+      ),
+      l,
+      detail: detail,
+      seed: massSeed,
+    );
+
+    // 뭉치 단위의 밝기 차 — 잎이 여러 겹으로 겹쳐 있다는 신호.
+    if (detail > 0.4) {
+      c.save();
+      c.clipPath(shape);
+      lobeLight(c, at, rad, rad * 0.88, tone, l,
+          seed: massSeed, count: 3, strength: 0.55 + 0.55 * lit);
+      c.restore();
+    }
+
+    // 빛이 잎을 통과해 그늘 쪽 가장자리가 뜬다.
+    translucentBand(
+      c,
+      shape,
+      l,
+      width: rad * 0.14,
+      color: _through,
+      alpha: (0.16 + 0.20 * lit) * l.intensity,
+      blur: rad * 0.10,
+    );
+
+    // 앞쪽 덩어리 위에만 림을 얹어 수관이 하늘과 만나는 선을 살린다.
+    if (lit > 0.55 && detail > 0.45) {
+      rimBand(c, shape, l, width: rad * 0.09, alpha: 0.42 * lit, blur: rad * 0.05);
+    }
+  }
+
+  // ── 전나무 ──────────────────────────────────────────────────────────────
+  void _paintConiferTiers(
+      Canvas c, LightRig l, double topX, double topY, double t, double detail) {
+    // 처진 바늘잎 층을 아래에서 위로 쌓는다. **위층이 아래층에 드리우는
+    // 그림자**가 이 나무의 입체를 만드는 전부다 — 그것이 없으면 초록 삼각형이
+    // 겹친 것에 지나지 않는다.
+    final tiers = _blobCount;
+    final shapes = <Path>[];
+    final tones = <Color>[];
+
+    for (var i = 0; i < tiers; i++) {
+      final u = i / (tiers - 1); // 0 아래 … 1 위
+      final y = topY * (0.24 + 0.80 * u) - _canopyR * 0.05;
+      final halfW = _canopyR * (1.0 - 0.78 * u) * (0.92 + 0.16 * _noise.at1(i * 3.1));
+      final drop = _canopyR * (0.50 - 0.16 * u);
+      final w = wind * sway(t, seed, phase: i * 0.8, speed: 1.1) * halfW * 0.045;
+      final cx = topX * (0.24 + 0.80 * u) + w;
+
+      shapes.add(coniferTier(
+        Offset(cx, y - drop * 0.9),
+        halfW,
+        drop,
+        teeth: detail > 0.5 ? 7 : 5,
+        seed: seed + i * 7,
+        sag: 0.36,
+      ));
+      tones.add(_leaf.lighten(0.16 * u).mix(l.ambient, 0.18 * (1 - u)));
+    }
+
+    for (var i = 0; i < tiers; i++) {
+      paintSurface(
+        c,
+        shapes[i],
+        Surface(tones[i], Finish.foliage,
+            contrast: 1.05, sss: _through.darken(0.28 * (1 - i / tiers))),
+        l,
+        detail: detail,
+        seed: seed + i * 7,
+      );
+
+      // 위층 그림자. 아래층 위쪽 절반이 눌려야 층이 겹쳐 보인다.
+      if (i + 1 < tiers) {
+        c.save();
+        c.clipPath(shapes[i]);
+        final ub = shapes[i + 1].getBounds();
+        c.drawPath(
+          shapes[i + 1].shift(Offset(0, ub.height * 0.34)),
+          Paint()
+            ..isAntiAlias = true
+            ..blendMode = BlendMode.multiply
+            ..color = l.ambient.mix(const Color(0xFF05070E), 0.30).fade(0.62)
+            ..maskFilter = MaskFilter.blur(BlurStyle.normal, ub.width * 0.06),
+        );
+        c.restore();
+      }
+
+      translucentBand(c, shapes[i], l,
+          width: _canopyR * 0.06,
+          color: _through,
+          alpha: 0.14 * l.intensity,
+          blur: _canopyR * 0.05);
+      if (detail > 0.5) {
+        rimBand(c, shapes[i], l,
+            width: _canopyR * 0.035, alpha: 0.34, blur: 2);
+      }
+    }
+  }
+
+  // ── 소나무 ──────────────────────────────────────────────────────────────
+  void _paintPineCrown(
+      Canvas c, LightRig l, double topX, double topY, double t, double detail) {
+    // 소나무는 줄기가 길게 드러나고 수관이 위에만 우산처럼 얹힌다. 가지가
+    // 옆으로 뻗고 그 끝에서 잎 다발이 판판하게 퍼진다.
+    final r = Rng(seed * 19 + 3);
+    final tufts = <(Offset, double, double)>[];
+
+    for (var i = 0; i < _blobCount; i++) {
+      final side = i.isEven ? 1.0 : -1.0;
+      final u = 0.72 + (i / _blobCount) * 0.34;
+      final from = Offset(topX * u, topY * u);
+      final len = _canopyR * r.range(0.55, 1.0);
+      final rise = r.range(0.18, 0.42);
+      final to = from + Offset(side * len, -len * rise);
+
+      final br = tube(
+        [from, lerpO(from, to, 0.55) + Offset(0, len * 0.10), to],
+        [_trunkR * 0.60, _trunkR * 0.32, _trunkR * 0.12],
+        samples: 12,
+      );
+      paintSurface(c, br, Surface(_bark.darken(0.10), Finish.bark), l,
+          detail: detail * 0.6, seed: seed + i * 5);
+
+      tufts.add((to, _canopyR * r.range(0.36, 0.54), side));
+    }
+
+    // 잎 다발은 판판하게(가로로 넓게) 퍼진다. 이 납작함이 소나무의 정체성이다.
+    tufts.sort((a, b) => a.$1.dy.compareTo(b.$1.dy));
+    for (final (i, tuft) in tufts.indexed) {
+      final (at, rad, side) = tuft;
+      final w = wind * sway(t, seed, phase: i * 1.3, speed: 1.2) * rad * 0.05;
+      final shape = leafCluster(
+        at + Offset(w + side * rad * 0.12, 0),
+        rad * 1.35,
+        rad * 0.56,
+        lobes: detail > 0.5 ? 7 : 4,
+        lobeSize: 0.40,
+        spread: 0.94,
+        seed: seed + i * 13,
+      );
+      final lit = 0.35 + 0.65 * (i / math.max(1, tufts.length - 1));
+      final tone =
+          _leaf.darken(0.20 * (1 - lit)).mix(l.ambient, 0.26 * (1 - lit));
       paintSurface(
         c,
         shape,
-        Surface(tone, kind == TreeKind.blossom ? Finish.cloth : Finish.fur,
-            contrast: 0.95 + 0.2 * lit),
+        Surface(tone, Finish.foliage, contrast: 1.0, sss: _through),
         l,
         detail: detail,
-        seed: seed + i * 11,
+        seed: seed + i * 13,
       );
-
-      // 앞쪽 덩어리 위에만 림을 얹어 수관 상단이 하늘과 만나는 선을 살린다.
-      if (lit > 0.6 && detail > 0.5) {
-        rimBand(c, shape, l, width: rad * 0.10, alpha: 0.45 * lit, blur: rad * 0.06);
+      if (detail > 0.4) {
+        c.save();
+        c.clipPath(shape);
+        lobeLight(c, at, rad * 1.3, rad * 0.55, tone, l,
+            seed: seed + i, count: 2, strength: 0.7);
+        c.restore();
+      }
+      translucentBand(c, shape, l,
+          width: rad * 0.11,
+          color: _through,
+          alpha: 0.18 * l.intensity,
+          blur: rad * 0.09);
+      if (detail > 0.55) {
+        scatterLeaves(c, at, rad * 1.35, rad * 0.58, tone.lighten(0.10), l,
+            seed: seed + i * 29, count: (12 * detail).round(), size: 0.16);
       }
     }
   }
 
-  void _paintConiferTiers(
-      Canvas c, LightRig l, double topX, double topY, double sway, double detail) {
-    // 침엽수는 원뿔을 층으로 쌓는다. 아래 층이 넓고 위로 갈수록 좁아지며,
-    // 층 사이가 조금씩 겹쳐야 나뭇가지 단이 읽힌다.
-    final tiers = _blobCount + 2;
-    for (var i = tiers - 1; i >= 0; i--) {
-      final u = i / (tiers - 1); // 0 아래 … 1 위
-      final y = topY * (0.28 + 0.78 * u) - _canopyR * 0.1;
-      final halfW = _canopyR * (1.0 - 0.72 * u);
-      final h = _canopyR * (0.42 - 0.14 * u);
-      final w = wind * math.sin(sway * 8 + i * 0.9 + seed * 0.3) * halfW * 0.05;
-      final cx = topX * (0.28 + 0.78 * u) + w;
+  // ── 관목 ────────────────────────────────────────────────────────────────
+  void _paintBush(Canvas c, LightRig l, double t, double detail) {
+    final r = Rng(seed * 37 + 5);
+    final clumps = <(Offset, double, double)>[];
+    for (var i = 0; i < _blobCount; i++) {
+      final a = (i / _blobCount) * math.pi * 2 + r.signed(0.5);
+      final dist = _canopyR * r.range(0.20, 0.46);
+      final rad = _canopyR * (i == 0 ? r.range(0.56, 0.68) : r.range(0.34, 0.50));
+      clumps.add((
+        Offset(math.cos(a) * dist, -_canopyR * 0.42 - math.sin(a) * dist * 0.38),
+        rad,
+        math.sin(a),
+      ));
+    }
+    clumps.sort((a, b) => a.$3.compareTo(b.$3));
 
-      final tier = smoothClosedPath([
-        Offset(cx, y - h * 1.5),
-        Offset(cx + halfW * 0.55, y - h * 0.15),
-        Offset(cx + halfW, y + h * 0.55),
-        Offset(cx + halfW * 0.42, y + h * 0.35),
-        Offset(cx, y + h * 0.62),
-        Offset(cx - halfW * 0.42, y + h * 0.35),
-        Offset(cx - halfW, y + h * 0.55),
-        Offset(cx - halfW * 0.55, y - h * 0.15),
-      ], tension: 0.75);
-
-      final tone = _leaf.lighten(0.14 * u).mix(l.ambient, 0.16 * (1 - u));
-      paintSurface(c, tier, Surface(tone, Finish.fur, contrast: 1.05), l,
-          detail: detail, seed: seed + i * 7);
-      if (detail > 0.5 && u > 0.35) {
-        rimBand(c, tier, l, width: halfW * 0.08, alpha: 0.4, blur: 2);
+    // 잔가지가 몇 개 비쳐야 덤불이 흙에서 자란 것으로 읽힌다.
+    if (detail > 0.45) {
+      for (var i = 0; i < 3; i++) {
+        final a = -math.pi * 0.5 + r.range(-0.7, 0.7);
+        final len = _canopyR * r.range(0.4, 0.7);
+        final stem = tube(
+          [Offset.zero, Offset(math.cos(a) * len, math.sin(a) * len)],
+          [_trunkR * 0.9, _trunkR * 0.2],
+          samples: 6,
+        );
+        paintSurface(c, stem, Surface(_bark, Finish.bark), l,
+            detail: detail * 0.4, seed: seed + i);
       }
+    }
+
+    for (final (i, clump) in clumps.indexed) {
+      final (pos, rad, depth) = clump;
+      final w = wind * sway(t, seed, phase: i * 1.9, speed: 1.5) * rad * 0.035;
+      _paintLeafMass(c, l, pos + Offset(w, 0), rad, (depth + 1) * 0.5,
+          seed + i * 17, detail);
+    }
+    if (detail > 0.55) {
+      scatterLeaves(c, Offset(0, -_canopyR * 0.45), _canopyR * 0.95,
+          _canopyR * 0.62, _leaf.lighten(0.12), l,
+          seed: seed * 5 + 3, count: (22 * detail).round(), size: 0.20);
     }
   }
 
+  // ── 버드나무 ────────────────────────────────────────────────────────────
   void _paintWillowFall(
       Canvas c, LightRig l, double topX, double topY, double t, double detail) {
-    // 늘어지는 가지. 끝으로 갈수록 가늘어지고 바람에 크게 흔들린다.
+    // 늘어지는 가닥은 선이 아니라 **잎이 달린 띠**여야 한다. 얇은 선으로
+    // 그리면 국수 다발이 된다.
     final r = Rng(seed * 29 + 13);
-    final n = detail > 0.5 ? 14 : 7;
+    final n = detail > 0.5 ? 12 : 6;
     for (var i = 0; i < n; i++) {
       final a = r.range(-1.0, 1.0);
-      final from = Offset(topX + a * _canopyR * 0.85,
-                          topY - _canopyR * 0.1 + r.range(-0.2, 0.2) * _canopyR);
-      final len = _canopyR * r.range(0.8, 1.5);
-      final w = wind * math.sin(t * 1.1 + i * 0.8) * len * 0.10;
+      final from = Offset(
+        topX + a * _canopyR * 0.88,
+        topY - _canopyR * 0.12 + r.range(-0.18, 0.22) * _canopyR,
+      );
+      final len = _canopyR * r.range(0.9, 1.7);
+      final w = wind * sway(t, seed, phase: i * 0.8, speed: 1.0) * len * 0.10;
+      final lit = 0.35 + 0.65 * r.unit;
+      final tone = _leaf
+          .darken(0.20 * (1 - lit))
+          .mix(l.ambient, 0.24 * (1 - lit));
+
       final strand = tube(
         [
           from,
           from + Offset(w * 0.4, len * 0.45),
-          from + Offset(w, len * 0.9),
+          from + Offset(w, len * 0.92),
         ],
-        [_trunkR * 0.14, _trunkR * 0.09, _trunkR * 0.02],
-        samples: 10,
+        [_canopyR * 0.10, _canopyR * 0.075, _canopyR * 0.012],
+        samples: 12,
       );
-      paintSurface(c, strand, Surface(_leaf.darken(0.05 * (i % 3)), Finish.fur), l,
-          detail: detail * 0.5, seed: seed + i);
+      paintSurface(
+        c,
+        strand,
+        Surface(tone, Finish.foliage, contrast: 0.95, sss: _through),
+        l,
+        detail: detail * 0.6,
+        seed: seed + i,
+        rim: false,
+      );
+      // 가닥 끝에 잎을 몇 장 달아 윤곽을 깨뜨린다.
+      if (detail > 0.55) {
+        final tip = from + Offset(w, len * 0.92);
+        scatterLeaves(c, tip, _canopyR * 0.12, _canopyR * 0.16, tone.lighten(0.1),
+            l, seed: seed + i * 7, count: 4, size: 0.55);
+      }
+    }
+  }
+
+  // ── 꽃잎 ────────────────────────────────────────────────────────────────
+  void _paintFallingPetals(Canvas c, double t, double detail) {
+    // 흩날리는 꽃잎. 정지한 벚나무는 조화(造花)다.
+    final r = Rng(seed * 61 + 7);
+    final paint = Paint()..isAntiAlias = true;
+    final n = (10 * detail).round();
+    for (var i = 0; i < n; i++) {
+      final phase = (t * r.range(0.18, 0.34) + r.unit) % 1.0;
+      final x = _canopyR * r.range(-1.1, 1.1) +
+          math.sin(t * 1.6 + i * 2.1) * _canopyR * 0.16;
+      final y = -trunkHeight * (1.02 - phase * 0.95) + _canopyR * 0.2;
+      final sz = _canopyR * r.range(0.022, 0.040);
+      final spin = t * 2.2 + i;
+      paint.color = _leaf.lighten(0.14).fade(0.85 * (1 - phase * 0.55));
+      c.save();
+      c.translate(x, y);
+      c.scale(1.0, 0.35 + 0.65 * math.sin(spin).abs());
+      c.drawOval(
+        Rect.fromCenter(center: Offset.zero, width: sz * 2.2, height: sz * 1.5),
+        paint,
+      );
+      c.restore();
     }
   }
 }
@@ -361,16 +720,27 @@ List<PropInstance> plantForest({
   final r = Rng(seed);
   return [
     for (final (i, tile) in tiles.indexed)
-      PropInstance(
-        prop: TreeProp(
-          seed: seed + i * 977,
-          kind: r.pick(kinds),
-          trunkHeight: baseHeight * r.bell(0.82, 1.18),
-        ),
-        tile: tile,
-        facesLeft: r.chance(0.5),
-        timeOffset: r.range(0, 6),
-        scale: r.bell(0.9, 1.12),
-      ),
+      () {
+        final kind = r.pick(kinds);
+        return PropInstance(
+          prop: TreeProp(
+            seed: seed + i * 977,
+            kind: kind,
+            // 관목은 나무 키로 만들면 화면을 덮는다. 종류별 기준을 따로 둔다.
+            trunkHeight: baseHeight *
+                r.bell(0.82, 1.18) *
+                switch (kind) {
+                  TreeKind.bush => 0.34,
+                  TreeKind.pine => 1.18,
+                  TreeKind.conifer => 1.10,
+                  _ => 1.0,
+                },
+          ),
+          tile: tile,
+          facesLeft: r.chance(0.5),
+          timeOffset: r.range(0, 6),
+          scale: r.bell(0.9, 1.12),
+        );
+      }(),
   ];
 }

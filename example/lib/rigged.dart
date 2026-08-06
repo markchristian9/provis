@@ -1,0 +1,69 @@
+import 'dart:ui';
+
+import 'package:provis/provis.dart';
+
+/// 초상용 [Artist] 를 게임 맵에서 걷는 액터로 바꾼다.
+///
+/// ## 왜 변환이 필요한가
+///
+/// `Artist` 는 고정된 3/4 초상이다 — 갤러리에서는 가장 예쁘지만 걸어도 자세가
+/// 그대로고 방향이 없다. 게임 맵에서는 다리가 교차하고 북/남/동/서로 몸이
+/// 돌아야 하므로 [RiggedIsoActor] 가 필요하다.
+///
+/// ## 정체성을 어떻게 잇는가
+///
+/// 두 가지로 잇는다.
+///
+/// 1. **시드를 `id` 에서 뽑는다.** `Rng.fromString('aldric')` 이므로 같은
+///    캐릭터는 언제나 같은 체형·장비를 갖는다. 게임에 들어갈 때마다 몸이
+///    바뀌면 같은 인물로 안 보인다.
+/// 2. **`accent` 색으로 팔레트를 물들인다.** 갤러리에서 본 그 색이 옷과 발광에
+///    그대로 나타나므로, 초상과 게임 액터가 한 인물로 읽힌다.
+///
+/// 완전히 같은 그림은 아니다 — 그건 캐릭터마다 측면·후면을 손으로 그려야
+/// 가능하다. 여기서는 **색과 실루엣 계열을 유지한 대역**을 목표로 한다.
+RiggedIsoActor riggedFromArtist(
+  Artist a, {
+  required Offset tile,
+  double height = 200,
+}) {
+  final seed = Rng.fromString(a.id).intRange(1, 0x7FFFFFF);
+  final spec = HumanoidSpec.generate(seed);
+  final beast = a.camp == Camp.monster;
+
+  return RiggedIsoActor(
+    renderer: HumanoidRenderer(
+      spec,
+      body: beast
+          ? Body.beast(Rng(seed ^ 0x5EED), height: spec.height * 1.1)
+          : null,
+      palette: _tinted(a, Rng(seed ^ 0xC0107), beast: beast),
+      beast: beast,
+    ),
+    tile: tile,
+    height: height,
+  );
+}
+
+/// 캐릭터의 강조색으로 물들인 팔레트.
+///
+/// 옷·강조·발광·눈만 갈아 끼우고 피부·금속은 기본 생성기에 맡긴다. 전부
+/// 한 색으로 칠하면 단색 인형이 되므로, **색이 얹히는 자리를 한정하는 것**이
+/// 오히려 정체성을 살린다.
+Palette _tinted(Artist a, Rng r, {required bool beast}) {
+  final base = beast ? Palette.monster(r) : Palette.hero(r);
+  final c = a.accent;
+  return Palette(
+    skin: base.skin,
+    skinDeep: base.skinDeep,
+    hair: base.hair,
+    cloth: c.darken(0.42).desaturate(0.15),
+    clothShade: c.darken(0.66).desaturate(0.1),
+    accent: c,
+    leather: base.leather,
+    metal: base.metal,
+    metalWarm: base.metalWarm,
+    eye: c.lighten(0.34),
+    glow: c.lighten(0.12),
+  );
+}

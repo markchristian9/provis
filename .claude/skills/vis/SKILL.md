@@ -77,7 +77,9 @@ flutter test && (cd example && flutter test)
 
 13. **유기체는 스플라인으로, 인공물은 직선을 허용한다.** 살·잎·천·촉수는 `tube`/`blob`/`smoothClosedPath` 를 거친다. 갑옷 패널·검날·바위의 깨진 면·건물 벽은 의도적인 직선이 옳다.
 
-14. **Flame 과 `mix` 이름이 충돌한다.** `import 'package:flame/game.dart' hide mix;`.
+14. **방향은 폭 축소가 아니라 골격 투영으로 만든다.** `solve(body, pose, yaw:)` 가 시상면 스윙과 좌우 폭을 `yaw` 로 섞는다. 이걸 안 넘기면 여덟 방향이 전부 같은 옆모습이 된다. 얼굴은 `Facing.faceVisible`·`bothEyes` 로 **연속 보간**한다 — 이진으로 껐다 켜면 3/4 에서 껌뻑인다.
+
+15. **Flame 과 `mix` 이름이 충돌한다.** `import 'package:flame/game.dart' hide mix;`.
 
 ---
 
@@ -264,5 +266,7 @@ flutter run -t lib/viewer.dart    # 절차 액터 뷰어
 | 클릭한 곳과 다른 데로 간다 | 카메라 오프셋 불일치 | `scene.tileAt()` 사용 |
 | 걸을 때 자세가 그대로다 | `IsoActor`(Artist)를 게임플레이에 씀 | `RiggedIsoActor` + `follow()` |
 | 북쪽으로 가도 뒷모습이 안 나온다 | 같은 원인 | `RiggedIsoActor` 는 8방향을 낸다 |
+| 여덟 방향이 전부 옆모습이다 | `solve` 에 `yaw` 미전달 | `solve(body, pose, yaw: facing.yaw)` |
+| 3/4 에서 얼굴이 갑자기 사라진다 | `toCamera` 로 이진 판정 | `faceVisible`·`bothEyes` 로 연속 알파 |
 | 공격 자세로 굳어 걸어 다닌다 | 한 번짜리 클립이 안 끝남 | `update` 가 자동 복귀시킨다 — `play()` 로만 전환 |
 | `ambiguous_import: mix` | Flame 의 vector_math 충돌 | `hide mix` |

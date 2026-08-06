@@ -195,6 +195,17 @@ enum Finish {
   slime,
   stone,
   membrane,
+
+  /// 잎 덩어리. 빛이 **잎을 통과해** 반대편이 밝은 황록으로 뜨는 것이
+  /// 나뭇잎의 결정적 신호다. 이것 없이 `fur` 로 칠하면 초록 풍선이 된다.
+  foliage,
+
+  /// 나무껍질. `wood` 는 대패질한 판재의 결이고, 이쪽은 세로로 갈라진 홈과
+  /// 거친 요철이다. 줄기·기둥·통나무에 쓴다.
+  bark,
+
+  /// 흙·모래·마른 땅. 확산이 거의 전부이고 스펙큘러가 없다. 지면·둔덕·길에 쓴다.
+  soil,
 }
 
 /// 하나의 파츠가 무엇으로 만들어졌는지.
@@ -315,6 +326,12 @@ void paintSurface(
       _stone(c, b, r, l, detail, seed);
     case Finish.membrane:
       _membrane(c, b, r, l, s);
+    case Finish.foliage:
+      _foliage(c, b, r, l, s, detail, seed);
+    case Finish.bark:
+      _bark(c, b, r, l, detail, seed);
+    case Finish.soil:
+      _soil(c, b, r, l, detail, seed);
   }
 
   if (ao) _ambientOcclusion(c, b, l, s);
@@ -690,6 +707,91 @@ void _membrane(Canvas c, Rect b, Ramp r, LightRig l, Surface s) {
   );
 }
 
+void _foliage(
+    Canvas c, Rect b, Ramp r, LightRig l, Surface s, double detail, int seed) {
+  // ① 확산 — 잎 덩어리는 하늘을 위에서 받는다. 광원 쪽이 밝고 반대편 아래가
+  //    급격히 어두워져야 구(球)로 읽힌다.
+  c.drawRect(
+    b,
+    _p()
+      ..shader = _radial(
+        b,
+        l.keyAlign,
+        [r.light, r.mid, r.shadow, r.deep],
+        const [0.0, 0.33, 0.74, 1.0],
+        radius: 1.12,
+      ),
+  );
+
+  // ② 투과 — 빛이 얇은 잎을 통과해 광원 반대편이 밝은 황록으로 뜬다.
+  //    **이 한 겹이 나뭇잎과 초록 풍선을 가른다.** 그림자 쪽이 그냥 어두우면
+  //    아무리 형태가 좋아도 플라스틱 장식이다.
+  final through =
+      s.sss ?? r.mid.mix(const Color(0xFFC8F06E), 0.52).lighten(0.05);
+  c.drawRect(
+    b,
+    _p()
+      ..blendMode = BlendMode.plus
+      ..shader = _radial(
+        b,
+        Alignment(-l.dir.dx * 0.62, -l.dir.dy * 0.66),
+        [through.fade(0.0), through.fade(0.30), through.fade(0.0)],
+        const [0.10, 0.48, 0.95],
+        radius: 1.15,
+      ),
+  );
+
+  // ③ 잎 사이 그늘과 반짝임. 매끈한 면은 풍선이므로 반드시 깨 준다.
+  if (detail > 0.35) _dapple(c, b, r, seed, 0.9 * detail);
+}
+
+void _bark(Canvas c, Rect b, Ramp r, LightRig l, double detail, int seed) {
+  // 줄기는 원통이므로 명암이 축을 가로질러 띠로 눕는다. 그 위에 세로로 갈라진
+  // 홈이 파이고, 홈의 광원 쪽 턱만 밝다 — 이 짝이 있어야 껍질로 읽힌다.
+  _diffuse(c, b, r, l, softness: 0.26);
+  if (detail <= 0.35) return;
+
+  final n = Noise(seed * 53 + 19);
+  final long = b.height >= b.width;
+  final across = long ? b.width : b.height;
+  final along = long ? b.height : b.width;
+  final count = (across / math.max(2.5, across * 0.17)).round().clamp(3, 9);
+  final w = math.max(0.7, across * 0.055);
+  final groove = _p()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = w
+    ..strokeCap = StrokeCap.round;
+  final ridge = _p()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = w * 0.55
+    ..strokeCap = StrokeCap.round;
+
+  for (var i = 0; i < count; i++) {
+    final u = (i + 0.5) / count;
+    final pts = <Offset>[];
+    const segs = 7;
+    for (var j = 0; j <= segs; j++) {
+      final v = j / segs;
+      final wob = n.signed1(i * 6.1 + v * 4.3) * 0.055;
+      pts.add(long
+          ? Offset(b.left + b.width * (u + wob), b.top + along * v)
+          : Offset(b.left + along * v, b.top + b.height * (u + wob)));
+    }
+    final line = smoothOpenPath(pts);
+    groove.color = r.deep.fade(0.38 + 0.18 * n.at1(i * 2.7));
+    c.drawPath(line, groove);
+    // 홈 옆의 융기 — 광원 쪽으로 살짝 밀어 그린다.
+    ridge.color = r.light.fade(0.24);
+    c.drawPath(line.shift(-l.dir * w * 0.85), ridge);
+  }
+}
+
+void _soil(Canvas c, Rect b, Ramp r, LightRig l, double detail, int seed) {
+  // 흙은 확산이 전부다. 스펙큘러를 얹으면 즉시 젖은 진흙이 된다.
+  _diffuse(c, b, r, l, softness: 0.65);
+  if (detail > 0.35) _grain(c, b, r, seed, 0.22);
+}
+
 // ---------------------------------------------------------------------------
 // 공통 레이어
 // ---------------------------------------------------------------------------
@@ -794,6 +896,30 @@ void _grain(Canvas c, Rect b, Ramp r, int seed, double alpha) {
       if (v < 0.55) continue;
       paint.color = (v > 0.78 ? r.light : r.deep).fade(alpha * (v - 0.5));
       c.drawCircle(Offset(x, y), step * 0.42, paint);
+    }
+  }
+}
+
+void _dapple(Canvas c, Rect b, Ramp r, int seed, double strength) {
+  // 잎 덩어리 안쪽의 얼룩진 그늘과 반짝임. `_grain` 보다 덩어리가 크고
+  // 흐릿하며, 밝은 점과 어두운 구멍이 섞여야 잎이 겹쳐 있는 것으로 읽힌다.
+  final n = Noise(seed * 269 + 41);
+  final step = math.max(4.0, b.shortestSide / 7);
+  final blur = MaskFilter.blur(BlurStyle.normal, step * 0.38);
+  final paint = _p()..maskFilter = blur;
+  for (var y = b.top; y < b.bottom; y += step) {
+    for (var x = b.left; x < b.right; x += step) {
+      final u = x / step, v = y / step;
+      final k = n.at2(u * 1.6, v * 1.6);
+      final jx = n.signed1(u * 3.1 + v) * step * 0.42;
+      final jy = n.signed1(v * 2.7 - u) * step * 0.42;
+      if (k > 0.63) {
+        paint.color = r.light.fade((k - 0.58) * 1.5 * strength);
+        c.drawCircle(Offset(x + jx, y + jy), step * 0.40, paint);
+      } else if (k < 0.35) {
+        paint.color = r.deep.fade((0.40 - k) * 1.5 * strength);
+        c.drawCircle(Offset(x + jx, y + jy), step * 0.52, paint);
+      }
     }
   }
 }
@@ -988,6 +1114,66 @@ void panelLine(Canvas c, Path line, Ramp r, LightRig l,
       ..strokeWidth = width * 0.55
       ..strokeCap = StrokeCap.round
       ..color = r.light.fade(0.55 * alpha),
+  );
+}
+
+/// 얇은 재질을 빛이 통과해 광원 **반대쪽** 가장자리가 밝아지는 띠.
+///
+/// 잎·꽃잎·천막·귀처럼 두께가 얇은 것에 쓴다. [rimBand] 는 백라이트가 만드는
+/// 윤곽선이고 이쪽은 재질을 뚫고 나온 빛이므로, 색이 재질의 고유색 쪽으로
+/// 밀려 있어야 한다 — 흰 림을 쓰면 그냥 반짝이는 플라스틱이 된다.
+void translucentBand(
+  Canvas c,
+  Path p,
+  LightRig l, {
+  double width = 6,
+  Color? color,
+  double alpha = 0.45,
+  double blur = 4,
+}) {
+  final away = -l.dir;
+  final inner = p.shift(-away * width);
+  final band = Path.combine(PathOperation.difference, p, inner);
+  c.drawPath(
+    band,
+    _p()
+      ..color = (color ?? l.key.mix(const Color(0xFFBDF06A), 0.55)).fade(alpha)
+      ..blendMode = BlendMode.plus
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur),
+  );
+}
+
+/// 기물 밑동이 지면과 만나는 자리의 좁고 짙은 그늘.
+///
+/// `propShadow` 는 광원 반대편으로 길게 눕는 **넓고 옅은** 그림자이고, 이쪽은
+/// 접촉선 바로 아래의 **좁고 짙은** 코어다. 둘 다 있어야 기물이 지면에 박혀
+/// 보인다. 넓은 그림자만 있으면 물체가 그림자 위에 얹힌 스티커가 된다.
+void contactAO(
+  Canvas c,
+  double radius, {
+  double alpha = 0.55,
+  double squash = 0.36,
+  Offset at = Offset.zero,
+}) {
+  if (radius < 0.5) return;
+  final rect = Rect.fromCenter(
+    center: at,
+    width: radius * 2,
+    height: radius * 2 * squash,
+  );
+  c.drawOval(
+    rect,
+    _p()
+      ..shader = _radial(
+        rect,
+        Alignment.center,
+        [
+          const Color(0xFF04060C).fade(alpha),
+          const Color(0xFF04060C).fade(alpha * 0.34),
+          const Color(0x0004060C),
+        ],
+        const [0.0, 0.42, 1.0],
+      ),
   );
 }
 

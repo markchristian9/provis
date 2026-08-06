@@ -122,7 +122,7 @@ void main() {
       final image = await recorder.endRecording().toImage(w.round(), h.round());
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
       Directory('/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/9b49c4f1-d75a-46f9-a56b-81e8fd36373f/scratchpad/snapshots').createSync(recursive: true);
-      File('/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/9b49c4f1-d75a-46f9-a56b-81e8fd36373f/scratchpad/snapshots/facing.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+      File('/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/d83a6054-46af-4fe1-ad43-82da4277d273/scratchpad/facing.png').writeAsBytesSync(bytes!.buffer.asUint8List());
       });
 });
 }

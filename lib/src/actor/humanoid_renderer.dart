@@ -126,15 +126,20 @@ class HumanoidRenderer {
     double detail = 1.0,
     bool ranged = false,
   }) {
-    // 정면을 볼수록 사지의 앞뒤 스윙은 화면에서 단축된다. 포즈를 줄일 뿐
-    // 치수는 건드리지 않으므로 IK 길이는 그대로다.
-    final p = _foreshorten(pose, 0.34 + 0.66 * facing.profile);
-    final b = body.scaledWidth(facing.shoulderScale);
+    // 골격을 방향과 함께 푼다. solve 가 시상면 스윙과 좌우 폭을 yaw 로
+    // 섞으므로, 정면에서는 팔다리가 좌우로 벌어지고 스윙이 화면에서 사라진다.
+    //
+    // 캔버스를 미러할 방향이면 거울 반사한 yaw 를 넘긴다 — 그래야 뒤집은
+    // 뒤에도 좌우 성분이 월드 기준으로 맞는다.
+    final mirror = facing.nearSide < 0;
+    final solveYaw = mirror ? math.pi - facing.yaw : facing.yaw;
 
-    var sk = solve(b, p);
+    final b = body;
+    final p = pose;
+    var sk = solve(b, p, yaw: solveYaw);
     final low = _lowestFoot(sk);
     if (low > 0.5) {
-      sk = solve(b, p.copyWith(rootY: p.rootY - low / b.height));
+      sk = solve(b, p.copyWith(rootY: p.rootY - low / b.height), yaw: solveYaw);
     }
     final airborne = low < 0 ? (-low / (b.height * 0.12)).clamp(0.0, 1.0) : 0.0;
 
@@ -154,7 +159,6 @@ class HumanoidRenderer {
     canvas.save();
     canvas.scale(1, iso.squash);
 
-    final mirror = facing.nearSide < 0;
     if (mirror) canvas.scale(-1, 1);
     // 캔버스를 뒤집으면 광원도 따라 뒤집히므로, 리그의 x 성분을 되돌려
     // 조명이 월드에 고정되게 한다.
@@ -192,6 +196,7 @@ class HumanoidRenderer {
 
   /// 앞뒤로 흔드는 관절만 [k] 배로 줄인다. 굽힘(팔꿈치·무릎)은 화면 깊이와
   /// 무관하므로 건드리지 않는다 — 줄이면 다리가 펴져 걸음이 무너진다.
+  // ignore: unused_element
   Pose _foreshorten(Pose p, double k) => p.copyWith(
         armNear: ArmPose(
           shoulder: p.armNear.shoulder * k + (1 - k) * 0.12,
@@ -524,8 +529,14 @@ class HumanoidRenderer {
       }
     }
 
-    if (f.toCamera) {
+    // 얼굴은 방향에 따라 서서히 사라진다. toCamera 로 끊으면 3/4 를 지나는
+    // 순간 이목구비가 통째로 없어져 캐릭터가 껌뻑인다.
+    if (f.faceVisible > 0.02) {
       _face(canvas, hLight, hl, sk.pose, f, q);
+    }
+    // 측면·후면에서는 코와 턱이 실루엣 밖으로 나와야 옆얼굴로 읽힌다.
+    if (f.profileJut > 0.15) {
+      _profileFeatures(canvas, hLight, hl, f, q);
     }
 
     if (beast) {
@@ -578,17 +589,31 @@ class HumanoidRenderer {
       return;
     }
 
-    // 가까운 눈은 얼굴 앞쪽, 먼 눈은 페이싱이 정면일수록 뒤로 벌어진다.
-    final gap = hl * 0.26 * (1 - f.profile);
-    for (final ex in [hl * 0.30, hl * 0.30 - gap]) {
-      if (ex < hl * 0.30 - 1e-3 && gap < hl * 0.04) break;
+    // 눈 두 개. 정면일수록 좌우로 벌어지고, 3/4 를 지나면 **먼 쪽 눈이 얼굴
+    // 윤곽에 가려** 사라진다. 이 가림이 없으면 옆얼굴에 눈이 둘 다 붙어
+    // 있어 즉시 가짜로 보인다.
+    final vis = f.faceVisible;
+    final gap = hl * 0.30 * (1 - f.profile);
+    final eyes = <(double, double)>[
+      (hl * 0.30, 1.0),                     // 가까운 눈 — 항상 보인다
+      (hl * 0.30 - gap, f.bothEyes),        // 먼 눈 — 3/4 를 지나면 가린다
+    ];
+    for (final (ex, weight) in eyes) {
+      final a = (weight * vis).clamp(0.0, 1.0);
+      if (a < 0.04) continue;
       final eye = blob(Offset(ex, -hl * 0.05), hl * 0.075, hl * 0.055 * open);
-      paintSurface(canvas, eye, Surface(pal.eye, Finish.gem, glow: 0.9, glowColor: pal.glow), light,
+      paintSurface(
+          canvas,
+          eye,
+          Surface(pal.eye, Finish.gem,
+              glow: 0.9, glowColor: pal.glow, alpha: a),
+          light,
           detail: q);
       canvas.drawCircle(
         Offset(ex + hl * 0.012, -hl * 0.05),
         hl * 0.026 * open,
-        Paint()..color = const Color(0xFF120E14).withValues(alpha: 0.85),
+        Paint()
+          ..color = const Color(0xFF120E14).withValues(alpha: 0.85 * a),
       );
     }
 
@@ -601,7 +626,7 @@ class HumanoidRenderer {
         ..style = PaintingStyle.stroke
         ..strokeWidth = hl * 0.05
         ..strokeCap = StrokeCap.round
-        ..color = pal.skinDeep.withValues(alpha: 0.5)
+        ..color = pal.skinDeep.withValues(alpha: 0.5 * vis)
         ..maskFilter = MaskFilter.blur(BlurStyle.normal, hl * 0.03),
     );
 
@@ -614,8 +639,41 @@ class HumanoidRenderer {
     );
     canvas.drawOval(
       mouth,
-      Paint()..color = mix(pal.skinDeep, const Color(0xFF1A0C10), 0.55 + 0.3 * m),
+      Paint()
+        ..color = mix(pal.skinDeep, const Color(0xFF1A0C10), 0.55 + 0.3 * m)
+            .withValues(alpha: vis),
     );
+  }
+
+  /// 옆얼굴의 코·턱 실루엣.
+  ///
+  /// 측면에서 얼굴이 밋밋한 타원으로 남으면 사람 머리로 안 보인다. 실루엣
+  /// 밖으로 나온 코 하나가 방향을 확정한다 — 정면에서는 0, 완전 측면에서 최대.
+  void _profileFeatures(
+      Canvas canvas, LightRig light, double hl, Facing f, double q) {
+    final jut = f.profileJut;
+    final back = f.showBack;
+    // 후면에서는 코가 반대쪽(화면 뒤)이므로 그리지 않는다.
+    if (back) return;
+
+    final nose = smoothClosedPath([
+      Offset(hl * 0.40, -hl * 0.10),
+      Offset(hl * (0.40 + 0.16 * jut), -hl * 0.02),
+      Offset(hl * (0.40 + 0.13 * jut), hl * 0.04),
+      Offset(hl * 0.40, hl * 0.08),
+    ], tension: 0.8);
+    paintSurface(canvas, nose, Surface(pal.skin, Finish.skin), light,
+        detail: q, rim: false);
+
+    // 턱 — 코보다 덜 나오되 같은 방향으로. 둘이 함께 옆얼굴을 만든다.
+    final chin = smoothClosedPath([
+      Offset(hl * 0.34, hl * 0.22),
+      Offset(hl * (0.34 + 0.10 * jut), hl * 0.30),
+      Offset(hl * 0.30, hl * 0.38),
+      Offset(hl * 0.24, hl * 0.30),
+    ], tension: 0.8);
+    paintSurface(canvas, chin, Surface(pal.skin, Finish.skin), light,
+        detail: q, rim: false);
   }
 
   void _hairAndHelm(

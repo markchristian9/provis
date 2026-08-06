@@ -296,58 +296,110 @@ const double _up = -math.pi / 2;
 const double _down = math.pi / 2;
 
 /// 포즈와 체형으로부터 관절 월드 좌표를 계산한다(순운동학).
-Skeleton solve(Body body, Pose pose) {
+///
+/// ## [yaw] — 이것이 8방향을 만든다
+///
+/// 인체의 관절 운동은 대부분 **시상면(sagittal, 앞뒤)** 에서 일어난다. 팔은
+/// 앞뒤로 흔들리고 무릎은 앞뒤로 굽는다. 그래서 순수한 측면 뷰는 2D 로 풀 수
+/// 있지만, **정면에서는 그 스윙이 화면에서 사라지고 대신 좌우 폭이 드러난다.**
+///
+/// [yaw] 를 주면 각 관절을 세 성분으로 나눠 투영한다.
+///
+/// ```
+/// 화면 x = 시상면성분 · sin(yaw) + 좌우성분 · cos(yaw)
+/// 화면 y = 수직성분                       (아이소 단축은 렌더러가 따로 건다)
+/// ```
+///
+/// - `yaw = ±π/2` → 완전 측면. 스윙이 최대로 보이고 좌우 폭은 0. (기본값)
+/// - `yaw = 0` → 정면. 스윙이 화면에서 사라지고 팔다리가 좌우로 벌어진다.
+/// - `yaw = π` → 후면. 정면과 같되 좌우가 뒤집힌다.
+///
+/// 기본값이 `π/2` 인 이유는 **기존 호출부의 동작을 그대로 두기 위해서**다.
+/// 초상·갤러리는 측면 골격이 맞고, 방향이 필요한 인게임 액터만 값을 넘긴다.
+Skeleton solve(Body body, Pose pose, {double yaw = math.pi / 2}) {
   final h = body.height;
   final sq = pose.squash;
 
+  // 시상면 스윙이 화면에 드러나는 비율. 미러는 렌더러가 캔버스를 뒤집어
+  // 처리하므로 여기서는 절댓값만 쓴다.
+  final sag = math.sin(yaw).abs();
+  // 좌우 폭이 화면에 드러나는 비율. 부호가 있어 후면에서 좌우가 뒤집힌다.
+  final lat = math.cos(yaw);
+
+  /// 관절 하나를 3성분으로 투영해 잇는다.
+  ///
+  /// [angle] 은 시상면 각(기존 2D 규약 그대로), [splay] 는 좌우 벌림이다.
+  /// 정면일수록 시상면 성분이 줄고 좌우 성분이 살아난다.
+  Offset step3(Offset from, double angle, double len,
+      {double splay = 0, double side = 0}) {
+    final sagittal = math.cos(angle) * len;
+    final vertical = math.sin(angle) * len;
+    final lateral = splay * len * side;
+    return from + Offset(sagittal * sag + lateral * lat, vertical);
+  }
+
   // 골반. 스쿼시는 골반 높이를 눌러 무게감을 만든다.
-  final pelvis = Offset(pose.rootX * h, -body.hipHeight * sq + pose.rootY * h);
+  final pelvis = Offset(pose.rootX * h * sag, -body.hipHeight * sq + pose.rootY * h);
 
   // 척추: 골반 → 허리 → 가슴. rootRot 이 몸 전체를 기울이고 spine 이
   // 허리 굽힘을, chest 가 흉곽의 젖힘을 더한다.
   final lean = pose.rootRot + body.hunch * 0.5;
   final spineAngle = _up + lean + pose.spine;
-  final waist = _step(pelvis, spineAngle, body.torso * 0.45 * sq);
+  final waist = step3(pelvis, spineAngle, body.torso * 0.45 * sq);
   final chestAngle = spineAngle + pose.chest + body.hunch * 0.5;
-  final chest = _step(waist, chestAngle, body.torso * 0.55 * sq);
+  final chest = step3(waist, chestAngle, body.torso * 0.55 * sq);
 
   // 목과 머리.
   final neckAngle = chestAngle + pose.neck;
-  final neckTop = _step(chest, neckAngle, body.neck);
+  final neckTop = step3(chest, neckAngle, body.neck);
   final headAngle = neckAngle + pose.head;
-  final headCenter = _step(neckTop, headAngle, body.headLen * 0.5);
-  final headTop = _step(neckTop, headAngle, body.headLen);
+  final headCenter = step3(neckTop, headAngle, body.headLen * 0.5);
+  final headTop = step3(neckTop, headAngle, body.headLen);
 
   Limb solveArm(ArmPose ap, double side) {
-    // 어깨 관절은 가슴 끝보다 조금 아래, 그리고 앞뒤로 어긋나 있다. 측면뷰에서
-    // 근거리 어깨를 앞, 원거리 어깨를 뒤로 밀면 정측면 특유의 납작함이 사라진다.
+    // 어깨 관절의 위치는 두 성분의 합이다.
+    //  ① 좌우 — 정면에서 어깨가 벌어지는 실제 폭
+    //  ② 앞뒤 — 측면에서 근/원 어깨가 어긋나 납작함을 없애는 양
+    final base = _step(chest, chestAngle, -body.torso * 0.07);
     final across = chestAngle + math.pi / 2;
-    final shoulder = _step(
-      _step(chest, chestAngle, -body.torso * 0.07),
-      across,
-      body.shoulderHalf * 0.30 * side,
-    );
+    final lateralOff = body.shoulderHalf * side * lat;
+    final sagittalOff = body.shoulderHalf * 0.30 * side * sag;
+    final shoulder = base +
+        Offset(math.cos(across), math.sin(across)) * 0 +
+        Offset(lateralOff + sagittalOff, -body.torso * 0.01);
+
     // 레스트(shoulder = 0)는 팔을 아래로 늘어뜨린 상태.
-    // shoulder = π/2 면 전방 수평, π 면 머리 위로 든다.
+    // 정면일수록 팔을 몸통 바깥으로 조금 벌려 겨드랑이가 붙지 않게 한다.
+    final splay = (1 - sag) * 0.30;
     final upperAngle = chestAngle + math.pi - ap.shoulder;
-    final elbow = _step(shoulder, upperAngle, body.upperArm);
+    final elbow = step3(shoulder, upperAngle, body.upperArm,
+        splay: splay, side: side);
     final foreAngle = upperAngle - ap.elbow;
-    final wrist = _step(elbow, foreAngle, body.foreArm);
+    final wrist =
+        step3(elbow, foreAngle, body.foreArm, splay: splay * 0.6, side: side);
     final handAngle = foreAngle - ap.wrist;
-    final handTip = _step(wrist, handAngle, body.hand);
+    final handTip = step3(wrist, handAngle, body.hand);
     return Limb(shoulder, elbow, wrist, handTip, upperAngle, foreAngle, handAngle);
   }
 
   Limb solveLeg(LegPose lp, double side) {
-    final across = spineAngle + math.pi / 2;
-    final root = _step(pelvis, across, body.hipHalf * 0.45 * side);
+    // 골반도 어깨와 같다 — 정면에서 좌우로 벌어지고 측면에서 앞뒤로 어긋난다.
+    final lateralOff = body.hipHalf * side * lat;
+    final sagittalOff = body.hipHalf * 0.45 * side * sag;
+    final root = pelvis + Offset(lateralOff + sagittalOff, 0);
+
+    // 정면에서는 다리가 약간 벌어져 선다. 완전히 붙이면 인형처럼 보인다.
+    final splay = (1 - sag) * 0.13;
     final thighAngle = _down + pose.rootRot * 0.15 - lp.hip;
-    final knee = _step(root, thighAngle, body.thigh * sq);
+    final knee = step3(root, thighAngle, body.thigh * sq,
+        splay: splay, side: side);
     final shinAngle = thighAngle + lp.knee;
-    final ankle = _step(knee, shinAngle, body.shin * sq);
+    final ankle = step3(knee, shinAngle, body.shin * sq,
+        splay: splay * 0.5, side: side);
     // 발은 정강이에 대해 직각이 기본. ankle 이 +면 발끝을 든다.
+    // 정면에서는 발끝이 화면 앞을 향하므로 길이가 단축돼 보인다.
     final footAngle = shinAngle - math.pi / 2 - lp.ankle;
-    final toe = _step(ankle, footAngle, body.foot);
+    final toe = step3(ankle, footAngle, body.foot * (0.55 + 0.45 * sag));
     return Limb(root, knee, ankle, toe, thighAngle, shinAngle, footAngle);
   }
 
