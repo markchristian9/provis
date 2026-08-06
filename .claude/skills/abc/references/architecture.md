@@ -32,35 +32,83 @@
 
 ## 디렉토리 지도
 
+> **이 지도는 스냅샷이다.** 저장소가 활발히 진화 중이므로, 작업 시작 전
+> `find lib -name '*.dart'` 로 실제 구조를 먼저 확인한다. **레이어 원칙과 아래
+> 문서들의 기법은 파일이 옮겨져도 그대로 유효하다.**
+
 ```
 lib/
-├── main.dart                  갤러리/데모 진입점
+├── main.dart                  갤러리/데모 진입점 (Flame GameWidget)
 └── src/
-    ├── core/
+    ├── core/                  아무것도 캐릭터를 모른다
     │   ├── rng.dart           Rng — xorshift 결정론 난수
     │   ├── noise.dart         Noise — 값 노이즈·fbm, wobble()
     │   ├── spline.dart        Offset2 확장, tube()/blob()/web(), smoothClosedPath()
-    │   └── palette.dart       ColorTune 확장, Ramp, Pal (세계관 공기색)
-    ├── rig/
+    │   ├── palette.dart       ColorTune 확장, Ramp, Pal (세계관 공기색)
+    │   └── shading.dart       [계보 B] LightRig, Finish, Surface — 아래 주의 참조
+    ├── rig/                   치수와 관절. Canvas 를 모른다
     │   ├── body.dart          Body — 골격 치수 (humanoid/beast 팩토리)
     │   ├── pose.dart          Pose/ArmPose/LegPose, Limb, Skeleton, solve()
     │   └── ik.dart            solveIk2(), reachable(), lerpAngle(), polar()
-    ├── anim/
-    │   └── verlet.dart        VerletChain, ClothStrip
-    ├── render/
+    ├── anim/                  시간 → Pose
+    │   ├── verlet.dart        VerletChain, ClothStrip
+    │   ├── clip.dart          Clip, sampleLoop()/sampleOnce() (Catmull-Rom 키프레임)
+    │   ├── animator.dart      Animator — 클립 전환·블렌딩 상태 기계
+    │   └── library.dart       Anims — 이름으로 꺼내 쓰는 클립 모음
+    ├── render/                [계보 A] 픽셀. 난수를 뽑지 않는다
     │   ├── light.dart         LightRig — 3점 조명 리그 + 4가지 프리셋
     │   ├── palette.dart       hsl()/shiftColor()/mix(), Palette.hero/.monster
-    │   └── surface.dart       Surface, Quality, paintSurface(), paintContactShadow(),
-    │                          paintGroundShadow(), paintTrim(), paintGlow()
-    └── actor/
-        └── spec.dart          Archetype, HumanoidSpec.generate()
+    │   └── surface.dart       Surface, Quality, paintSurface() 외 보조 페인터
+    ├── art/                   한 캐릭터의 "작품". 부위 형상 라이브러리
+    │   ├── creature.dart      Artist 추상 클래스, Camp/Sex, kStage
+    │   ├── anatomy.dart       headShape/torsoShape/limb/drawEye/handShape/bootShape …
+    │   ├── pc/                aldric, kaelen, lyra, seraphine …
+    │   └── mob/               몬스터 구현체
+    └── actor/                 조립
+        ├── spec.dart          Archetype, HumanoidSpec.generate()
+        └── humanoid_renderer.dart
 ```
 
-> **주의**: `core/palette.dart` 와 `render/palette.dart` 는 서로 다른 파일이다.
-> - `core/palette.dart` → `ColorTune` 확장(darken/lighten/saturate/mix), `Ramp`(5단계 톤), `Pal`(전역 상수색)
-> - `render/palette.dart` → `hsl()`, `shiftColor()`, `mix()`, `luminance()`, `Palette`(캐릭터 1인분 색 조합)
->
-> 셰이딩 내부는 `render/palette.dart` 의 `shiftColor`/`mix` 를 쓴다. `Ramp` 는 간이 톤 계산용이며 `paintSurface` 내부의 `_Ramp` 와 다르다.
+### 주의 ① — 셰이딩 계보가 둘이다
+
+현재 저장소에는 **두 개의 `LightRig` 와 두 개의 `Surface`** 가 있다.
+
+| | 계보 A: `render/surface.dart` + `render/light.dart` | 계보 B: `core/shading.dart` |
+|---|---|---|
+| 재질 | `Surface` + `SurfaceKind`(10종) + `Quality` | `Surface` + `Finish` |
+| 조명 | `LightRig`(keyDir/rimDir/ambient/bounce/exposure, 프리셋 4종) | `LightRig`(dir/rim/key/intensity) |
+| 진입점 | `paintSurface()` 9패스 | 파일별 헬퍼 |
+
+**새 코드를 쓸 때는 한 파일 안에서 한 계보만 쓴다.** 둘을 섞으면 조명 방향 규약(`keyDir` = 빛의 진행 방향)이 어긋나 명암이 뒤집힌다. 어느 계보를 쓸지는 **수정하려는 파일이 이미 import 하고 있는 쪽**을 따른다. [shading.md](shading.md) 는 계보 A 를 문서화한 것이며, 9패스 원리 자체는 양쪽에 동일하게 적용된다.
+
+### 주의 ② — `palette.dart` 도 둘이다
+
+- `core/palette.dart` → `ColorTune` 확장(darken/lighten/saturate/mix), `Ramp`(5단계 톤), `Pal`(전역 상수색)
+- `render/palette.dart` → `hsl()`, `shiftColor()`, `mix()`, `luminance()`, `Palette`(캐릭터 1인분 색 조합)
+
+셰이딩 내부는 `render/palette.dart` 의 `shiftColor`/`mix` 를 쓴다.
+
+### 주의 ③ — Flame 과 `mix` 이름 충돌
+
+`package:flame/components.dart` 는 `vector_math` 를 통해 전역 함수 `mix` 를 노출한다. 같은 파일에서 `render/palette.dart` 를 import 하면 **`ambiguous_import` 컴파일 오류**가 난다.
+
+```dart
+// ✗ 컴파일 실패
+import 'package:flame/components.dart';
+import 'src/render/palette.dart';
+
+// ✓ 해법 1 — 프로젝트 팔레트에 접두사
+import 'src/render/palette.dart' as pal;   // pal.mix(a, b, t)
+
+// ✓ 해법 2 — Flame 쪽 이름을 숨긴다
+import 'package:flame/components.dart' hide mix;
+```
+
+같은 이유로 `flutter/material.dart` 를 렌더 코드에 통째로 끌어오지 않는다. `Alignment`·`LinearGradient` 처럼 필요한 것만 `show` 로 가져온다:
+
+```dart
+import 'package:flutter/painting.dart' show Alignment, LinearGradient, RadialGradient;
+```
 
 ---
 
