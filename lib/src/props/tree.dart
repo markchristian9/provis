@@ -81,8 +81,8 @@ class TreeProp extends Prop {
       TreeKind.conifer => r.intRange(6, 9),
       TreeKind.pine => r.intRange(3, 5),
       TreeKind.dead => 0,
-      TreeKind.bush => r.intRange(3, 5),
-      _ => r.intRange(5, 7),
+      TreeKind.bush => r.intRange(4, 6),
+      _ => r.intRange(7, 10),
     };
     _branchCount = r.intRange(3, 6);
     _noise = Noise(seed * 31 + 7);
@@ -350,9 +350,9 @@ class TreeProp extends Prop {
     final clumps = <(Offset, double, double)>[];
     for (var i = 0; i < _blobCount; i++) {
       final a = (i / _blobCount) * math.pi * 2 + r.signed(0.42);
-      final dist = _canopyR * r.range(0.18, 0.50);
+      final dist = _canopyR * r.range(0.24, 0.62);
       // 첫 덩어리를 크게 잡아 주역으로 삼는다.
-      final rad = _canopyR * (i == 0 ? r.range(0.72, 0.86) : r.range(0.40, 0.66));
+      final rad = _canopyR * (i == 0 ? r.range(0.60, 0.72) : r.range(0.30, 0.52));
       final depth = math.sin(a); // -1 뒤 … +1 앞
       clumps.add((
         center + Offset(math.cos(a) * dist, -math.sin(a) * dist * 0.52),

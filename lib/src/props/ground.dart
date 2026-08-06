@@ -260,6 +260,8 @@ class PathPatch extends Prop {
     final b = road.getBounds();
 
     // 노면 — 가운데가 밟혀 밝고 단단하며, 가장자리가 어둡고 축축하다.
+    // **가장자리에서 알파를 떨어뜨린다.** 불투명한 띠로 끝나면 지면 위에 붙인
+    // 갈색 테이프가 되고, 흙길이 땅에 스며든 것으로 보이지 않는다.
     c.drawRect(
       b,
       Paint()
@@ -268,11 +270,13 @@ class PathPatch extends Prop {
           b.center - nrm * half,
           b.center + nrm * half,
           [
-            _tone.darken(0.24).fade(0.92),
-            _tone.lighten(0.06).fade(0.95),
-            _tone.darken(0.24).fade(0.92),
+            _tone.darken(0.24).fade(0.0),
+            _tone.darken(0.20).fade(0.72),
+            _tone.lighten(0.06).fade(0.94),
+            _tone.darken(0.20).fade(0.72),
+            _tone.darken(0.24).fade(0.0),
           ],
-          const [0.0, 0.5, 1.0],
+          const [0.0, 0.18, 0.5, 0.82, 1.0],
         ),
     );
 

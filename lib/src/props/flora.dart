@@ -604,7 +604,7 @@ class FenceProp extends Prop {
       contactAO(c, fenceHeight * 0.20, alpha: 0.42, squash: 0.42, at: at);
       final post = tube(
         [at, at + Offset(lean * h * 0.5, -h * 0.55), at + Offset(lean * h, -h)],
-        [fenceHeight * 0.13, fenceHeight * 0.105, fenceHeight * 0.082],
+        [fenceHeight * 0.085, fenceHeight * 0.070, fenceHeight * 0.055],
         samples: 10,
         capStart: false,
       );
@@ -615,8 +615,8 @@ class FenceProp extends Prop {
       final cap = Path()
         ..addOval(Rect.fromCenter(
           center: topAt,
-          width: fenceHeight * 0.095,
-          height: fenceHeight * 0.095 * k,
+          width: fenceHeight * 0.075,
+          height: fenceHeight * 0.075 * k,
         ));
       paintSurface(c, cap, Surface(_tone.lighten(0.16), Finish.wood), light,
           detail: detail * 0.5, seed: seed + i, rim: false);
