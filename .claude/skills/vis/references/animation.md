@@ -255,6 +255,10 @@ FK 로 만든 클립 위에 IK 를 **덧씌우는** 순서가 표준이다: `Pos
 
 > 망토·머리카락·꼬리·사슬 장식 등 "몸이 움직인 뒤에 뒤따라오는" 모든 것. **키프레임으로는 결코 얻을 수 없는 관성과 지연이 여기서 나온다.**
 
+> **⚠️ 프로덕션 적용 전례가 없다.** 2026-08-06 기준 `VerletChain`·`ClothStrip` 을 호출하는 캐릭터가
+> `lib/` 에 **0건**이다(완성 9종은 전부 시간 함수로 천을 그린다). 검증된 레시피가 아니라 **준비된
+> 도구**로 취급하고, 처음 적용할 때는 아래 파라미터 표에서 시작해 직접 튜닝하라.
+
 ```dart
 class VerletChain {
   VerletChain({
@@ -264,7 +268,15 @@ class VerletChain {
     this.stiffness = 0.62, this.iterations = 6,
   });
 
-  final List<Offset> pos, prev;
+  final int segments;
+  final double segmentLength;
+  final double gravity;
+  final double damping;
+  final double stiffness;
+  final int iterations;
+
+  final List<Offset> pos = [];
+  final List<Offset> prev = [];
   Offset restDir = const Offset(0, 1);   // 사슬이 뻗으려는 고정 방향
   double restStrength = 0.0;
 
@@ -332,12 +344,12 @@ class ClothStrip {
 
 | 대상 | segments | segmentLength | gravity | damping | stiffness | flare |
 |------|----------|---------------|---------|---------|-----------|-------|
-| 망토 | 7–9 | height·0.055 | 780 | .985 | .62 | .55 |
-| 짧은 머리카락 | 3–4 | height·0.020 | 620 | .975 | .80 | — |
-| 긴 머리카락 | 6–8 | height·0.028 | 700 | .980 | .70 | — |
-| 꼬리 | 6–10 | height·0.045 | 400 | .990 | .55 | — |
-| 촉수 | 10–14 | height·0.035 | 250 | .992 | .35 | — |
-| 사슬 장식 | 4–6 | height·0.018 | 1100 | .970 | .90 | — |
+| 망토 | 7–9 | height·0.055 | 780 | 0.985 | 0.62 | 0.55 |
+| 짧은 머리카락 | 3–4 | height·0.020 | 620 | 0.975 | 0.80 | — |
+| 긴 머리카락 | 6–8 | height·0.028 | 700 | 0.980 | 0.70 | — |
+| 꼬리 | 6–10 | height·0.045 | 400 | 0.990 | 0.55 | — |
+| 촉수 | 10–14 | height·0.035 | 250 | 0.992 | 0.35 | — |
+| 사슬 장식 | 4–6 | height·0.018 | 1100 | 0.970 | 0.90 | — |
 
 꼬리는 `restDir` + `restStrength` 0.2~0.4 를 주어 몸 뒤로 뻗으려는 성질을 만든다.
 

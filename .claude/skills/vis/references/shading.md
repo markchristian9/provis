@@ -1,6 +1,11 @@
-# 셰이딩 — 재질·조명·9패스 파이프라인
+# 셰이딩 (트랙 A) — 재질·조명·10패스 파이프라인
 
 `lib/src/render/surface.dart`, `lib/src/render/light.dart`, `lib/src/render/palette.dart` 의 완전한 참조.
+
+> **🚦 이 문서는 트랙 A(인게임 아이소 액터) 전용이다.**
+> 이름 있는 작품 캐릭터(`art/pc/`·`art/mob/`)를 만든다면 이 문서가 아니라
+> [artist-craft.md](artist-craft.md) 를 읽어야 한다. 그쪽은 `core/shading.dart` 계보이며
+> `Surface`·`LightRig`·`paintSurface` 이름은 같지만 **필드와 조명 부호 규약이 다르다.**
 
 ## 목차
 
@@ -8,7 +13,7 @@
 2. [LightRig — 3점 조명의 2D 근사 (전체 소스)](#lightrig--3점-조명의-2d-근사)
 3. [Surface — PBR 을 2D 로 번역한 재질 (전체 소스)](#surface--pbr-을-2d-로-번역한-재질)
 4. [명암 램프 `_Ramp` — 그림을 살리는 4줄](#명암-램프-_ramp)
-5. [paintSurface — 9패스 (전체 소스)](#paintsurface--9패스)
+5. [paintSurface — 10패스 (전체 소스)](#paintsurface--10패스)
 6. [미세 디테일 `_paintMicroDetail`](#미세-디테일)
 7. [보조 페인터: 접촉 그림자·지면 그림자·트림·글로우](#보조-페인터)
 8. [색 조작 유틸 (render/palette.dart)](#색-조작-유틸)
@@ -148,18 +153,18 @@ class Surface {
 **프리셋 팩토리 (수치를 임의로 바꾸지 말 것 — 재질 구분이 이 표에서 나온다)**
 
 ```dart
-static Surface skin(Color c)    => Surface(albedo: c, kind: .skin,    roughness: .68, sss: .85,  rim: 1.0,  outline: .42, detail: .15);
-static Surface flesh(Color c)   => Surface(albedo: c, kind: .flesh,   roughness: .55, sss: 1.0,  rim: 1.15, outline: .5,  detail: .4);
-static Surface cloth(Color c)   => Surface(albedo: c, kind: .cloth,   roughness: .92, sss: .18,  rim: .75,  outline: .6,  detail: .25);
-static Surface leather(Color c) => Surface(albedo: c, kind: .leather, roughness: .72,            rim: .85,  outline: .7,  detail: .35);
+static Surface skin(Color c)    => Surface(albedo: c, kind: .skin,    roughness: 0.68, sss: 0.85,  rim: 1.0,  outline: 0.42, detail: 0.15);
+static Surface flesh(Color c)   => Surface(albedo: c, kind: .flesh,   roughness: 0.55, sss: 1.0,  rim: 1.15, outline: 0.5,  detail: 0.4);
+static Surface cloth(Color c)   => Surface(albedo: c, kind: .cloth,   roughness: 0.92, sss: 0.18,  rim: 0.75,  outline: 0.6,  detail: 0.25);
+static Surface leather(Color c) => Surface(albedo: c, kind: .leather, roughness: 0.72,            rim: 0.85,  outline: 0.7,  detail: 0.35);
 static Surface metal(Color c, {double polish = 0.8})
-                                => Surface(albedo: c, kind: .metal,   roughness: (1-polish).clamp(.06,.9), metalness: 1.0, rim: 1.35, outline: .75, detail: .5);
-static Surface chitin(Color c)  => Surface(albedo: c, kind: .chitin,  roughness: .30, metalness: .35, rim: 1.3, outline: .8, detail: .45);
-static Surface bone(Color c)    => Surface(albedo: c, kind: .bone,    roughness: .62, sss: .35,  rim: 1.0,  outline: .7,  detail: .3);
-static Surface hair(Color c)    => Surface(albedo: c, kind: .hair,    roughness: .34,            rim: 1.5,  outline: .5,  detail: .6);
+                                => Surface(albedo: c, kind: .metal,   roughness: (1-polish).clamp(0.06,0.9), metalness: 1.0, rim: 1.35, outline: 0.75, detail: 0.5);
+static Surface chitin(Color c)  => Surface(albedo: c, kind: .chitin,  roughness: 0.30, metalness: 0.35, rim: 1.3, outline: 0.8, detail: 0.45);
+static Surface bone(Color c)    => Surface(albedo: c, kind: .bone,    roughness: 0.62, sss: 0.35,  rim: 1.0,  outline: 0.7,  detail: 0.3);
+static Surface hair(Color c)    => Surface(albedo: c, kind: .hair,    roughness: 0.34,            rim: 1.5,  outline: 0.5,  detail: 0.6);
 static Surface gem(Color c, {Color? glow})
-                                => Surface(albedo: c, kind: .gem,     roughness: .05, metalness: .2, rim: 1.6, outline: .4, emissive: glow ?? c, emissiveStrength: .9);
-static Surface stone(Color c)   => Surface(albedo: c, kind: .stone,   roughness: .95,            rim: .6,   outline: .65, detail: .5);
+                                => Surface(albedo: c, kind: .gem,     roughness: 0.05, metalness: 0.2, rim: 1.6, outline: 0.4, emissive: glow ?? c, emissiveStrength: 0.9);
+static Surface stone(Color c)   => Surface(albedo: c, kind: .stone,   roughness: 0.95,            rim: 0.6,   outline: 0.65, detail: 0.5);
 ```
 
 ---
@@ -198,7 +203,7 @@ class _Ramp {
 
 ---
 
-## paintSurface — 9패스
+## paintSurface — 10패스
 
 **호출 규약**: 파츠 하나 = 호출 한 번. 개별 패스를 호출부에서 재조합하지 않는다.
 
@@ -473,16 +478,16 @@ double luminance(Color c);
 
 | kind | roughness | metalness | sss | rim | outline | detail | 비고 |
 |------|-----------|-----------|-----|-----|---------|--------|------|
-| skin | .60–.75 | 0 | .7–.9 | 1.0 | .40–.45 | .1–.2 | sss 가 핵심 |
-| flesh | .50–.60 | 0 | 1.0 | 1.15 | .5 | .4 | 몬스터 살점 |
-| cloth | .88–.95 | 0 | .1–.2 | .7–.8 | .6 | .25 | 램프 대비 낮음 |
-| leather | .68–.78 | 0 | 0 | .85 | .7 | .35 | |
-| metal | .06–.90 | 1.0 | 0 | 1.35 | .75 | .5 | `polish` 로 제어 |
-| chitin | .25–.35 | .35 | 0 | 1.3 | .8 | .45 | 곤충 갑각 |
-| bone | .58–.66 | 0 | .35 | 1.0 | .7 | .3 | |
-| hair | .30–.40 | 0 | 0 | 1.5 | .5 | .6 | rim 이 가장 높다 |
-| gem | .03–.08 | .2 | 0 | 1.6 | .4 | 0 | emissive 필수 |
-| stone | .92–.98 | 0 | 0 | .6 | .65 | .5 | rim 이 가장 낮다 |
+| skin | 0.60–.75 | 0 | 0.7–.9 | 1.0 | 0.40–.45 | 0.1–.2 | sss 가 핵심 |
+| flesh | 0.50–.60 | 0 | 1.0 | 1.15 | 0.5 | 0.4 | 몬스터 살점 |
+| cloth | 0.88–.95 | 0 | 0.1–.2 | 0.7–.8 | 0.6 | 0.25 | 램프 대비 낮음 |
+| leather | 0.68–.78 | 0 | 0 | 0.85 | 0.7 | 0.35 | |
+| metal | 0.06–.90 | 1.0 | 0 | 1.35 | 0.75 | 0.5 | `polish` 로 제어 |
+| chitin | 0.25–.35 | 0.35 | 0 | 1.3 | 0.8 | 0.45 | 곤충 갑각 |
+| bone | 0.58–.66 | 0 | 0.35 | 1.0 | 0.7 | 0.3 | |
+| hair | 0.30–.40 | 0 | 0 | 1.5 | 0.5 | 0.6 | rim 이 가장 높다 |
+| gem | 0.03–.08 | 0.2 | 0 | 1.6 | 0.4 | 0 | emissive 필수 |
+| stone | 0.92–.98 | 0 | 0 | 0.6 | 0.65 | 0.5 | rim 이 가장 낮다 |
 
 ---
 

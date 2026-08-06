@@ -129,7 +129,7 @@ void renderActor(Canvas canvas, IsoView iso, Offset worldTile, void Function(Can
 /// 액터가 바라보는 방향. yaw = 0 이 카메라 정면(화면 아래, 아이소 S).
 ///
 /// 스프라이트를 굽지 않으므로 yaw 는 연속값이어도 된다. 8방향 게임플레이에서는
-/// [snap8] 으로 스냅하되, 전환 시 [Facing.lerp] 로 부드럽게 돌리면 스프라이트
+/// [snap8] 으로 스냅하되, 전환 시 `lerpAngle`(rig/ik.dart)로 부드럽게 돌리면 스프라이트
 /// 기반 게임이 낼 수 없는 품질이 나온다.
 class Facing {
   const Facing(this.yaw);

@@ -32,6 +32,14 @@
 
 ## 비용 표 — 무엇이 비싼가
 
+> **⚠️ 이 문서의 수치는 미측정 가설이다.** 상대 비용·`saveLayer` 150회·블러 3000px 은 이 프로젝트에서
+> 실측한 값이 아니라 일반적인 Skia/Impeller 특성에서 온 출발점이다. 최적화 판단의 근거로 쓰되,
+> **합격 기준으로 쓰지 마라.** `flutter run --profile` 로 실측한 뒤 이 표를 갱신할 것.
+>
+> **또한 이 모델은 트랙 A(`render/surface.dart`) 한정이다.** 파츠마다 `saveLayer` 를 여는 구조를
+> 전제하기 때문이다. 트랙 B(`core/shading.dart`)의 `paintSurface` 는 `saveLayer` 없이 `clipPath` +
+> `Finish` 별 분기로 그리므로 병목 지점이 다르다 — 트랙 B 는 별도로 프로파일해야 한다.
+
 | 연산 | 상대 비용 | 비고 |
 |------|-----------|------|
 | `canvas.drawPath` (단색) | 1 | 기준 |
@@ -53,7 +61,8 @@
 
 ## Flame 통합
 
-**신설 파일: `lib/src/actor/actor_component.dart`**
+**현재 위치: `lib/main.dart` 의 `ActorComponent`** (별도 파일이 아니다). 아래는 그 구조를 요약한
+참고 골격이며, 실제 코드를 고칠 때는 `main.dart` 를 연다.
 
 ```dart
 import 'package:flame/components.dart';
@@ -156,7 +165,8 @@ Quality qualityFor(double screenHeightPx, {bool isPlayer = false, bool isBoss = 
 
 ```dart
 /// 아주 작거나(<32px) 아주 많은 액터. 실루엣 + 그림자 + 색 하나.
-void renderImposter(Canvas canvas, Path silhouette, Color tint, LightRig light) {
+/// 구현체는 `lib/src/render/iso.dart` 의 `paintImposter` 다.
+void paintImposter(Canvas canvas, Path silhouette, Color tint, LightRig light) {
   canvas.drawPath(silhouette, Paint()..color = tint);
   canvas.drawPath(silhouette, Paint()      // 림만 남긴다 — 이것만으로 형태가 산다
     ..style = PaintingStyle.stroke ..strokeWidth = 1.5
@@ -210,7 +220,10 @@ class BakedPart {
 **사용 규약:**
 
 1. **광원이 바뀌면 다시 굽는다.** 구운 파츠에는 조명이 이미 칠해져 있다. 낮/밤 전환, `rotatedKey` 시 전체 무효화. 무효화 키: `(specSeed, lightPresetIndex, quality)`.
-2. **회전 변환은 허용, 비균등 스케일은 금지.** 구운 뒤 세로만 늘리면 블러와 스펙큘러가 찌그러진다.
+2. **셰이딩된 파트는 회전 재생하지 않는다.** 구운 `Picture` 에는 조명이 이미 칠해져 있으므로, 파츠를
+   돌리면 하이라이트·그림자·스크래치 방향도 함께 돌아 **월드 조명이 무너진다**. 회전이 필요하면
+   각도를 캐시 키에 넣어 각도별로 따로 굽는다. 비균등 스케일도 금지 — 블러와 스펙큘러가 찌그러진다.
+   캐시 키 = `(specSeed, lightPreset, quality, angleBucket, scale)`.
 3. **반드시 `dispose`.** `Picture` 는 네이티브 자원이다. 액터 제거 시 해제하지 않으면 누수된다.
 4. **N프레임 갱신**: 원거리 NPC 는 6~10프레임마다 다시 구우면 움직이면서도 비용이 1/8 이다.
 

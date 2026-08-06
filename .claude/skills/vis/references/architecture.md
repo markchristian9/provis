@@ -38,7 +38,8 @@
 
 ```
 lib/
-├── main.dart                  갤러리/데모 진입점 (Flame GameWidget)
+├── entry.dart                 【트랙 B 진입점】 로스터 갤러리 앱
+├── main.dart                  【트랙 A 진입점】 절차 액터 뷰어 (ActorComponent 인라인)
 └── src/
     ├── core/                  아무것도 캐릭터를 모른다
     │   ├── rng.dart           Rng — xorshift 결정론 난수
@@ -59,12 +60,15 @@ lib/
     │   ├── light.dart         LightRig — 3점 조명 리그 + 4가지 프리셋
     │   ├── palette.dart       hsl()/shiftColor()/mix(), Palette.hero/.monster
     │   └── surface.dart       Surface, Quality, paintSurface() 외 보조 페인터
-    ├── art/                   한 캐릭터의 "작품". 부위 형상 라이브러리
-    │   ├── creature.dart      Artist 추상 클래스, Camp/Sex, kStage
-    │   ├── anatomy.dart       headShape/torsoShape/limb/drawEye/handShape/bootShape …
-    │   ├── pc/                aldric, kaelen, lyra, seraphine …
-    │   └── mob/               몬스터 구현체
-    └── actor/                 조립
+    ├── art/                   【트랙 B】 이름 있는 작품 캐릭터 — 완성 9종이 전부 여기
+    │   ├── creature.dart      Artist 추상 클래스, Camp/Sex, kStage(1000×1400), kGround(1332)
+    │   ├── anatomy.dart       headShape/torsoShape/limb/drawEye/handShape/bootShape/
+    │   │                      hairStrand/clothSpine/breathe/jitter/drawMotes …
+    │   ├── roster.dart        heroes(5) / monsters(4) / everyone — 등록하지 않으면 안 뜬다
+    │   ├── pc/                aldric, kaelen, seraphine, lyra, vesper  (PC 5종)
+    │   └── mob/               gorehide, vaelmorth, mourne, chitinis   (Mob 4종)
+    ├── ui/                    갤러리 UI — entry_screen, portrait_card, backdrop, stage
+    └── actor/                 【트랙 A】 조립
         ├── spec.dart          Archetype, HumanoidSpec.generate()
         └── humanoid_renderer.dart
 ```
@@ -119,7 +123,8 @@ import 'package:flutter/painting.dart' show Alignment, LinearGradient, RadialGra
 ```
 ① 월드(타일) 공간 — 2:1 dimetric, 지면 평면
       screen.x = (wx - wy) * TILE_W / 2
-      screen.y = (wx + wy) * TILE_H / 2 - wz * TILE_H
+      screen.y = (wx + wy) * TILE_H / 2 - wz * iso.heightScale
+                 // heightScale = tileWidth * cosθ / √2  (iso.dart 참조)
 
 ② 액터 국소 공간 — 화면에 세워진 카드 (billboard)
         -y (위)
@@ -212,7 +217,7 @@ Rng branch(int salt)             // 상태를 소비하지 않는 자식 생성�
 Noise(int seed)
 double at1(double x)                              // 1D 값 노이즈 0..1
 double at2(double x, double y)
-double fbm1(double x, {int octaves = 4, double gain = .5, double lacunarity = 2})
+double fbm1(double x, {int octaves = 4, double gain = 0.5, double lacunarity = 2})
 double fbm2(double x, double y, {...})
 double signed1(double x, {int octaves = 3})       // -1..1
 double signed2(double x, double y, {int octaves = 3})
@@ -288,8 +293,8 @@ Offset polar(Offset from, double angle, double len)
 ```dart
 class VerletChain {
   VerletChain({required Offset anchor, required int segments, required double segmentLength,
-               Offset initialDir, double gravity = 900, double damping = .986,
-               double stiffness = .62, int iterations = 6});
+               Offset initialDir, double gravity = 900, double damping = 0.986,
+               double stiffness = 0.62, int iterations = 6});
   List<Offset> pos, prev;
   Offset restDir; double restStrength;
   void step(double dt, Offset anchor, {Offset wind, Offset carry});
@@ -352,7 +357,7 @@ enum WeaponKind { sword, greatsword, axe, staff, spear, daggers, bow, none }
 enum HeadGear { none, circlet, hood, halfHelm, fullHelm, hornedHelm }
 class HumanoidSpec {
   static HumanoidSpec generate(int seed, {Archetype? forceArchetype});
-  // 43개 필드: 랜드마크 높이, 사지 길이, 장비 플래그, palette
+  // final 필드 26개: 랜드마크 높이, 사지 길이, 장비 플래그, palette
 }
 ```
 
@@ -360,7 +365,20 @@ class HumanoidSpec {
 
 ---
 
-## 새 액터를 추가하는 절차
+## 새 캐릭터를 추가하는 절차
+
+> **🚦 먼저 트랙을 정한다.** 이름과 사연이 있는 간판 캐릭터인가, 시드로 찍는 군중인가.
+> 잘못 고르면 파일이 쓰이지 않는 경로에 생기고 갤러리에 나타나지 않는다.
+
+### 트랙 B — 이름 있는 작품 캐릭터 (완성 9종이 전부 이 방식)
+
+1. **시각 논제를 한 문장으로 정한다** → [art-direction.md](art-direction.md)
+2. **`lib/src/art/pc/<name>.dart`** 또는 **`art/mob/<name>.dart`** 에 `Artist` 상속 클래스를 만든다.
+3. `art/anatomy.dart` 헬퍼로 부위를 조립하고 `core/shading.dart` 로 칠한다 → [artist-craft.md](artist-craft.md)
+4. **`lib/src/art/roster.dart`** 의 `heroes` / `monsters` 리스트에 등록한다. **이걸 빠뜨리면 갤러리에 안 뜬다.**
+5. `test/render_sheet_test.dart` 로 시트를 뽑아 확인한다.
+
+### 트랙 A — 시드 기반 인게임 액터
 
 1. **명세 타입 정의** — `lib/src/actor/<name>_spec.dart`
    - `Archetype` 에 대응하는 원형 enum 을 먼저 만든다. 원형 없이 파라미터를 독립 무작위화하면 "특징 없는 평균"만 나온다.

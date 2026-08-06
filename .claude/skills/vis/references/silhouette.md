@@ -41,6 +41,9 @@
 
 **구현 방법** — 도형 편향을 숫자 하나로 만들어 전 파츠에 전달한다:
 
+> **🚧 미구현 설계** — 아래 `shapeBias` 는 `lib/` 에 없다. 트랙 A 에서 도형 언어를 코드로 강제하고
+> 싶을 때 이 패턴으로 직접 추가하라. 트랙 B 는 캐릭터마다 시각 논제를 손으로 정하므로 필요 없다.
+
 ```dart
 /// -1 = 완전 원형(부드러움), 0 = 중립, +1 = 완전 삼각(공격적)
 double shapeBias(Archetype a) => switch (a) {
@@ -256,8 +259,8 @@ final ribcage = blob(chestPt, chestW * 0.5, torso * 0.30, warp: ...);
 final belly   = blob(waistPt, waistW * 0.5, torso * 0.22, warp: ...);
 final pelvis  = blob(pelvisPt, hipW * 0.5, torso * 0.20, warp: ...);
 final body = Path()
-  ..addPath(web(chestPt, chestW * .42, waistPt, waistW * .40), Offset.zero)
-  ..addPath(web(waistPt, waistW * .40, pelvisPt, hipW * .42), Offset.zero)
+  ..addPath(web(chestPt, chestW * 0.42, waistPt, waistW * 0.40), Offset.zero)
+  ..addPath(web(waistPt, waistW * 0.40, pelvisPt, hipW * 0.42), Offset.zero)
   ..addPath(ribcage, Offset.zero)
   ..addPath(belly, Offset.zero)
   ..addPath(pelvis, Offset.zero);
@@ -283,7 +286,13 @@ final upper = tube([limb.a, lerpO(limb.a, limb.b, 0.5), limb.b],
 
 두개골 blob + 턱 + (선택) 후드/투구. **아이소에서는 정수리가 보이므로** 머리 blob 의 상단을 살짝 부풀리고 `paintTopPlane` 을 적용한다.
 
-이목구비는 `facing.toCamera` 일 때만 그린다. 눈은 **어두운 소켓 → 흰자 → 홍채 → 하이라이트 점** 4겹. 하이라이트 점 하나가 생기를 만든다.
+이목구비는 `facing.toCamera` 일 때만 그린다.
+
+**눈의 겹 수는 트랙에 따라 다르다.**
+- **트랙 A**(축소 렌더): 소켓 → 흰자 → 홍채 → 하이라이트 점 **4겹**으로 축약한다. 48px 에서는 그 이상이 보이지 않는다.
+- **트랙 B**(초상): `anatomy.dart` 의 `drawEye` 가 **6겹**으로 그린다 — 소켓·흰자·홍채 섬유·동공·각막 하이라이트·눈꺼풀. 상세는 [artist-craft.md](artist-craft.md#얼굴).
+
+어느 쪽이든 **하이라이트 점 하나가 생기를 만든다.**
 
 ### 망토 / 천
 

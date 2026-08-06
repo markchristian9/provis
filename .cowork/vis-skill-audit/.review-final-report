@@ -1,0 +1,7 @@
+2026-08-06 15:26:50
+vis 스킬을 분석하여, Flutter Flame 으로 2.5d isometric 게임의 pc/mob 을 잘 생성할 수 있도록, 멋지고 예쁜 AAA 급 pc/mob 비주얼 디자인을 할 수 있도록 되어져 있는지 분석 후, 수정보완 할 내용이 있으면 수정보완해주세요. 참고: 폴더 이름 abc 를 vis 로 변경했습니다.
+
+[분석 대상] /Users/thruthesky/tmp/games/vis/.claude/skills/vis/ 스킬 문서 일체 — SKILL.md(188줄), references/{architecture,isometric,shading,silhouette,procgen,animation,performance}.md(7개, 약 2845줄), assets/iso.dart(248줄).
+[대조 자료] 실제 구현 코드 /Users/thruthesky/tmp/games/vis/lib/ (약 13400줄) — 특히 완성된 PC(art/pc/)와 Mob(art/mob/), 렌더 파이프라인(render/surface.dart, core/shading.dart, render/iso.dart).
+[핵심 질문] 이 스킬 문서만 읽은 AI 가 실제로 AAA 급 2.5D 아이소메트릭 PC/Mob 을 만들어낼 수 있는가? 못 만든다면 무엇이 빠졌거나 틀렸는가? 문서와 실제 코드가 어긋난 곳은 어디인가?
+[주의] 시간이 제한돼 있다. 파일을 전부 정독하려 하지 말고, 먼저 스킬 문서 7개의 목차와 SKILL.md 를 읽은 뒤 lib/ 의 대표 파일 3~4개만 표적 대조하라. 그리고 반드시 결론을 출력하라 — 탐색만 하다 끝나면 분석이 통째로 버려진다.

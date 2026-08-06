@@ -109,12 +109,44 @@ class Rng {
 **② `branch` 로 하위 시스템을 격리한다.**
 장비 생성이 몸 비율 생성의 난수 상태를 소비하면, **장비 규칙을 하나 추가하는 것만으로 기존 모든 캐릭터의 체형이 바뀐다.** 이것은 절차적 시스템에서 가장 흔하고 가장 치명적인 버그다.
 
+> ### ⚠️ `branch` 의 현재 한계 — 격리가 완전하지 않다
+>
+> `core/rng.dart:77` 의 실제 구현은 **루트 시드가 아니라 호출 시점의 상태 `_s`** 에서 파생한다:
+>
+> ```dart
+> Rng branch(int salt) => Rng((_s ^ (salt * 0x9E3779B9)) & 0xFFFFFFFF);
+> ```
+>
+> 따라서 브랜치 **앞에** 부모 난수 호출을 하나라도 추가하면 그 브랜치의 결과도 함께 바뀐다.
+> 문서가 약속하는 완전한 격리는 현재 성립하지 않는다.
+>
+> **당장의 대처**: 안정성이 필요한 브랜치는 **부모 난수를 소비하기 전에** 먼저 만든다.
+>
+> ```dart
+> final r = Rng(seed);
+> final paletteRng = r.branch(11);   // ← 먼저 확보
+> final gearRng    = r.branch(23);
+> final body = buildBody(r);          // 그다음 메인 스트림 소비
+> ```
+>
+> **근본 수정안**(적용 시 기존 모든 시드의 결과가 한 번 바뀌므로 사람 확인 필요):
+>
+> ```dart
+> class Rng {
+>   Rng(int seed)
+>       : _root = (seed == 0 ? 0x9E3779B9 : seed) & 0xFFFFFFFF,
+>         _s = (seed == 0 ? 0x9E3779B9 : seed) & 0xFFFFFFFF;
+>   final int _root;
+>   int _s;
+>   Rng branch(int salt) => Rng((_root ^ (salt * 0x9E3779B9)) & 0xFFFFFFFF);
+> }
+> ```
+
 ```dart
 final r = Rng(seed);
-final body    = buildBody(r);                    // 메인 스트림
 final palette = Palette.hero(r.branch(11));      // 색은 독립 브랜치
 final gear    = buildGear(r.branch(23));         // 장비도 독립 브랜치
-final mutation = buildMutation(r.branch(37));    // 나중에 추가해도 위가 안 바뀐다
+final body    = buildBody(r);                    // 메인 스트림은 마지막에
 ```
 
 salt 상수는 **한 번 정하면 절대 바꾸지 않는다** (바꾸면 모든 시드의 결과가 바뀐다). 소수를 쓰면 충돌이 적다: 11, 23, 37, 53, 71, 97.
@@ -144,7 +176,7 @@ class Noise {
 
   double at1(double x);                    // 1D 값 노이즈 0..1
   double at2(double x, double y);
-  double fbm1(double x, {int octaves = 4, double gain = .5, double lacunarity = 2});
+  double fbm1(double x, {int octaves = 4, double gain = 0.5, double lacunarity = 2});
   double fbm2(double x, double y, {...});
   double signed1(double x, {int octaves = 3});      // -1..1, 변위에 바로 곱함
   double signed2(double x, double y, {int octaves = 3});
@@ -227,17 +259,17 @@ class Palette {
     late double bodyHue, bodySat, bodyLight, glowHue;
     switch (family) {
       case 0:  // 부패한 살덩이
-        bodyHue = r.range(300, 355); bodySat = r.range(.18, .34);
-        bodyLight = r.range(.28, .42); glowHue = r.range(70, 100);
+        bodyHue = r.range(300, 355); bodySat = r.range(0.18, 0.34);
+        bodyLight = r.range(0.28, 0.42); glowHue = r.range(70, 100);
       case 1:  // 갑각/키틴
-        bodyHue = r.range(230, 275); bodySat = r.range(.24, .44);
-        bodyLight = r.range(.16, .28); glowHue = r.range(150, 185);
+        bodyHue = r.range(230, 275); bodySat = r.range(0.24, 0.44);
+        bodyLight = r.range(0.16, 0.28); glowHue = r.range(150, 185);
       case 2:  // 화산암/재
-        bodyHue = r.range(10, 28);   bodySat = r.range(.10, .24);
-        bodyLight = r.range(.14, .24); glowHue = r.range(18, 40);
+        bodyHue = r.range(10, 28);   bodySat = r.range(0.10, 0.24);
+        bodyLight = r.range(0.14, 0.24); glowHue = r.range(18, 40);
       default: // 심연/그림자
-        bodyHue = r.range(190, 225); bodySat = r.range(.22, .40);
-        bodyLight = r.range(.13, .24); glowHue = r.range(280, 320);
+        bodyHue = r.range(190, 225); bodySat = r.range(0.22, 0.40);
+        bodyLight = r.range(0.13, 0.24); glowHue = r.range(280, 320);
     }
     return Palette( /* bodyHue 파생 + glowHue 로 eye/glow/accent */ );
   }
@@ -337,12 +369,12 @@ static HumanoidSpec generate(int seed, {Archetype? forceArchetype}) {
 
 | 원형 | weapon (가중치) | headGear (가중치) | cape | pauldrons | shield | armorHeaviness |
 |------|-----------------|-------------------|------|-----------|--------|----------------|
-| knight | sword 5, spear 2, axe 2 | halfHelm 3, fullHelm 3, horned 2, none 1 | .75 | .90 | .45 | .70–.95 |
-| berserker | axe 3, greatsword 3 | horned 4, none 3, halfHelm 2 | .30 | .90 | — | .25–.50 |
-| ranger | bow 4, daggers 2, spear 1 | hood 4, none 3, circlet 1 | .55 | .35 | — | .20–.42 |
-| mage | staff (고정) | hood 5, circlet 2, none 1 | .90 | .25 | — | .02–.16 |
-| assassin | daggers 5, sword 1 | hood 6, none 1 | .70 | .20 | — | .12–.32 |
-| paladin | sword 4, greatsword 2 | fullHelm 3, halfHelm 3, circlet 2 | .95 | .90 | .45 | .75–1.00 |
+| knight | sword 5, spear 2, axe 2 | halfHelm 3, fullHelm 3, horned 2, none 1 | 0.75 | 0.90 | 0.45 | 0.70–.95 |
+| berserker | axe 3, greatsword 3 | horned 4, none 3, halfHelm 2 | 0.30 | 0.90 | — | 0.25–.50 |
+| ranger | bow 4, daggers 2, spear 1 | hood 4, none 3, circlet 1 | 0.55 | 0.35 | — | 0.20–.42 |
+| mage | staff (고정) | hood 5, circlet 2, none 1 | 0.90 | 0.25 | — | 0.02–.16 |
+| assassin | daggers 5, sword 1 | hood 6, none 1 | 0.70 | 0.20 | — | 0.12–.32 |
+| paladin | sword 4, greatsword 2 | fullHelm 3, halfHelm 3, circlet 2 | 0.95 | 0.90 | 0.45 | 0.75–1.00 |
 
 `glowRunes`: mage 0.9, paladin 0.6, 그 외 0.2. `trimAccent`: 0.7 공통.
 
@@ -379,6 +411,11 @@ static HumanoidSpec generate(int seed, {Archetype? forceArchetype}) {
 ---
 
 ## 몬스터 생성 확장 패턴
+
+> **🚧 미구현 설계 — 아래 `MonsterRole`·`MonsterParts` 는 `lib/` 에 존재하지 않는다.**
+> 현재 완성된 Mob 4종(`art/mob/`)은 전부 트랙 B 로 **손수** 만들어졌다. 이 절은 트랙 A 로 몬스터를
+> 절차 생성하기로 결정했을 때의 설계안이며, 그대로 import 하면 컴파일되지 않는다.
+> 이름 있는 몬스터를 만들라는 요청이라면 [art-direction.md](art-direction.md) 로 갈 것.
 
 `HumanoidSpec` 을 몬스터로 확장할 때의 설계.
 
