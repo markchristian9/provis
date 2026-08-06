@@ -111,7 +111,7 @@ class HumanoidSpec {
 
   static HumanoidSpec generate(int seed, {Archetype? forceArchetype}) {
     final r = Rng(seed);
-    final arch = forceArchetype ?? r.pick(Archetype.values);
+    final Archetype arch = forceArchetype ?? r.pick<Archetype>(Archetype.values);
 
     // 원형별 체형 다이얼.
     late double heads, broad, bulk, poise;

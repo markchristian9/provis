@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'package:flutter/painting.dart' show HSLColor;
+
 import '../core/rng.dart';
 
 /// 색 조작 헬퍼. 절차적 색상은 RGB 로 다루면 금방 탁해지므로 전부 HSL 에서

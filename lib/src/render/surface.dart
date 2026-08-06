@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/painting.dart' show Alignment, LinearGradient, RadialGradient;
+
 import '../core/noise.dart';
 import '../core/spline.dart';
 import 'light.dart';

@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/painting.dart' show Alignment;
+
 /// 스플라인 및 실루엣 생성 유틸리티.
 ///
 /// 절차적 캐릭터의 품질은 실루엣에서 결정된다. 다각형 그대로 그리면

@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/painting.dart' show Alignment;
+
 import '../core/spline.dart';
 
 /// 3점 조명 리그의 2D 근사.
