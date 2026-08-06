@@ -1,11 +1,8 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
-import 'package:flutter/painting.dart' show Alignment, LinearGradient;
-
-import 'light.dart';
-import 'palette.dart';
-import 'surface.dart';
+import '../core/palette.dart';
+import '../core/shading.dart';
 
 /// 2.5D 아이소메트릭 카메라.
 ///
@@ -106,9 +103,9 @@ double yawFromVelocity(Offset worldVelocity) => math.atan2(
 
 /// 아이소 뷰에서 위를 향한 면에 얹는 하이라이트.
 ///
-/// 카메라가 내려다보는 각도만큼 파츠의 상단이 하늘빛을 받는다. 어깨·투구·
-/// 어깨보호대·발등처럼 "윗면이 있는" 파츠에만 준다. 사지 옆면에 주면 오히려
-/// 형태가 납작해진다. [paintSurface] 직후에 호출한다.
+/// 셰이딩 본체는 `core/shading.dart` 의 [topPlane] 이다. 여기서는 카메라
+/// 고도각만 [IsoView] 에서 꺼내 넘겨 준다 — 타일 비율을 바꾸면 상단면 폭이
+/// 자동으로 따라오게 하기 위함이다.
 void paintTopPlane(
   Canvas canvas,
   Path path,
@@ -116,30 +113,8 @@ void paintTopPlane(
   IsoView iso, {
   double strength = 0.5,
 }) {
-  final b = path.getBounds();
-  if (b.isEmpty || b.height < 0.5) return;
-
-  // 고도각이 클수록(위에서 볼수록) 상단면이 넓게 보인다.
-  final band = 0.18 + 0.30 * iso.elevationSin;
-
-  canvas.save();
-  canvas.clipPath(path, doAntiAlias: true);
-  canvas.drawRect(
-    b,
-    Paint()
-      ..blendMode = BlendMode.plus
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          mix(light.rimColor, light.keyColor, 0.45)
-              .withValues(alpha: (0.34 * strength).clamp(0, 1)),
-          const Color(0x00000000),
-        ],
-        stops: [0.0, band.clamp(0.05, 0.95)],
-      ).createShader(b),
-  );
-  canvas.restore();
+  topPlane(canvas, path, light,
+      strength: strength, elevationSin: iso.elevationSin);
 }
 
 /// 아이소 지면에 눕는 접지 그림자.
@@ -160,13 +135,12 @@ void paintIsoGroundShadow(
   double airborne = 0.0,
 }) {
   final k = (1 - airborne * 0.6).clamp(0.35, 1.0);
-  paintGroundShadow(
+  groundShadow(
     canvas,
-    groundAt,
-    width * k,
-    width * iso.shadowRatio * k,
-    light,
-    strength: strength * k,
+    groundAt + Offset(light.dir.dx * -width * 0.12, 0),
+    width * 0.5 * k,
+    width * 0.5 * iso.shadowRatio * k,
+    alpha: strength * k,
   );
 }
 
@@ -181,7 +155,7 @@ void paintImposter(Canvas canvas, Path silhouette, Color tint, LightRig light) {
     Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
-      ..color = light.rimColor.withValues(alpha: 0.5)
+      ..color = light.rim.fade(0.5)
       ..blendMode = BlendMode.plus,
   );
 }
@@ -226,17 +200,18 @@ class BakedPart {
   void dispose() => picture.dispose();
 }
 
-/// 화면상 크기와 게임플레이 중요도로 렌더 품질을 정한다.
+/// 화면상 크기와 게임플레이 중요도로 디테일 레벨을 정한다.
 ///
-/// 플레이어와 보스는 언제나 최고 품질을 쓴다 — 시선이 가장 오래 머무는
-/// 대상에서 아끼면 게임 전체의 인상이 떨어진다.
-Quality qualityFor(
+/// 계보 B 의 `paintSurface` 는 0..1 연속값을 받으므로 등급 enum 이 아니라
+/// 숫자를 돌려준다. 플레이어와 보스는 언제나 최대치를 쓴다 — 시선이 가장 오래
+/// 머무는 대상에서 아끼면 게임 전체의 인상이 떨어진다.
+double detailFor(
   double screenHeightPx, {
   bool isPlayer = false,
   bool isBoss = false,
 }) {
-  if (isPlayer || isBoss) return Quality.high;
-  if (screenHeightPx > 140) return Quality.high;
-  if (screenHeightPx > 70) return Quality.medium;
-  return Quality.low;
+  if (isPlayer || isBoss) return 1.0;
+  if (screenHeightPx > 140) return 1.0;
+  if (screenHeightPx > 70) return 0.6;
+  return 0.25;
 }

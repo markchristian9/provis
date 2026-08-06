@@ -43,72 +43,80 @@ void main() {
   final a = everyone.firstWhere((x) => x.id == target);
 
   testWidgets('전신 — 두 시점', (tester) async {
-    for (final (i, t) in [1.4, 3.9].indexed) {
-      await dump('${target}_full$i', 900, 1260, (c) {
-        c.drawRect(
-          const Rect.fromLTWH(0, 0, 900, 1260),
-          Paint()
-            ..shader = LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: a.moodSky,
-            ).createShader(const Rect.fromLTWH(0, 0, 900, 1260)),
-        );
-        place(c, a, const Rect.fromLTWH(0, 0, 900, 1260), t);
+    await tester.runAsync(() async {
+      for (final (i, t) in [1.4, 3.9].indexed) {
+        await dump('${target}_full$i', 900, 1260, (c) {
+          c.drawRect(
+            const Rect.fromLTWH(0, 0, 900, 1260),
+            Paint()
+              ..shader = LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: a.moodSky,
+              ).createShader(const Rect.fromLTWH(0, 0, 900, 1260)),
+          );
+          place(c, a, const Rect.fromLTWH(0, 0, 900, 1260), t);
+        });
+      }
       });
-    }
-  });
+});
 
   testWidgets('얼굴 클로즈업', (tester) async {
-    // 눈·입 같은 미세 디테일은 전신 컷에서 확인할 수 없다.
-    const f = Rect.fromLTWH(330, 180, 400, 400);
-    await dump('${target}_face', 620, 620, (c) {
-      c.drawRect(
-        const Rect.fromLTWH(0, 0, 620, 620),
-        Paint()..color = a.moodSky.first,
-      );
-      c.save();
-      c.scale(620 / f.width);
-      c.translate(-f.left, -f.top);
-      a.paint(c, 1.4);
-      c.restore();
-    });
-  });
+    await tester.runAsync(() async {
+      // 눈·입 같은 미세 디테일은 전신 컷에서 확인할 수 없다.
+      const f = Rect.fromLTWH(330, 180, 400, 400);
+      await dump('${target}_face', 620, 620, (c) {
+        c.drawRect(
+          const Rect.fromLTWH(0, 0, 620, 620),
+          Paint()..color = a.moodSky.first,
+        );
+        c.save();
+        c.scale(620 / f.width);
+        c.translate(-f.left, -f.top);
+        a.paint(c, 1.4);
+        c.restore();
+      });
+      });
+});
 
   testWidgets('실루엣 — 검게 칠했을 때 정체가 읽히는가', (tester) async {
-    const cw = 300.0;
-    const h = 420.0;
-    final w = cw * heroes.length;
-    await dump('silhouette', w.toInt(), h.toInt(), (c) {
-      final full = Rect.fromLTWH(0, 0, w, h);
-      c.drawRect(full, Paint()..color = const Color(0xFFE6ECF5));
-      for (var i = 0; i < heroes.length; i++) {
-        c.saveLayer(full, Paint());
-        place(c, heroes[i], Rect.fromLTWH(cw * i, 0, cw, h), 1.4, detail: 0.2);
-        c.drawRect(
-          full,
-          Paint()
-            ..blendMode = BlendMode.srcIn
-            ..color = const Color(0xFF12161C),
-        );
-        c.restore();
-      }
-    });
-  });
+    await tester.runAsync(() async {
+      const cw = 300.0;
+      const h = 420.0;
+      final w = cw * heroes.length;
+      await dump('silhouette', w.toInt(), h.toInt(), (c) {
+        final full = Rect.fromLTWH(0, 0, w, h);
+        c.drawRect(full, Paint()..color = const Color(0xFFE6ECF5));
+        for (var i = 0; i < heroes.length; i++) {
+          c.saveLayer(full, Paint());
+          place(c, heroes[i], Rect.fromLTWH(cw * i, 0, cw, h), 1.4, detail: 0.2);
+          c.drawRect(
+            full,
+            Paint()
+              ..blendMode = BlendMode.srcIn
+              ..color = const Color(0xFF12161C),
+          );
+          c.restore();
+        }
+      });
+      });
+});
 
   testWidgets('게임 크기 — 64px 로 줄여도 구분되는가', (tester) async {
-    const cell = 72.0;
-    const h = 104.0;
-    final w = cell * heroes.length;
-    await dump('tiny', w.toInt(), h.toInt(), (c) {
-      c.drawRect(
-        Rect.fromLTWH(0, 0, w, h),
-        Paint()..color = const Color(0xFF141A26),
-      );
-      for (var i = 0; i < heroes.length; i++) {
-        place(c, heroes[i], Rect.fromLTWH(cell * i, 0, cell, h), 1.4,
-            detail: 0.2);
-      }
-    });
-  });
+    await tester.runAsync(() async {
+      const cell = 72.0;
+      const h = 104.0;
+      final w = cell * heroes.length;
+      await dump('tiny', w.toInt(), h.toInt(), (c) {
+        c.drawRect(
+          Rect.fromLTWH(0, 0, w, h),
+          Paint()..color = const Color(0xFF141A26),
+        );
+        for (var i = 0; i < heroes.length; i++) {
+          place(c, heroes[i], Rect.fromLTWH(cell * i, 0, cell, h), 1.4,
+              detail: 0.2);
+        }
+      });
+      });
+});
 }

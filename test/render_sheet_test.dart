@@ -64,56 +64,62 @@ void main() {
   }
 
   testWidgets('전체 캐릭터 시트를 렌더한다', (tester) async {
-    const cw = 430.0;
-    const ch = 610.0;
-    const cols = 4;
-    final rows = (everyone.length + cols - 1) ~/ cols;
-    await dump('sheet_all', (cw * cols).toInt(), (ch * rows).toInt(), (c) {
-      for (var i = 0; i < everyone.length; i++) {
-        final col = i % cols;
-        final row = i ~/ cols;
-        drawOne(
-          c,
-          everyone[i],
-          Rect.fromLTWH(col * cw, row * ch, cw, ch),
-          1.7 + i * 0.4,
-        );
-      }
-    });
-  });
+    await tester.runAsync(() async {
+      const cw = 430.0;
+      const ch = 610.0;
+      const cols = 4;
+      final rows = (everyone.length + cols - 1) ~/ cols;
+      await dump('sheet_all', (cw * cols).toInt(), (ch * rows).toInt(), (c) {
+        for (var i = 0; i < everyone.length; i++) {
+          final col = i % cols;
+          final row = i ~/ cols;
+          drawOne(
+            c,
+            everyone[i],
+            Rect.fromLTWH(col * cw, row * ch, cw, ch),
+            1.7 + i * 0.4,
+          );
+        }
+      });
+      });
+});
 
   testWidgets('캐릭터별 고해상도 개별 컷을 렌더한다', (tester) async {
-    for (final a in everyone) {
-      await dump('solo_${a.id}', 640, 900, (c) {
-        drawOne(c, a, const Rect.fromLTWH(0, 0, 640, 900), 2.3);
+    await tester.runAsync(() async {
+      for (final a in everyone) {
+        await dump('solo_${a.id}', 640, 900, (c) {
+          drawOne(c, a, const Rect.fromLTWH(0, 0, 640, 900), 2.3);
+        });
+      }
       });
-    }
-  });
+});
 
   testWidgets('얼굴 클로즈업을 렌더한다', (tester) async {
-    // 눈·입 같은 미세 디테일은 전신 컷에서 확인할 수 없다.
-    const faces = <String, Rect>{
-      'aldric': Rect.fromLTWH(330, 200, 340, 340),
-      'kaelen': Rect.fromLTWH(300, 250, 340, 340),
-      'seraphine': Rect.fromLTWH(330, 190, 340, 340),
-      'lyra': Rect.fromLTWH(360, 200, 340, 340),
-      'vesper': Rect.fromLTWH(360, 190, 320, 320),
-      'gorehide': Rect.fromLTWH(340, 380, 360, 360),
-      'vaelmorth': Rect.fromLTWH(100, 280, 420, 420),
-      'mourne': Rect.fromLTWH(330, 180, 360, 360),
-      'chitinis': Rect.fromLTWH(160, 690, 400, 400),
-    };
-    for (final a in everyone) {
-      // 명부는 다른 작업자도 건드리므로, 좌표를 등록하지 않은 캐릭터는 건너뛴다.
-      final f = faces[a.id];
-      if (f == null) continue;
-      await dump('face_${a.id}', 560, 560, (c) {
-        c.save();
-        c.scale(560 / f.width);
-        c.translate(-f.left, -f.top);
-        a.paint(c, 2.3);
-        c.restore();
+    await tester.runAsync(() async {
+      // 눈·입 같은 미세 디테일은 전신 컷에서 확인할 수 없다.
+      const faces = <String, Rect>{
+        'aldric': Rect.fromLTWH(330, 200, 340, 340),
+        'kaelen': Rect.fromLTWH(300, 250, 340, 340),
+        'seraphine': Rect.fromLTWH(330, 190, 340, 340),
+        'lyra': Rect.fromLTWH(360, 200, 340, 340),
+        'vesper': Rect.fromLTWH(360, 190, 320, 320),
+        'gorehide': Rect.fromLTWH(340, 380, 360, 360),
+        'vaelmorth': Rect.fromLTWH(100, 280, 420, 420),
+        'mourne': Rect.fromLTWH(330, 180, 360, 360),
+        'chitinis': Rect.fromLTWH(160, 690, 400, 400),
+      };
+      for (final a in everyone) {
+        // 명부는 다른 작업자도 건드리므로, 좌표를 등록하지 않은 캐릭터는 건너뛴다.
+        final f = faces[a.id];
+        if (f == null) continue;
+        await dump('face_${a.id}', 560, 560, (c) {
+          c.save();
+          c.scale(560 / f.width);
+          c.translate(-f.left, -f.top);
+          a.paint(c, 2.3);
+          c.restore();
+        });
+      }
       });
-    }
-  });
+});
 }

@@ -10,10 +10,9 @@ import 'src/anim/animator.dart';
 import 'src/anim/library.dart';
 import 'src/core/rng.dart';
 import 'src/render/iso.dart';
-import 'src/render/light.dart';
 // flame 이 재수출하는 vector_math 에도 mix() 가 있어 이름이 겹친다.
 import 'src/render/palette.dart' as pal;
-import 'src/render/surface.dart';
+import 'src/core/shading.dart';
 import 'src/rig/body.dart';
 
 void main() {
@@ -214,7 +213,7 @@ class IsoFloor extends Component {
           Paint()
             ..style = PaintingStyle.stroke
             ..strokeWidth = 0.7
-            ..color = light.rimColor.withValues(alpha: 0.06 * fade),
+            ..color = light.rim.withValues(alpha: 0.06 * fade),
         );
       }
     }
@@ -247,7 +246,7 @@ class ActorComponent extends PositionComponent {
       light: model.light,
       facing: Facing(model.yaw),
       time: model.animator.clock,
-      quality: Quality.high,
+      detail: 1.0,
       ranged: model.ranged,
     );
   }

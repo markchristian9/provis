@@ -5,7 +5,9 @@ import 'dart:math' as math;
 /// 같은 시드는 항상 같은 캐릭터를 만든다. 절차적 생성의 재현성을 보장하는
 /// 유일한 난수원이므로, 캐릭터 생성 경로에서는 `math.Random` 을 쓰지 않는다.
 class Rng {
-  Rng(int seed) : _s = (seed == 0 ? 0x9E3779B9 : seed) & 0xFFFFFFFF;
+  Rng(int seed)
+      : _root = (seed == 0 ? 0x9E3779B9 : seed) & 0xFFFFFFFF,
+        _s = (seed == 0 ? 0x9E3779B9 : seed) & 0xFFFFFFFF;
 
   /// 문자열 시드(캐릭터 이름 등)로부터 생성.
   factory Rng.fromString(String s) {
@@ -16,6 +18,9 @@ class Rng {
     }
     return Rng(h);
   }
+
+  /// 생성 당시의 시드. 소비되지 않으며 [branch] 의 유일한 기준점이다.
+  final int _root;
 
   int _s;
 
@@ -72,7 +77,14 @@ class Rng {
     return math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2);
   }
 
-  /// 독립적으로 진행하는 자식 생성기. 부모의 상태를 소비하지 않는 브랜치가
-  /// 필요할 때 쓴다(예: 장비 생성은 몸 비율 생성과 분리).
-  Rng branch(int salt) => Rng((_s ^ (salt * 0x9E3779B9)) & 0xFFFFFFFF);
+  /// 독립적으로 진행하는 자식 생성기.
+  ///
+  /// **호출 시점의 상태가 아니라 루트 시드에서 파생한다.** 그래서 부모 스트림을
+  /// 얼마나 소비한 뒤에 부르든 같은 salt 는 언제나 같은 자식을 낸다. 이 성질이
+  /// 없으면 체형 난수 한 줄을 추가하는 것만으로 기존 모든 캐릭터의 색과 장비가
+  /// 바뀌어, 절차적 생성기를 손볼 수 없게 된다.
+  ///
+  /// salt 는 하위 시스템마다 고정 상수를 쓴다(11 색, 23 장비, 37 변이 …).
+  /// 한 번 정한 salt 를 바꾸면 그 하위 시스템의 모든 결과가 바뀐다.
+  Rng branch(int salt) => Rng((_root ^ (salt * 0x9E3779B9)) & 0xFFFFFFFF);
 }

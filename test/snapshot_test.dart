@@ -8,9 +8,8 @@ import 'package:vis/src/actor/spec.dart';
 import 'package:vis/src/anim/library.dart';
 import 'package:vis/src/core/rng.dart';
 import 'package:vis/src/render/iso.dart';
-import 'package:vis/src/render/light.dart';
+import 'package:vis/src/core/shading.dart';
 import 'package:vis/src/render/palette.dart';
-import 'package:vis/src/render/surface.dart';
 import 'package:vis/src/rig/body.dart';
 
 /// 눈으로 확인하기 위한 시트를 굽는다.
@@ -67,7 +66,7 @@ void main() {
           light: light,
           facing: const Facing(0.9),
           time: phases[c] * clip.duration,
-          quality: Quality.high,
+          detail: 1.0,
           ranged: clip.name == 'shoot',
         );
         canvas.restore();
@@ -82,49 +81,55 @@ void main() {
   }
 
   testWidgets('영웅 애니메이션 시트', (tester) async {
-    await bake('hero', HumanoidRenderer(HumanoidSpec.generate(7)), 0);
-    await bake('knight', HumanoidRenderer(HumanoidSpec.generate(3, forceArchetype: Archetype.knight)), 0);
-  });
+    await tester.runAsync(() async {
+      await bake('hero', HumanoidRenderer(HumanoidSpec.generate(7)), 0);
+      await bake('knight', HumanoidRenderer(HumanoidSpec.generate(3, forceArchetype: Archetype.knight)), 0);
+      });
+});
 
   testWidgets('짐승 애니메이션 시트', (tester) async {
-    final spec = HumanoidSpec.generate(7);
-    await bake(
-      'beast',
-      HumanoidRenderer(
-        spec,
-        body: Body.beast(Rng(7 ^ 0x5EED), height: spec.height * 1.12),
-        palette: Palette.monster(Rng(7 ^ 0xB0A5)),
-        beast: true,
-      ),
-      3,
-    );
-  });
+    await tester.runAsync(() async {
+      final spec = HumanoidSpec.generate(7);
+      await bake(
+        'beast',
+        HumanoidRenderer(
+          spec,
+          body: Body.beast(Rng(7 ^ 0x5EED), height: spec.height * 1.12),
+          palette: Palette.monster(Rng(7 ^ 0xB0A5)),
+          beast: true,
+        ),
+        3,
+      );
+      });
+});
 
   testWidgets('8방향 시트', (tester) async {
-    final renderer = HumanoidRenderer(HumanoidSpec.generate(7));
-    const w = 190.0 * 8;
-    const h = 300.0;
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, w, h));
-    canvas.drawRect(
-      const Rect.fromLTWH(0, 0, w, h),
-      Paint()..color = const Color(0xFF0B0E17),
-    );
-    for (var i = 0; i < 8; i++) {
-      canvas.save();
-      canvas.translate(190.0 * i + 95, h * 0.86);
-      renderer.paint(
-        canvas,
-        pose: Anims.wait.sample(0.2),
-        light: LightRig.preset(1),
-        facing: Facing(i * 3.14159265 / 4),
-        quality: Quality.high,
+    await tester.runAsync(() async {
+      final renderer = HumanoidRenderer(HumanoidSpec.generate(7));
+      const w = 190.0 * 8;
+      const h = 300.0;
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, w, h));
+      canvas.drawRect(
+        const Rect.fromLTWH(0, 0, w, h),
+        Paint()..color = const Color(0xFF0B0E17),
       );
-      canvas.restore();
-    }
-    final image = await recorder.endRecording().toImage(w.round(), h.round());
-    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    Directory('/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/9b49c4f1-d75a-46f9-a56b-81e8fd36373f/scratchpad/snapshots').createSync(recursive: true);
-    File('/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/9b49c4f1-d75a-46f9-a56b-81e8fd36373f/scratchpad/snapshots/facing.png').writeAsBytesSync(bytes!.buffer.asUint8List());
-  });
+      for (var i = 0; i < 8; i++) {
+        canvas.save();
+        canvas.translate(190.0 * i + 95, h * 0.86);
+        renderer.paint(
+          canvas,
+          pose: Anims.wait.sample(0.2),
+          light: LightRig.preset(1),
+          facing: Facing(i * 3.14159265 / 4),
+          detail: 1.0,
+        );
+        canvas.restore();
+      }
+      final image = await recorder.endRecording().toImage(w.round(), h.round());
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      Directory('/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/9b49c4f1-d75a-46f9-a56b-81e8fd36373f/scratchpad/snapshots').createSync(recursive: true);
+      File('/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/9b49c4f1-d75a-46f9-a56b-81e8fd36373f/scratchpad/snapshots/facing.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+      });
+});
 }
