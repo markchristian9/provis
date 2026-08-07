@@ -7,6 +7,7 @@ import '../core/rng.dart';
 import '../core/scheme.dart';
 import '../core/shading.dart';
 import '../core/spline.dart';
+import '../iso/world_scale.dart';
 import 'prop.dart';
 
 /// 웅덩이·연못·개울.
@@ -33,6 +34,7 @@ class WaterProp extends Prop {
     this.ripple = 1.0,
     this.shallow = false,
     this.reeds = true,
+    this.scale = const WorldScale(),
   }) {
     final r = Rng(seed);
     _tone = color ??
@@ -81,9 +83,19 @@ class WaterProp extends Prop {
   @override
   bool get walkable => shallow;
 
+  /// 통행 판정을 타일로 옮길 때 쓰는 자.
+  final WorldScale scale;
+
+  /// 수면이 덮는 타일.
+  ///
+  /// 예전에는 `radius / 78` 이라는 상수로 타일 수를 셌다. 78 은 어떤 특정
+  /// 타일 폭에서만 맞는 숫자여서, 카메라를 바꾸거나 연못이 제 크기를 찾는
+  /// 순간 통행 판정이 수면과 어긋난다 — 물 위를 걷거나 마른 땅에서 막힌다.
   @override
-  Size get footprint =>
-      Size((radius / 78).ceilToDouble(), (radius / 78).ceilToDouble());
+  Size get footprint {
+    final n = (radius * 2 / scale.pxPerTile).ceilToDouble().clamp(1.0, 64.0);
+    return Size(n, n);
+  }
 
   @override
   void paint(Canvas c, double t, LightRig light, {double detail = 1.0}) {

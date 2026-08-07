@@ -290,8 +290,12 @@ class IsoSceneComponent extends Component {
     _order.sort((a, b) => depthOf(a).compareTo(depthOf(b)));
 
     final cull = cullToViewport && viewport != null;
+    // 종류별 실측. 이것 없이 최적화하면 안 아픈 곳을 수술한다.
+    final sw = SceneProfile.enabled ? (Stopwatch()..start()) : null;
     for (final k in _order) {
       final i = k >> 2;
+      final t0 = sw?.elapsedMicroseconds ?? 0;
+      String? key;
       switch (k & 3) {
         case 0:
           final it = props[i];
@@ -299,10 +303,16 @@ class IsoSceneComponent extends Component {
           // 애니메이션 상태는 계속 흘러야 하기 때문이다.
           if (cull && !_onScreen(it.tile, it.prop.height * it.scale)) continue;
           paintProp(canvas, it, iso, light, _clock);
+          if (sw != null) key = it.prop.runtimeType.toString();
         case 1:
           paintIsoActor(canvas, actors[i], iso, _clock);
+          if (sw != null) key = 'IsoActor';
         default:
           paintRiggedActor(canvas, rigged[i], iso, light, _clock);
+          if (sw != null) key = 'RiggedActor';
+      }
+      if (sw != null && key != null) {
+        SceneProfile.add(key, sw.elapsedMicroseconds - t0);
       }
     }
   }

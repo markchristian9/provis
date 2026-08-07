@@ -7,6 +7,7 @@ import '../core/scheme.dart';
 import '../core/rng.dart';
 import '../core/shading.dart';
 import '../core/spline.dart';
+import '../iso/world_scale.dart';
 import 'prop.dart';
 import 'prop_kit.dart';
 
@@ -59,6 +60,7 @@ class TreeProp extends Prop {
     this.canopyColor,
     this.barkColor,
     this.wind = 1.0,
+    this.scale = const WorldScale(),
   }) {
     final r = Rng(seed);
     _lean = r.signed(0.09);
@@ -132,6 +134,9 @@ class TreeProp extends Prop {
   /// 바람 세기 배율. 0 이면 완전히 정지한다.
   final double wind;
 
+  /// 통행 판정을 타일로 옮길 때 쓰는 자. 그리기에는 영향을 주지 않는다.
+  final WorldScale scale;
+
   late final double _lean;
   late final double _trunkR;
   late final double _canopyR;
@@ -149,8 +154,18 @@ class TreeProp extends Prop {
         _ => trunkHeight + _canopyR * 1.6,
       };
 
+  /// 통행을 막는 것은 **줄기**다.
+  ///
+  /// 예전에는 수관 반지름으로 판정했다. 나무가 제 크기를 찾자 그 규칙은
+  /// 즉시 무너진다 — 다 자란 활엽수의 수관은 지름 5 m 를 넘으므로 사람이
+  /// 걸어 들어갈 수 있는 나무 그늘이 통째로 벽이 된다. 실제로 몸이 걸리는
+  /// 것은 줄기뿐이고, 그것은 어느 종이든 한 타일을 넘지 않는다.
   @override
-  Size get footprint => _canopyR > 130 ? const Size(2, 2) : const Size(1, 1);
+  Size get footprint {
+    final across =
+        (_trunkR * 2 / scale.pxPerTile).ceilToDouble().clamp(1.0, 3.0);
+    return Size(across, across);
+  }
 
   @override
   bool get walkable => kind == TreeKind.bush;
@@ -723,9 +738,13 @@ List<PropInstance> plantForest({
   required int seed,
   required List<Offset> tiles,
   List<TreeKind> kinds = const [TreeKind.broadleaf, TreeKind.conifer],
-  double baseHeight = 190,
+  double? baseHeight,
+  WorldScale scale = const WorldScale(),
 }) {
   final r = Rng(seed);
+  // 밑동에서 수관 시작까지 [kTreeTrunkM]. 픽셀을 직접 고르면 카메라를 바꿀
+  // 때마다 숲이 사람과 다른 비율로 자란다.
+  final trunk = baseHeight ?? scale.px(kTreeTrunkM);
   return [
     for (final (i, tile) in tiles.indexed)
       () {
@@ -734,8 +753,9 @@ List<PropInstance> plantForest({
           prop: TreeProp(
             seed: seed + i * 977,
             kind: kind,
+            scale: scale,
             // 관목은 나무 키로 만들면 화면을 덮는다. 종류별 기준을 따로 둔다.
-            trunkHeight: baseHeight *
+            trunkHeight: trunk *
                 r.bell(0.82, 1.18) *
                 switch (kind) {
                   TreeKind.bush => 0.34,

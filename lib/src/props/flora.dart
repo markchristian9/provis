@@ -7,6 +7,7 @@ import '../core/rng.dart';
 import '../core/scheme.dart';
 import '../core/shading.dart';
 import '../core/spline.dart';
+import '../iso/world_scale.dart';
 import 'prop.dart';
 import 'prop_kit.dart';
 
@@ -524,7 +525,7 @@ class FenceProp extends Prop {
     required this.seed,
     this.tileWidth = 156,
     this.isoRatio = 0.5,
-    this.fenceHeight = 58,
+    double? fenceHeight,
     this.color,
     this.alongX = true,
     this.rails = 2,
@@ -533,12 +534,17 @@ class FenceProp extends Prop {
     final r = Rng(seed);
     _tone = color ??
         hsl(r.range(24, 40), r.range(0.14, 0.28), r.range(0.28, 0.40));
+    // 기본값 58 px 는 0.55 m — 사람 무릎 아래였다. 울타리는 허리께다.
+    this.fenceHeight =
+        fenceHeight ?? WorldScale.ofTileWidth(tileWidth).px(kFenceHeightM);
   }
 
   final int seed;
   final double tileWidth;
   final double isoRatio;
-  final double fenceHeight;
+
+  /// 울타리 높이(국소 px). 생략하면 [kFenceHeightM] 에서 유도한다.
+  late final double fenceHeight;
   final Color? color;
   final bool alongX;
   final int rails;

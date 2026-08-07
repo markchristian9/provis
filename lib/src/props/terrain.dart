@@ -7,6 +7,7 @@ import '../core/rng.dart';
 import '../core/scheme.dart';
 import '../core/shading.dart';
 import '../core/spline.dart';
+import '../iso/world_scale.dart';
 import 'prop.dart';
 import 'prop_kit.dart';
 
@@ -37,6 +38,7 @@ class MoundProp extends Prop {
     this.soilColor,
     this.walkOver = false,
     this.tufts = 8,
+    this.scale = const WorldScale(),
   }) {
     final r = Rng(seed);
     _grass = grassColor ??
@@ -84,9 +86,14 @@ class MoundProp extends Prop {
   @override
   bool get walkable => walkOver;
 
+  /// 통행 판정을 타일로 옮길 때 쓰는 자.
+  final WorldScale scale;
+
+  /// 둔덕이 덮는 타일. `radius / 78` 이라는 상수를 쓰던 자리다 — 78 은 어떤
+  /// 특정 타일 폭에서만 맞는 숫자여서 스케일이 바뀌면 즉시 어긋난다.
   @override
   Size get footprint {
-    final n = (radius / 78).ceilToDouble();
+    final n = (radius * 2 / scale.pxPerTile).ceilToDouble().clamp(1.0, 64.0);
     return Size(n, n);
   }
 

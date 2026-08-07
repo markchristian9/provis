@@ -7,6 +7,7 @@ import '../core/rng.dart';
 import '../core/scheme.dart';
 import '../core/shading.dart';
 import '../core/spline.dart';
+import '../iso/world_scale.dart';
 import 'prop.dart';
 import 'prop_kit.dart';
 
@@ -104,7 +105,9 @@ class BuildingProp extends Prop {
     this.litWindows = true,
     this.ridgeAlongX = true,
     this.chimney = true,
-  }) : skin = skin ??
+    double? storeyHeightOverride,
+  })  : _storeyOverride = storeyHeightOverride,
+        skin = skin ??
             switch (wall) {
               WallStyle.stone => RoofSkin.tile,
               WallStyle.brick => RoofSkin.tile,
@@ -113,7 +116,14 @@ class BuildingProp extends Prop {
               WallStyle.timber => RoofSkin.thatch,
             } {
     final r = Rng(seed);
-    _storeyH = tileWidth * r.bell(0.32, 0.40);
+    // 층고는 **미터로 선언하고 한 번만 픽셀로 바꾼다.** 예전에는
+    // `tileWidth * bell(0.32, 0.40)` 이었는데, 그 값은 층고 0.45~0.57 m —
+    // 2층집이 사람보다 낮았다. 픽셀을 직접 고르면 반드시 이렇게 된다.
+    //
+    // 난수는 덮어쓸 때도 반드시 소비한다. 그러지 않으면 층고를 지정한 건물과
+    // 아닌 건물의 벽색·창 배치가 달라져 비교 시트가 두 가지를 한꺼번에 바꾼다.
+    final auto = _scale.px(r.bell(kStoreyHeightM * 0.92, kStoreyHeightM * 1.10));
+    _storeyH = _storeyOverride ?? auto;
     final cr = r.branch(11);
     _wallTone = wallColor ??
         switch (wall) {
@@ -175,6 +185,13 @@ class BuildingProp extends Prop {
   /// 굴뚝과 연기를 세운다.
   final bool chimney;
 
+  /// 층고를 미터 유도 대신 직접 지정한 값(국소 px). 보통은 `null` 이다.
+  ///
+  /// 옛 치수를 재현해 **고치기 전/후를 나란히 굽는** 대조 시트에 쓴다
+  /// (`scale_shot_test.dart`). 일반 사용에서는 넘기지 않는다 — 넘기는 순간
+  /// 그 건물만 마을의 자에서 벗어난다.
+  final double? _storeyOverride;
+
   late final double _storeyH;
   late final Color _wallTone;
   late final Color _roofTone;
@@ -187,8 +204,36 @@ class BuildingProp extends Prop {
   @override
   Size get footprint => tiles;
 
+  /// 이 건물이 쓰는 미터 자. [tileWidth] 하나로 정해진다.
+  WorldScale get _scale => WorldScale.ofTileWidth(tileWidth);
+
+  /// 한 층의 높이(국소 px). 사람 키보다 크고 두 배보다 작아야 한다.
+  double get storeyHeight => _storeyH;
+
+  /// 출입문 안목 높이(국소 px). 사람이 고개를 숙이지 않고 지난다.
+  ///
+  /// 층고에 비례시키지 않는다 — 층고가 흔들리면 문이 따라 흔들려 사람이
+  /// 못 들어가는 집이 생긴다. 문은 **사람 치수**에 매인다.
+  double get doorHeight => _scale.px(kDoorHeightM);
+
+  /// 출입문 너비(국소 px).
+  double get doorWidth => _scale.px(kDoorWidthM);
+
+  /// 지붕 마루가 처마에서 솟는 높이(국소 px).
+  double get _roofRise => switch (roof) {
+        RoofStyle.flat => 0.0,
+        RoofStyle.cone => _storeyH * 1.35,
+        RoofStyle.gambrel => _storeyH * 0.86,
+        _ => _storeyH * 0.70,
+      };
+
+  /// 접지에서 지붕 꼭대기까지.
+  ///
+  /// 예전에는 지붕 몫을 `tileWidth * 0.5` 라는 상수로 때웠다. 그 값은 타일에만
+  /// 매여 있어 층수·지붕 모양과 무관했고, 깊이 정렬과 컬링이 실제와 다른
+  /// 높이를 쓰게 만들었다.
   @override
-  double get height => _storeyH * storeys + tileWidth * 0.5;
+  double get height => _plinthH + _storeyH * storeys + _roofRise;
 
   @override
   bool get walkable => false;
@@ -527,8 +572,10 @@ class BuildingProp extends Prop {
     // ── 문 — 앞 모서리 쪽 한 면에만 낸다.
     if (side == 0) {
       final u = r.range(0.34, 0.62);
-      final dw = _storeyH * 0.30;
-      final dh = _storeyH * 0.62;
+      // 사람 치수에 맞춘다. 층고에 비례시키면 집이 커질 때 문도 같이 커져
+      // 대문 같은 문이 되고, 작아지면 사람이 못 들어간다.
+      final dw = doorWidth;
+      final dh = doorHeight;
       final foot = a + span * u;
       final dir = span.normalized();
       final p0 = foot - dir * dw * 0.5;
@@ -586,8 +633,10 @@ class BuildingProp extends Prop {
         final u = i / (cols + 1) + r.signed(0.05);
         final v = (s + 0.60) / storeys;
         final at = a + span * u + up * v;
-        final ww = _storeyH * 0.17;
-        final wh = _storeyH * 0.24;
+        // 창도 사람 치수다 — 한 짝 0.85×1.20 m. 이 단위가 보여야 관객이
+        // 건물의 실제 규모를 읽는다.
+        final ww = _scale.px(kWindowWidthM);
+        final wh = _scale.px(kWindowHeightM);
         final on = litWindows && r.chance(0.62);
         _paintWindow(c, l, at, span.normalized(), ww, wh, on, detail);
       }
@@ -1211,18 +1260,24 @@ class WallProp extends Prop {
     required this.seed,
     this.tileWidth = 156,
     this.isoRatio = 0.5,
-    this.wallHeight = 52,
+    double? wallHeight,
     this.thickness = 0.16,
     this.color,
     this.crenellated = false,
     this.alongX = true,
     this.mossy = true,
-  });
+  }) {
+    // 기본값 52 px 는 이 타일 크기에서 0.49 m — 사람 발목 높이의 "성벽"이었다.
+    this.wallHeight =
+        wallHeight ?? WorldScale.ofTileWidth(tileWidth).px(kWallHeightM);
+  }
 
   final int seed;
   final double tileWidth;
   final double isoRatio;
-  final double wallHeight;
+
+  /// 담 높이(국소 px). 생략하면 [kWallHeightM] 에서 유도한다.
+  late final double wallHeight;
 
   /// 타일 폭 대비 두께.
   final double thickness;
