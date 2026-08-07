@@ -131,6 +131,10 @@ Map<String, List<Uint8List>> bakeClips(BakeOrder order) {
   bank.addVariants(SfxKeys.parry, 2, (s) => Sfx.parry(seed: s, rate: order.sfxRate));
   bank.addVariants(SfxKeys.guardUp, 2,
       (s) => Sfx.guardUp(seed: s, rate: order.sfxRate));
+  // 활은 원거리 무기 유무와 상관없이 굽는다. `release` 클립 이벤트가 이
+  // 이름으로 소리를 부르므로, 빠뜨리면 첫 사격에서 게임 루프가 죽는다.
+  bank.addVariants(SfxKeys.bowShot, 2,
+      (s) => Sfx.bowShot(seed: s, rate: order.sfxRate));
   bank.addVariants(SfxKeys.bodyFall, 2,
       (s) => Sfx.bodyFall(seed: s, weight: Rng(s).bell(0.35, 0.8), rate: order.sfxRate));
   bank.addVariants(SfxKeys.moveMark, 2,
