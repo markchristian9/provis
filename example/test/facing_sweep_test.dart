@@ -7,10 +7,12 @@ import 'package:provis/provis.dart';
 
 /// 방향 해상도 검증 — 32 분할과 연속 회전이 실제로 다르게 그려지는지 본다.
 void main() {
-  const out = '/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/'
-      'd83a6054-46af-4fe1-ad43-82da4277d273/scratchpad';
+  // 다른 시트 테스트와 같은 자리에 떨어뜨린다. 절대 경로를 박아 두면 그 경로가
+  // 있는 기계에서만 통과한다 — 실제로 다른 세션의 스크래치패드를 가리키고 있었다.
+  const out = 'build/art';
 
   Future<void> sheet(String name, int count, int cols) async {
+    Directory(out).createSync(recursive: true);
     final renderer = HumanoidRenderer(HumanoidSpec.generate(3));
     const cw = 132.0, ch = 210.0;
     final rows = (count / cols).ceil();
