@@ -23,8 +23,7 @@ void main() {
       energy += v * v;
     }
     final rms = (energy / w.length);
-    expect(rms, greaterThan(floor * floor * 0.01),
-        reason: '$what: 사실상 무음이다');
+    expect(rms, greaterThan(floor * floor * 0.01), reason: '$what: 사실상 무음이다');
     expect(w.peak, lessThanOrEqualTo(1.0), reason: '$what: 클리핑한다');
   }
 
@@ -52,11 +51,12 @@ void main() {
 
     test('포락선이 0..1 을 벗어나지 않는다', () {
       const e = Env(
-          attack: 0.01,
-          decay: 0.2,
-          sustain: 0.4,
-          sustainTime: 0.1,
-          release: 0.3);
+        attack: 0.01,
+        decay: 0.2,
+        sustain: 0.4,
+        sustainTime: 0.1,
+        release: 0.3,
+      );
       for (var i = 0; i <= 200; i++) {
         final v = e.at(e.duration * i / 200 * 1.2);
         expect(v, inInclusiveRange(0.0, 1.0));
@@ -82,8 +82,11 @@ void main() {
       // 같은 시드에서 바닥만 바꿨는데 파형이 같다면 분기가 죽은 것이다.
       final grass = Sfx.footstep(seed: 5, ground: StepGround.grass);
       final stone = Sfx.footstep(seed: 5, ground: StepGround.stone);
-      expect(_divergence(grass, stone), greaterThan(0.8),
-          reason: '풀밭과 돌바닥이 같은 소리다');
+      expect(
+        _divergence(grass, stone),
+        greaterThan(0.8),
+        reason: '풀밭과 돌바닥이 같은 소리다',
+      );
     });
 
     test('무기 8종의 휘두르기', () {
@@ -100,6 +103,7 @@ void main() {
       expectAudible(Sfx.parry(seed: 1), '흘리기');
       expectAudible(Sfx.guardUp(seed: 1), '방어 자세');
       expectAudible(Sfx.bowShot(seed: 1), '사격');
+      expectAudible(Sfx.magicCast(seed: 1), '마법 발사');
       expectAudible(Sfx.bodyFall(seed: 1), '쓰러짐');
       expectAudible(Sfx.moveMark(seed: 1), '이동 표식');
       expectAudible(Sfx.uiClick(seed: 1), 'UI');
@@ -115,9 +119,11 @@ void main() {
     });
 
     test('시드가 다르면 다른 소리를 낸다', () {
-      expect(_divergence(Sfx.footstep(seed: 1), Sfx.footstep(seed: 2)),
-          greaterThan(0.8),
-          reason: '시드가 변주를 만들지 못한다');
+      expect(
+        _divergence(Sfx.footstep(seed: 1), Sfx.footstep(seed: 2)),
+        greaterThan(0.8),
+        reason: '시드가 변주를 만들지 못한다',
+      );
     });
   });
 
@@ -141,10 +147,13 @@ void main() {
 
     test('개체마다 목소리가 다르다', () {
       expect(
-          _divergence(CreatureVoice(seed: 1, kind: VoiceKind.growl).idle(),
-              CreatureVoice(seed: 2, kind: VoiceKind.growl).idle()),
-          greaterThan(0.8),
-          reason: '같은 종이 전부 같은 소리를 낸다');
+        _divergence(
+          CreatureVoice(seed: 1, kind: VoiceKind.growl).idle(),
+          CreatureVoice(seed: 2, kind: VoiceKind.growl).idle(),
+        ),
+        greaterThan(0.8),
+        reason: '같은 종이 전부 같은 소리를 낸다',
+      );
     });
   });
 
@@ -163,8 +172,11 @@ void main() {
         for (var i = 0; i < s.left.length; i++) {
           if ((s.left[i] - s.right[i]).abs() < 1e-12) same++;
         }
-        expect(same / s.left.length, lessThan(0.5),
-            reason: '${mood.name}: 좌우가 같다');
+        expect(
+          same / s.left.length,
+          lessThan(0.5),
+          reason: '${mood.name}: 좌우가 같다',
+        );
       }
     });
 
@@ -178,8 +190,7 @@ void main() {
       }
       typical /= w.length - 1;
       final seam = (w[0] - w[w.length - 1]).abs();
-      expect(seam, lessThan(typical * 40 + 0.05),
-          reason: '루프 지점에서 딱 소리가 난다');
+      expect(seam, lessThan(typical * 40 + 0.05), reason: '루프 지점에서 딱 소리가 난다');
     });
   });
 
@@ -213,6 +224,7 @@ void main() {
       expect(bank.has(SfxKeys.impactFlesh), isTrue);
       expect(bank.has(SfxKeys.blockMetal), isTrue);
       expect(bank.has(SfxKeys.bowShot), isTrue);
+      expect(bank.has(SfxKeys.magicCast), isTrue);
       expect(bank.variants(SfxKeys.step(StepGround.grass)), 4);
     });
 
@@ -221,8 +233,11 @@ void main() {
       expect(bank.bakedCount, 0, reason: '만들자마자 굽고 있다');
       final first = bank.bytes(SfxKeys.impactFlesh);
       expect(bank.bakedCount, 1);
-      expect(identical(bank.bytes(SfxKeys.impactFlesh), first), isTrue,
-          reason: '두 번째 요청에 다시 굽고 있다');
+      expect(
+        identical(bank.bytes(SfxKeys.impactFlesh), first),
+        isTrue,
+        reason: '두 번째 요청에 다시 굽고 있다',
+      );
     });
 
     test('변주가 서로 다른 바이트다', () {
@@ -230,8 +245,11 @@ void main() {
       final key = SfxKeys.step(StepGround.grass);
       final a = bank.bytes(key, 0);
       final b = bank.bytes(key, 1);
-      expect(a.length == b.length && _same(a, b), isFalse,
-          reason: '변주 넷이 전부 같은 소리다');
+      expect(
+        a.length == b.length && _same(a, b),
+        isFalse,
+        reason: '변주 넷이 전부 같은 소리다',
+      );
     });
 
     test('없는 이름은 조용히 무음을 내지 않고 던진다', () {
@@ -240,8 +258,7 @@ void main() {
 
     test('몬스터 목소리를 창고에 붙인다', () {
       final bank = SoundBank.field(seed: 3);
-      final voice =
-          CreatureVoice(seed: 12, kind: VoiceKind.roar, size: 0.9);
+      final voice = CreatureVoice(seed: 12, kind: VoiceKind.roar, size: 0.9);
       bank.addVoice('gorehide', voice);
       expect(bank.has(VoiceKeys.attack('gorehide')), isTrue);
       expect(bank.bytes(VoiceKeys.attack('gorehide')).length, greaterThan(44));

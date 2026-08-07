@@ -10,6 +10,9 @@ import 'package:provis/provis.dart';
 
 import '../audio/game_audio.dart';
 import '../characters/roster.dart';
+import '../combat/attack_combo.dart';
+import '../combat/attack_mode.dart';
+import '../combat/projectile.dart';
 import '../world/camera.dart';
 import '../world/village.dart';
 import '../i18n/lang.dart';
@@ -239,6 +242,10 @@ class FieldGame extends FlameGame with TapCallbacks {
   /// 몬스터의 사정거리. 영웅보다 조금 짧아야 먼저 칠 여지가 생긴다.
   static const double _mobReach = 1.5;
 
+  /// 화살과 마법은 실제로 화면을 가로지를 수 있는 거리를 가진다.
+  static const double _bowReach = 11.0;
+  static const double _spellReach = 9.0;
+
   /// 영웅의 전투 체력. 몬스터 일격보다 여유는 주되, 공격을 안 막아도
   /// 몇 번은 버틸 수 있는 길이로 둔다.
   static const int _heroMaxHp = 6;
@@ -285,6 +292,9 @@ class FieldGame extends FlameGame with TapCallbacks {
   int _heroHp = _heroMaxHp;
   bool _heroAlive = true;
 
+  final AttackCombo _combo = AttackCombo();
+  final List<CombatProjectile> _projectiles = [];
+
   double _heroCooldown = 0;
 
   /// 흔들리기 전의 카메라 원점. 흔들림은 **여기로 정확히 돌아와야** 한다.
@@ -317,6 +327,7 @@ class FieldGame extends FlameGame with TapCallbacks {
     // 소리는 준비되는 대로 붙는다.
     unawaited(audio.warmUp(_bakeOrder()));
     unawaited(audio.setMood(Mood.values[preset]));
+    await add(_CombatProjectileLayer(this));
     // 이름표는 세계 위에 그려야 나무나 건물에 가려지지 않는다.
     await add(_CombatNameplateLayer(this));
   }
@@ -385,6 +396,7 @@ class FieldGame extends FlameGame with TapCallbacks {
     if (!_spawned || !_heroAlive) return;
     guarding = !guarding;
     if (guarding) {
+      _combo.reset();
       _heroCtrl.stop();
       audio.play(SfxKeys.guardUp, volume: 0.8);
     } else {
@@ -408,6 +420,9 @@ class FieldGame extends FlameGame with TapCallbacks {
     _target = null;
     _heroHp = _heroMaxHp;
     _heroAlive = true;
+    _heroCooldown = 0;
+    _combo.reset();
+    _projectiles.clear();
     guarding = false;
     _scene.groundSeed = mapSeed;
     // 구워 둔 기물 텍스처를 놓아 준다. 이걸 빠뜨리면 맵을 다시 생성할 때마다
@@ -570,6 +585,24 @@ class FieldGame extends FlameGame with TapCallbacks {
 
   WeaponKind get _heroWeapon => _heroActor.renderer.spec.weapon;
 
+  HeroAttackMode get _heroAttackMode => attackModeFor(
+    weapon: _heroWeapon,
+    archetype: _heroActor.renderer.spec.archetype,
+  );
+  bool get _heroUsesBow => _heroAttackMode == HeroAttackMode.bow;
+  bool get _heroCastsSpells => _heroAttackMode == HeroAttackMode.spell;
+  bool get _heroUsesRanged => _heroAttackMode != HeroAttackMode.melee;
+
+  double get _heroAttackRange => _heroUsesBow
+      ? _bowReach
+      : _heroCastsSpells
+      ? _spellReach
+      : _reach;
+
+  /// 공격 버튼이 적을 자동으로 고를 수 있는 거리.
+  double get _heroAcquireRange =>
+      _heroUsesRanged ? _heroAttackRange : _reach * 4;
+
   // ── 입력 ──────────────────────────────────────────────────────────────
 
   @override
@@ -585,9 +618,10 @@ class FieldGame extends FlameGame with TapCallbacks {
     final mob = _mobAt(target);
     if (mob != null) {
       _target = mob;
-      if ((mob.actor.tile - _heroActor.tile).distance <= _reach) {
+      if ((mob.actor.tile - _heroActor.tile).distance <= _heroAttackRange) {
         _beginHeroAttack();
       } else {
+        _combo.reset();
         _heroCtrl.moveTo(mob.actor.tile);
         _scene.marker?.ping(mob.actor.tile);
       }
@@ -595,6 +629,7 @@ class FieldGame extends FlameGame with TapCallbacks {
     }
 
     _target = null;
+    _combo.reset();
     _heroCtrl.moveTo(target);
     _scene.marker?.ping(target);
     audio.play(SfxKeys.moveMark, volume: 0.45);
@@ -628,7 +663,7 @@ class FieldGame extends FlameGame with TapCallbacks {
       }
     }
     // 사정거리 밖이면 노리기만 하고 헛스윙한다 — 휘둘렀다는 사실은 들려야 한다.
-    _target = bestD <= _reach * 4 ? best : null;
+    _target = bestD <= _heroAcquireRange ? best : null;
     _beginHeroAttack();
   }
 
@@ -642,6 +677,7 @@ class FieldGame extends FlameGame with TapCallbacks {
 
     _runPending(dt);
     _updateHero(dt);
+    _updateProjectiles(dt);
     _updateMobs(dt);
     _updateCamera(dt);
   }
@@ -654,14 +690,21 @@ class FieldGame extends FlameGame with TapCallbacks {
     _heroCooldown = math.max(0, _heroCooldown - dt);
     _heroCtrl.speed = sprinting ? 6.4 : 3.2;
 
-    // 노린 상대가 사정거리에 들어오면 벤다.
+    // 이전 동작 중에 눌러 둔 입력은 애니메이션이 끝난 첫 프레임에
+    // 소비한다. 그렇게 해야 두 동작 사이에 idle 한 프레임이 끼지 않는다.
+    if (!_heroBusy && _combo.takeQueued()) {
+      _startHeroAttack(chained: true);
+    }
+
+    // 노린 상대가 현재 무기의 사정거리에 들어오면 공격한다.
     final target = _target;
     if (target != null && target.alive && !_heroBusy) {
       final d = (target.actor.tile - _heroActor.tile).distance;
-      if (d <= _reach) {
+      if (d <= _heroAttackRange) {
         _heroCtrl.stop();
         _beginHeroAttack();
       } else if (!_heroCtrl.isMoving) {
+        _combo.reset();
         _heroCtrl.moveTo(target.actor.tile);
       }
     }
@@ -683,36 +726,54 @@ class FieldGame extends FlameGame with TapCallbacks {
       _heroActor.follow(_heroCtrl, dt);
     }
 
-    // 공격 중에는 상대를 향해 돈다. follow 가 yaw 를 덮으므로 **뒤에서** 건다.
-    if (_heroBusy && target != null && target.alive) {
-      final want = yawFromVelocity(target.actor.tile - _heroActor.tile);
-      _heroActor.yaw = lerpAngle(
-        _heroActor.yaw,
-        want,
-        1 - math.exp(-dt / 0.08),
-      );
+    if (_heroBusy) {
+      // follow 가 제자리 애니메이션의 rate 를 1로 돌리므로 콤보 배속은
+      // 그 뒤에 다시 건다.
+      _heroActor.animator.rate = _combo.attackRate;
+      // 공격 중에는 상대를 향해 돈다. follow 가 yaw 를 덮으므로
+      // **뒤에서** 건다.
+      if (target != null && target.alive) {
+        final want = yawFromVelocity(target.actor.tile - _heroActor.tile);
+        _heroActor.yaw = lerpAngle(
+          _heroActor.yaw,
+          want,
+          1 - math.exp(-dt / 0.08),
+        );
+      }
     }
 
     _consumeEvents(_heroActor, isHero: true);
+    _combo.update(dt, attacking: _heroBusy);
   }
 
   bool get _heroBusy =>
       _heroActor.state == 'attack' || _heroActor.state == 'shoot';
 
   void _beginHeroAttack() {
-    if (!_heroAlive || _heroBusy || _heroCooldown > 0) return;
-    _heroCtrl.stop();
-    _heroCooldown = 0.42;
+    if (!_heroAlive) return;
+    if (_heroBusy) {
+      _combo.queue();
+      return;
+    }
+    if (_heroCooldown > 0) return;
+    _startHeroAttack(chained: false);
+  }
 
-    final ranged = _heroWeapon == WeaponKind.bow;
-    _heroActor.ranged = ranged;
-    _heroActor.play(ranged ? 'shoot' : 'attack');
-    if (ranged) return; // 활은 release 이벤트가 시위 소리를 낸다
+  void _startHeroAttack({required bool chained}) {
+    _heroCtrl.stop();
+    guarding = false;
+    _heroCooldown = 0.42;
+    _combo.begin(chained: chained);
+
+    _heroActor.ranged = _heroUsesBow;
+    _heroActor.play(_heroUsesRanged ? 'shoot' : 'attack');
+    _heroActor.animator.rate = _combo.attackRate;
+    if (_heroUsesRanged) return; // release 이벤트가 발사체를 낸다
 
     // 스윙 소리의 봉우리는 파형의 60% 지점에 있다. 그 봉우리가 클립의 strike
     // 이벤트(t=0.5)에 떨어지도록 앞당겨 예약한다 — 소리와 그림이 어긋나는
     // 순간 두 배로 싸구려가 된다.
-    final lead = Anims.attack.duration * 0.5 - 0.21;
+    final lead = Anims.attack.duration * 0.5 / _combo.attackRate - 0.21;
     _after(math.max(0, lead), () {
       audio.play(
         SfxKeys.swing(_heroWeapon),
@@ -731,15 +792,15 @@ class FieldGame extends FlameGame with TapCallbacks {
       if (delta.distance > _reach + 0.4) continue;
       // 부채꼴 판정 — 등 뒤의 적이 맞으면 방향을 맞춘 의미가 없다.
       if (_angleBetween(_heroActor.yaw, yawFromVelocity(delta)) > 1.0) continue;
-      _hurt(mob);
+      _hurt(mob, damage: _combo.damage);
       landed = true;
     }
     // 빗나가면 바람 소리만 남는다. 이 차이가 맞았는지 아닌지를 말해 준다.
     if (landed) _shake = math.max(_shake, 3.4);
   }
 
-  void _hurt(_Mob mob) {
-    mob.hp -= 1;
+  void _hurt(_Mob mob, {int damage = 1, bool hitstopHero = true}) {
+    mob.hp = math.max(0, mob.hp - damage);
     final pan = _panOf(mob.actor.tile);
     final vol = _volumeAt(mob.actor.tile);
     final armored = mob.actor.renderer.spec.armorHeaviness > 0.55;
@@ -750,7 +811,7 @@ class FieldGame extends FlameGame with TapCallbacks {
     );
 
     // 히트스톱 — 타격감의 상당 부분이 이 0.06초에서 나온다.
-    _heroActor.animator.hitstop(0.06);
+    if (hitstopHero) _heroActor.animator.hitstop(0.06);
     mob.actor.animator.hitstop(0.06);
 
     if (mob.hp <= 0) {
@@ -766,6 +827,54 @@ class FieldGame extends FlameGame with TapCallbacks {
       audio.play(VoiceKeys.hurt(mob.artist.id), volume: vol * 0.9, pan: pan);
     }
   }
+
+  /// 애니메이션의 `release` 프레임에서 화살 또는 마법을 발사한다.
+  void _launchHeroProjectile() {
+    final start = _heroActor.tile;
+    final lockedTarget = _target != null && _target!.alive ? _target : null;
+    final forward = _worldDirection(_heroActor.yaw);
+    final destination =
+        lockedTarget?.actor.tile ??
+        start +
+            forward * (_heroUsesBow ? _bowReach * 0.72 : _spellReach * 0.72);
+    final distance = (destination - start).distance;
+    final bow = _heroUsesBow;
+    final speed = bow ? 15.0 : 9.5;
+    final damage = _combo.damage;
+
+    // 멀리서 맞은 적도 반격하러 다가와야 한다. 발사하자마자 전투 상태로
+    // 넣으면 체력바도 발사체와 함께 나타난다.
+    if (lockedTarget != null) lockedTarget.alerted = true;
+
+    _projectiles.add(
+      CombatProjectile(
+        kind: bow ? CombatProjectileKind.arrow : CombatProjectileKind.spell,
+        start: start,
+        destination: destination,
+        targetTile: lockedTarget == null ? null : () => lockedTarget.actor.tile,
+        color: bow ? hero.accent : _heroActor.renderer.spec.palette.glow,
+        duration: (distance / speed).clamp(0.16, 0.95),
+        onImpact: lockedTarget == null
+            ? null
+            : () {
+                if (!lockedTarget.alive) return;
+                _hurt(lockedTarget, damage: damage, hitstopHero: false);
+                _shake = math.max(_shake, bow ? 2.4 : 3.4);
+              },
+      ),
+    );
+  }
+
+  void _updateProjectiles(double dt) {
+    for (var i = _projectiles.length - 1; i >= 0; i--) {
+      if (_projectiles[i].update(dt)) _projectiles.removeAt(i);
+    }
+  }
+
+  /// 렌더러의 yaw 를 다시 월드 타일 방향으로 풀어 헛발사도 시선을 따르게 한다.
+  static Offset _worldDirection(double yaw) =>
+      Offset(math.sin(yaw) + math.cos(yaw), math.cos(yaw) - math.sin(yaw)) /
+      math.sqrt2;
 
   void _updateMobs(double dt) {
     for (final mob in _mobs) {
@@ -797,7 +906,7 @@ class FieldGame extends FlameGame with TapCallbacks {
           volume: _volumeAt(mob.actor.tile),
           pan: _panOf(mob.actor.tile),
         );
-      } else if (mob.alerted && d > 9.0) {
+      } else if (mob.alerted && d > 9.0 && !identical(_target, mob)) {
         mob.alerted = false;
       }
 
@@ -886,6 +995,7 @@ class FieldGame extends FlameGame with TapCallbacks {
     } else {
       audio.play(SfxKeys.impactFlesh, volume: 0.95, pan: pan);
       audio.play(VoiceKeys.hurt(hero.id), volume: 0.8, pan: pan);
+      _combo.reset();
       _heroHp = math.max(0, _heroHp - 1);
       _heroActor.animator.hitstop(0.06);
       _shake = math.max(_shake, 4.2);
@@ -940,8 +1050,16 @@ class FieldGame extends FlameGame with TapCallbacks {
             _resolveMobStrike(mob);
           }
         case 'release':
-          audio.play(SfxKeys.bowShot, volume: 0.9, pan: _panOf(actor.tile));
-          if (isHero) _resolveHeroStrike();
+          if (isHero && _heroUsesRanged) {
+            audio.play(
+              _heroUsesBow ? SfxKeys.bowShot : SfxKeys.magicCast,
+              volume: 0.9,
+              pan: _panOf(actor.tile),
+            );
+            _launchHeroProjectile();
+          } else {
+            audio.play(SfxKeys.bowShot, volume: 0.9, pan: _panOf(actor.tile));
+          }
         case 'collapse':
           audio.play(
             SfxKeys.bodyFall,
@@ -1021,6 +1139,21 @@ class FieldGame extends FlameGame with TapCallbacks {
   }
 }
 
+/// 지면과 이름표 사이에 발사체를 그린다.
+class _CombatProjectileLayer extends Component {
+  _CombatProjectileLayer(this.game) : super(priority: 500);
+
+  final FieldGame game;
+
+  @override
+  void render(Canvas canvas) {
+    if (!game._spawned) return;
+    for (final projectile in game._projectiles) {
+      projectile.paint(canvas, FieldGame.iso, game._scene.cameraOffset);
+    }
+  }
+}
+
 /// 캐릭터 위의 이름표와 전투 중에만 나타나는 체력 표시.
 ///
 /// 이 레이어는 [IsoSceneComponent] 뒤에 그려지므로 나무나 지붕이 사람을
@@ -1031,6 +1164,7 @@ class _CombatNameplateLayer extends Component {
 
   final FieldGame game;
   final Map<String, TextPainter> _names = {};
+  final Map<String, TextPainter> _comboLabels = {};
 
   static const double _barWidth = 72;
   static const double _barHeight = 7;
@@ -1048,6 +1182,7 @@ class _CombatNameplateLayer extends Component {
       hp: game._heroHp,
       maxHp: FieldGame._heroMaxHp,
     );
+    _paintCombo(canvas);
 
     for (final mob in game._mobs) {
       _paintNameplate(
@@ -1060,6 +1195,56 @@ class _CombatNameplateLayer extends Component {
         maxHp: _Mob.maxHp,
       );
     }
+  }
+
+  void _paintCombo(Canvas canvas) {
+    final combo = game._combo;
+    if (!combo.visible) return;
+
+    final actor = game._heroActor;
+    final anchor =
+        FieldGame.iso.project(actor.tile.dx, actor.tile.dy, actor.airborne) +
+        game._scene.cameraOffset;
+    final labelText = combo.queued
+        ? 'COMBO ${combo.step}/${combo.maxSteps}  •  NEXT'
+        : 'COMBO ${combo.step}/${combo.maxSteps}';
+    final label = _comboLabels.putIfAbsent(
+      labelText,
+      () => TextPainter(
+        text: TextSpan(
+          text: labelText,
+          style: TextStyle(
+            color: game.hero.accent.lighten(0.32),
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.15,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout(),
+    );
+    final nameHeight = 21 + (game._heroInCombat ? _barHeight + 5 : 0);
+    final nameTop =
+        anchor.dy - actor.height * FieldGame.iso.squash - nameHeight - 10;
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        anchor.dx - label.width * 0.5 - 8,
+        nameTop - 25,
+        label.width + 16,
+        19,
+      ),
+      const Radius.circular(9.5),
+    );
+    canvas.drawRRect(rect, Paint()..color = const Color(0xD9111622));
+    canvas.drawRRect(
+      rect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = game.hero.accent.withValues(alpha: 0.78),
+    );
+    label.paint(canvas, Offset(anchor.dx - label.width * 0.5, nameTop - 22));
   }
 
   void _paintNameplate(

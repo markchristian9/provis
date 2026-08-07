@@ -47,14 +47,14 @@ class VoiceSpec {
   }
 
   CreatureVoice toVoice(int rate) => CreatureVoice(
-        seed: seed,
-        kind: VoiceKind.values[kind],
-        size: size,
-        rasp: rasp,
-        breath: breath,
-        accentHz: accentHz,
-        rate: rate,
-      );
+    seed: seed,
+    kind: VoiceKind.values[kind],
+    size: size,
+    rasp: rasp,
+    breath: breath,
+    accentHz: accentHz,
+    rate: rate,
+  );
 }
 
 /// 이 게임이 실제로 쓰는 소리만 굽기 위한 주문서.
@@ -114,32 +114,84 @@ Map<String, List<Uint8List>> bakeClips(BakeOrder order) {
 
   for (final wi in order.weapons) {
     final w = WeaponKind.values[wi];
-    bank.addVariants(SfxKeys.swing(w), 3,
-        (s) => Sfx.swing(
-            seed: s, weapon: w, power: Rng(s).bell(0.45, 0.85),
-            rate: order.sfxRate));
+    bank.addVariants(
+      SfxKeys.swing(w),
+      3,
+      (s) => Sfx.swing(
+        seed: s,
+        weapon: w,
+        power: Rng(s).bell(0.45, 0.85),
+        rate: order.sfxRate,
+      ),
+    );
   }
 
-  bank.addVariants(SfxKeys.impactFlesh, 3,
-      (s) => Sfx.impact(seed: s, weight: Rng(s).bell(0.4, 0.75), rate: order.sfxRate));
-  bank.addVariants(SfxKeys.impactArmor, 2,
-      (s) => Sfx.impact(
-          seed: s, weight: Rng(s).bell(0.5, 0.85), armored: true,
-          rate: order.sfxRate));
-  bank.addVariants(SfxKeys.blockMetal, 3,
-      (s) => Sfx.block(seed: s, power: Rng(s).bell(0.5, 0.9), rate: order.sfxRate));
-  bank.addVariants(SfxKeys.parry, 2, (s) => Sfx.parry(seed: s, rate: order.sfxRate));
-  bank.addVariants(SfxKeys.guardUp, 2,
-      (s) => Sfx.guardUp(seed: s, rate: order.sfxRate));
-  // 활은 원거리 무기 유무와 상관없이 굽는다. `release` 클립 이벤트가 이
-  // 이름으로 소리를 부르므로, 빠뜨리면 첫 사격에서 게임 루프가 죽는다.
-  bank.addVariants(SfxKeys.bowShot, 2,
-      (s) => Sfx.bowShot(seed: s, rate: order.sfxRate));
-  bank.addVariants(SfxKeys.bodyFall, 2,
-      (s) => Sfx.bodyFall(seed: s, weight: Rng(s).bell(0.35, 0.8), rate: order.sfxRate));
-  bank.addVariants(SfxKeys.moveMark, 2,
-      (s) => Sfx.moveMark(seed: s, rate: order.sfxRate));
-  bank.add(SfxKeys.uiClick, () => Sfx.uiClick(seed: order.seed, rate: order.sfxRate));
+  bank.addVariants(
+    SfxKeys.impactFlesh,
+    3,
+    (s) => Sfx.impact(
+      seed: s,
+      weight: Rng(s).bell(0.4, 0.75),
+      rate: order.sfxRate,
+    ),
+  );
+  bank.addVariants(
+    SfxKeys.impactArmor,
+    2,
+    (s) => Sfx.impact(
+      seed: s,
+      weight: Rng(s).bell(0.5, 0.85),
+      armored: true,
+      rate: order.sfxRate,
+    ),
+  );
+  bank.addVariants(
+    SfxKeys.blockMetal,
+    3,
+    (s) =>
+        Sfx.block(seed: s, power: Rng(s).bell(0.5, 0.9), rate: order.sfxRate),
+  );
+  bank.addVariants(
+    SfxKeys.parry,
+    2,
+    (s) => Sfx.parry(seed: s, rate: order.sfxRate),
+  );
+  bank.addVariants(
+    SfxKeys.guardUp,
+    2,
+    (s) => Sfx.guardUp(seed: s, rate: order.sfxRate),
+  );
+  // 원거리 소리는 선택한 영웅과 상관없이 굽는다. `release` 클립 이벤트가
+  // 활과 마법 중 하나를 부르므로, 빠뜨리면 해당 영웅의 첫 발사에서 게임
+  // 루프가 죽는다.
+  bank.addVariants(
+    SfxKeys.bowShot,
+    2,
+    (s) => Sfx.bowShot(seed: s, rate: order.sfxRate),
+  );
+  bank.addVariants(
+    SfxKeys.magicCast,
+    2,
+    (s) => Sfx.magicCast(seed: s, rate: order.sfxRate),
+  );
+  bank.addVariants(
+    SfxKeys.bodyFall,
+    2,
+    (s) => Sfx.bodyFall(
+      seed: s,
+      weight: Rng(s).bell(0.35, 0.8),
+      rate: order.sfxRate,
+    ),
+  );
+  bank.addVariants(
+    SfxKeys.moveMark,
+    2,
+    (s) => Sfx.moveMark(seed: s, rate: order.sfxRate),
+  );
+  bank.add(
+    SfxKeys.uiClick,
+    () => Sfx.uiClick(seed: order.seed, rate: order.sfxRate),
+  );
 
   for (final v in order.voices) {
     bank.addVoice(v.id, v.toVoice(order.voiceRate));
@@ -180,10 +232,10 @@ Uint8List bakeBgm(List<int> moodAndSeed) {
 /// 비용을 프레임 예산에서 뺀다.
 class GameAudio {
   GameAudio({this.seed = 7, int voices = 12})
-      : _pool = List.generate(
-          voices,
-          (_) => AudioPlayer()..setReleaseMode(ReleaseMode.stop),
-        );
+    : _pool = List.generate(
+        voices,
+        (_) => AudioPlayer()..setReleaseMode(ReleaseMode.stop),
+      );
 
   final int seed;
 
@@ -244,11 +296,7 @@ class GameAudio {
   ///
   /// [volume] 은 거리 감쇠, [pan] 은 -1(왼쪽)..1(오른쪽) 이다. 아이소 맵에서
   /// 화면 어디서 난 소리인지가 들려야 몬스터가 다가오는 것을 등 뒤로도 안다.
-  void play(
-    String key, {
-    double volume = 1.0,
-    double pan = 0.0,
-  }) {
+  void play(String key, {double volume = 1.0, double pan = 0.0}) {
     if (muted || !_ready || _disposed) return;
     final variants = _clips[key];
     assert(variants != null, '등록되지 않은 소리: $key');
@@ -262,9 +310,11 @@ class GameAudio {
     if (src == null) return;
 
     final p = _pool[_next++ % _pool.length];
-    unawaited(p
-        .play(src, volume: v, balance: pan.clamp(-1.0, 1.0))
-        .catchError((Object e) => debugPrint('재생 실패 $key: $e')));
+    unawaited(
+      p
+          .play(src, volume: v, balance: pan.clamp(-1.0, 1.0))
+          .catchError((Object e) => debugPrint('재생 실패 $key: $e')),
+    );
   }
 
   /// 배경음을 무드에 맞춰 바꾼다. 굽지 않았으면 여기서 굽는다.

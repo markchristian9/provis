@@ -81,8 +81,15 @@ class Sfx {
           gain: 0.50 - 0.10 * w,
         );
         // 마른 풀이 부러지는 잔알갱이. 이것이 없으면 "쉬익"으로만 들린다.
-        _grains(out, seed: seed * 11 + 5, count: 5 + r.intRange(0, 4),
-            spread: 0.11, freq: 4200, q: 6, gain: 0.16);
+        _grains(
+          out,
+          seed: seed * 11 + 5,
+          count: 5 + r.intRange(0, 4),
+          spread: 0.11,
+          freq: 4200,
+          q: 6,
+          gain: 0.16,
+        );
       case StepGround.dirt:
         _sweepNoise(
           out,
@@ -93,8 +100,15 @@ class Sfx {
           q: 0.9,
           gain: 0.42,
         );
-        _grains(out, seed: seed * 11 + 5, count: 4, spread: 0.07,
-            freq: 2600, q: 5, gain: 0.12);
+        _grains(
+          out,
+          seed: seed * 11 + 5,
+          count: 4,
+          spread: 0.07,
+          freq: 2600,
+          q: 5,
+          gain: 0.12,
+        );
       case StepGround.stone:
         // 돌은 짧고 밝은 끝단 + 짧은 공명. 잡음만 있으면 모래가 된다.
         _sweepNoise(
@@ -106,16 +120,24 @@ class Sfx {
           mode: FilterMode.highpass,
           gain: 0.34,
         );
-        _ring(out, seed: seed * 13,
-            f0: 3300 * r.range(0.95, 1.06),
-            ratios: const [1.0, 1.62, 2.31],
-            decay: 0.085, gain: 0.16);
+        _ring(
+          out,
+          seed: seed * 13,
+          f0: 3300 * r.range(0.95, 1.06),
+          ratios: const [1.0, 1.62, 2.31],
+          decay: 0.085,
+          gain: 0.16,
+        );
       case StepGround.wood:
         // 나무는 속이 비었다 — 낮은 공명 두 개가 그 사실을 말한다.
-        _ring(out, seed: seed * 13,
-            f0: 205 * r.range(0.93, 1.08),
-            ratios: const [1.0, 1.74, 2.85],
-            decay: 0.16, gain: 0.30);
+        _ring(
+          out,
+          seed: seed * 13,
+          f0: 205 * r.range(0.93, 1.08),
+          ratios: const [1.0, 1.74, 2.85],
+          decay: 0.16,
+          gain: 0.30,
+        );
         _sweepNoise(
           out,
           seed: seed * 7 + 3,
@@ -136,14 +158,16 @@ class Sfx {
         // 물방울 — 위로 올라가는 음정이 물의 신호다.
         for (var i = 0; i < 3; i++) {
           final f = r.range(700, 1600);
-          _tone(out,
-              seed: seed * 17 + i,
-              from: f * 0.62,
-              to: f,
-              pitchCurve: -5.0,
-              env: Env.perc(attack: 0.001, decay: 0.055, curve: 5),
-              gain: 0.13,
-              at: r.range(0.03, 0.20));
+          _tone(
+            out,
+            seed: seed * 17 + i,
+            from: f * 0.62,
+            to: f,
+            pitchCurve: -5.0,
+            env: Env.perc(attack: 0.001, decay: 0.055, curve: 5),
+            gain: 0.13,
+            at: r.range(0.03, 0.20),
+          );
         }
     }
 
@@ -162,9 +186,15 @@ class Sfx {
 
     // 판금은 걸을 때마다 짤그랑거린다.
     if (w > 0.6) {
-      _grains(out, seed: seed * 23 + 9,
-          count: 3, spread: 0.09, freq: 5200, q: 14,
-          gain: 0.10 * (w - 0.6) / 0.4);
+      _grains(
+        out,
+        seed: seed * 23 + 9,
+        count: 3,
+        spread: 0.09,
+        freq: 5200,
+        q: 14,
+        gain: 0.10 * (w - 0.6) / 0.4,
+      );
     }
 
     return out.normalize(0.62 + 0.16 * w + (running ? 0.08 : 0.0));
@@ -233,13 +263,15 @@ class Sfx {
     // 날붙이는 스치는 순간 아주 짧게 운다.
     if (metal > 0.01) {
       final peak = length * 0.42;
-      _ring(out,
-          seed: seed * 29,
-          f0: 2600 * r.range(0.92, 1.10),
-          ratios: const [1.0, 1.51, 2.17],
-          decay: 0.09,
-          gain: metal * 0.22 * (0.4 + 0.6 * p),
-          at: peak);
+      _ring(
+        out,
+        seed: seed * 29,
+        f0: 2600 * r.range(0.92, 1.10),
+        ratios: const [1.0, 1.51, 2.17],
+        decay: 0.09,
+        gain: metal * 0.22 * (0.4 + 0.6 * p),
+        at: peak,
+      );
     }
     return out.normalize(0.55 + 0.30 * p);
   }
@@ -262,49 +294,64 @@ class Sfx {
 
     // ① 몸통 — 음정이 급락하는 사인. 타격감의 8할이 여기 있다.
     final f = lerpd(190, 95, w);
-    _tone(out,
-        seed: seed * 3,
-        from: f * r.range(0.95, 1.06),
-        to: f * 0.32,
-        pitchCurve: 11.0,
-        env: Env.perc(attack: 0.001, decay: lerpd(0.12, 0.20, w), curve: 4.0),
-        gain: 0.55 + 0.30 * w);
+    _tone(
+      out,
+      seed: seed * 3,
+      from: f * r.range(0.95, 1.06),
+      to: f * 0.32,
+      pitchCurve: 11.0,
+      env: Env.perc(attack: 0.001, decay: lerpd(0.12, 0.20, w), curve: 4.0),
+      gain: 0.55 + 0.30 * w,
+    );
 
     // ② 끝단 — 1ms 어택의 잡음. 이것이 "때린" 느낌을 만든다.
-    _sweepNoise(out,
-        seed: seed * 7,
-        env: Env(attack: 0.0005, decay: 0.055, curve: 5.5),
-        freq: (u) => lerpd(2400, 900, u),
-        q: 1.3,
-        gain: 0.45);
+    _sweepNoise(
+      out,
+      seed: seed * 7,
+      env: Env(attack: 0.0005, decay: 0.055, curve: 5.5),
+      freq: (u) => lerpd(2400, 900, u),
+      q: 1.3,
+      gain: 0.45,
+    );
 
     // ③ 표면 — 살이면 둔탁하게, 갑옷이면 금속이 운다.
     if (armored) {
-      _ring(out,
-          seed: seed * 13,
-          f0: 640 * r.range(0.9, 1.12),
-          ratios: const [1.0, 1.71, 2.43, 3.19, 4.11, 5.37],
-          decay: 0.55,
-          gain: 0.34,
-          detune: 1.8);
-      _sweepNoise(out,
-          seed: seed * 17,
-          env: Env(attack: 0.0004, decay: 0.03, curve: 6),
-          freq: (u) => 7000,
-          q: 0.8,
-          mode: FilterMode.highpass,
-          gain: 0.22);
+      _ring(
+        out,
+        seed: seed * 13,
+        f0: 640 * r.range(0.9, 1.12),
+        ratios: const [1.0, 1.71, 2.43, 3.19, 4.11, 5.37],
+        decay: 0.55,
+        gain: 0.34,
+        detune: 1.8,
+      );
+      _sweepNoise(
+        out,
+        seed: seed * 17,
+        env: Env(attack: 0.0004, decay: 0.03, curve: 6),
+        freq: (u) => 7000,
+        q: 0.8,
+        mode: FilterMode.highpass,
+        gain: 0.22,
+      );
     } else {
-      _sweepNoise(out,
-          seed: seed * 17,
-          pink: true,
-          env: Env(attack: 0.002, decay: 0.11, curve: 3.4),
-          freq: (u) => lerpd(900, 320, u),
-          q: 0.85,
-          gain: 0.34);
+      _sweepNoise(
+        out,
+        seed: seed * 17,
+        pink: true,
+        env: Env(attack: 0.002, decay: 0.11, curve: 3.4),
+        freq: (u) => lerpd(900, 320, u),
+        q: 0.85,
+        gain: 0.34,
+      );
     }
-    return reverb(out, size: 0.35, damp: 0.55, mix: 0.16, tail: 0.35)
-        .normalize(0.90);
+    return reverb(
+      out,
+      size: 0.35,
+      damp: 0.55,
+      mix: 0.16,
+      tail: 0.35,
+    ).normalize(0.90);
   }
 
   // ── 방어 ────────────────────────────────────────────────────────────────
@@ -314,29 +361,35 @@ class Sfx {
     final r = Rng(seed);
     final out = Wave.seconds(rate, 0.34);
     // 가죽끈이 스치는 소리.
-    _sweepNoise(out,
-        seed: seed * 5,
-        pink: true,
-        env: Env(attack: 0.03, decay: 0.16, curve: 2.4),
-        freq: (u) => lerpd(1600, 620, u),
-        q: 1.0,
-        gain: 0.34);
+    _sweepNoise(
+      out,
+      seed: seed * 5,
+      pink: true,
+      env: Env(attack: 0.03, decay: 0.16, curve: 2.4),
+      freq: (u) => lerpd(1600, 620, u),
+      q: 1.0,
+      gain: 0.34,
+    );
     // 팔에 닿는 둔한 소리.
-    _tone(out,
-        seed: seed * 3,
-        from: 150 * r.range(0.9, 1.1),
-        to: 82,
-        pitchCurve: 7,
-        env: Env.perc(attack: 0.004, decay: 0.10, curve: 4),
-        gain: 0.30,
-        at: 0.05);
-    _ring(out,
-        seed: seed * 11,
-        f0: 880 * r.range(0.9, 1.1),
-        ratios: const [1.0, 1.66, 2.38],
-        decay: 0.18,
-        gain: 0.12,
-        at: 0.05);
+    _tone(
+      out,
+      seed: seed * 3,
+      from: 150 * r.range(0.9, 1.1),
+      to: 82,
+      pitchCurve: 7,
+      env: Env.perc(attack: 0.004, decay: 0.10, curve: 4),
+      gain: 0.30,
+      at: 0.05,
+    );
+    _ring(
+      out,
+      seed: seed * 11,
+      f0: 880 * r.range(0.9, 1.1),
+      ratios: const [1.0, 1.66, 2.38],
+      decay: 0.18,
+      gain: 0.12,
+      at: 0.05,
+    );
     return out.normalize(0.42);
   }
 
@@ -357,83 +410,111 @@ class Sfx {
     final out = Wave.seconds(rate, metal ? 1.15 : 0.55);
 
     // 부딪는 순간.
-    _sweepNoise(out,
-        seed: seed * 7,
-        env: Env(attack: 0.0004, decay: 0.028, curve: 6.5),
-        freq: (u) => lerpd(6000, 2200, u),
-        q: 1.0,
-        mode: FilterMode.highpass,
-        gain: 0.42);
-    _tone(out,
-        seed: seed * 3,
-        from: 210,
-        to: 74,
-        pitchCurve: 12,
-        env: Env.perc(attack: 0.0008, decay: 0.11, curve: 4.4),
-        gain: 0.40 + 0.20 * p);
+    _sweepNoise(
+      out,
+      seed: seed * 7,
+      env: Env(attack: 0.0004, decay: 0.028, curve: 6.5),
+      freq: (u) => lerpd(6000, 2200, u),
+      q: 1.0,
+      mode: FilterMode.highpass,
+      gain: 0.42,
+    );
+    _tone(
+      out,
+      seed: seed * 3,
+      from: 210,
+      to: 74,
+      pitchCurve: 12,
+      env: Env.perc(attack: 0.0008, decay: 0.11, curve: 4.4),
+      gain: 0.40 + 0.20 * p,
+    );
 
     if (metal) {
       // 비화성 배음 + 미세 디튠. 디튠이 없으면 종이 아니라 신시사이저다.
-      _ring(out,
-          seed: seed * 13,
-          f0: 430 * r.range(0.92, 1.10),
-          ratios: const [1.0, 1.732, 2.412, 3.147, 4.213, 5.026, 6.41],
-          decay: 0.62 + 0.35 * p,
-          gain: 0.52,
-          detune: 2.4);
-      _ring(out,
-          seed: seed * 31,
-          f0: 1870 * r.range(0.94, 1.08),
-          ratios: const [1.0, 1.39, 2.06],
-          decay: 0.20,
-          gain: 0.18);
+      _ring(
+        out,
+        seed: seed * 13,
+        f0: 430 * r.range(0.92, 1.10),
+        ratios: const [1.0, 1.732, 2.412, 3.147, 4.213, 5.026, 6.41],
+        decay: 0.62 + 0.35 * p,
+        gain: 0.52,
+        detune: 2.4,
+      );
+      _ring(
+        out,
+        seed: seed * 31,
+        f0: 1870 * r.range(0.94, 1.08),
+        ratios: const [1.0, 1.39, 2.06],
+        decay: 0.20,
+        gain: 0.18,
+      );
     } else {
       // 나무 방패 — 낮은 통 울림에 곧 죽는다.
-      _ring(out,
-          seed: seed * 13,
-          f0: 240 * r.range(0.92, 1.10),
-          ratios: const [1.0, 1.78, 2.61, 3.44],
-          decay: 0.22,
-          gain: 0.44);
-      _sweepNoise(out,
-          seed: seed * 17,
-          pink: true,
-          env: Env(attack: 0.002, decay: 0.09, curve: 3.6),
-          freq: (u) => lerpd(1400, 500, u),
-          q: 1.0,
-          gain: 0.24);
+      _ring(
+        out,
+        seed: seed * 13,
+        f0: 240 * r.range(0.92, 1.10),
+        ratios: const [1.0, 1.78, 2.61, 3.44],
+        decay: 0.22,
+        gain: 0.44,
+      );
+      _sweepNoise(
+        out,
+        seed: seed * 17,
+        pink: true,
+        env: Env(attack: 0.002, decay: 0.09, curve: 3.6),
+        freq: (u) => lerpd(1400, 500, u),
+        q: 1.0,
+        gain: 0.24,
+      );
     }
-    return reverb(out, size: 0.5, damp: 0.4, mix: 0.22, tail: 0.5)
-        .normalize(0.94);
+    return reverb(
+      out,
+      size: 0.5,
+      damp: 0.4,
+      mix: 0.22,
+      tail: 0.5,
+    ).normalize(0.94);
   }
 
   /// 빗나가서 흘렸다(패링). 막기보다 짧고 높다.
   static Wave parry({int seed = 1, int rate = kSfxRate}) {
     final r = Rng(seed);
     final out = Wave.seconds(rate, 0.75);
-    _sweepNoise(out,
-        seed: seed * 7,
-        env: Env(attack: 0.0003, decay: 0.02, curve: 7),
-        freq: (u) => 7600,
-        q: 0.9,
-        mode: FilterMode.highpass,
-        gain: 0.40);
-    _ring(out,
-        seed: seed * 13,
-        f0: 1240 * r.range(0.94, 1.09),
-        ratios: const [1.0, 1.68, 2.44, 3.31, 4.62],
-        decay: 0.40,
-        gain: 0.55,
-        detune: 3.2);
+    _sweepNoise(
+      out,
+      seed: seed * 7,
+      env: Env(attack: 0.0003, decay: 0.02, curve: 7),
+      freq: (u) => 7600,
+      q: 0.9,
+      mode: FilterMode.highpass,
+      gain: 0.40,
+    );
+    _ring(
+      out,
+      seed: seed * 13,
+      f0: 1240 * r.range(0.94, 1.09),
+      ratios: const [1.0, 1.68, 2.44, 3.31, 4.62],
+      decay: 0.40,
+      gain: 0.55,
+      detune: 3.2,
+    );
     // 날이 미끄러지는 짧은 상승.
-    _sweepNoise(out,
-        seed: seed * 19,
-        env: Env(attack: 0.004, decay: 0.10, curve: 3),
-        freq: (u) => lerpd(2600, 5400, u),
-        q: 5.0,
-        gain: 0.22);
-    return reverb(out, size: 0.45, damp: 0.35, mix: 0.24, tail: 0.4)
-        .normalize(0.88);
+    _sweepNoise(
+      out,
+      seed: seed * 19,
+      env: Env(attack: 0.004, decay: 0.10, curve: 3),
+      freq: (u) => lerpd(2600, 5400, u),
+      q: 5.0,
+      gain: 0.22,
+    );
+    return reverb(
+      out,
+      size: 0.45,
+      damp: 0.35,
+      mix: 0.24,
+      tail: 0.4,
+    ).normalize(0.88);
   }
 
   // ── 원거리 ──────────────────────────────────────────────────────────────
@@ -455,21 +536,67 @@ class Sfx {
       gain: 0.6,
     );
     // 놓는 순간의 파열.
-    _sweepNoise(out,
-        seed: seed * 7,
-        env: Env(attack: 0.0006, decay: 0.055, curve: 5),
-        freq: (u) => lerpd(3200, 1100, u),
-        q: 1.6,
-        gain: 0.42);
+    _sweepNoise(
+      out,
+      seed: seed * 7,
+      env: Env(attack: 0.0006, decay: 0.055, curve: 5),
+      freq: (u) => lerpd(3200, 1100, u),
+      q: 1.6,
+      gain: 0.42,
+    );
     // 화살이 멀어진다.
-    _sweepNoise(out,
-        seed: seed * 11,
-        env: Env(attack: 0.01, decay: 0.34, curve: 2.4),
-        freq: (u) => lerpd(2200, 620, u),
-        q: 3.4,
-        gain: 0.20,
-        at: 0.02);
+    _sweepNoise(
+      out,
+      seed: seed * 11,
+      env: Env(attack: 0.01, decay: 0.34, curve: 2.4),
+      freq: (u) => lerpd(2200, 620, u),
+      q: 3.4,
+      gain: 0.20,
+      at: 0.02,
+    );
     return out.normalize(0.80);
+  }
+
+  /// 지팡이 끝에서 마력을 모아 탄환으로 날린다.
+  static Wave magicCast({int seed = 1, int rate = kSfxRate}) {
+    final r = Rng(seed);
+    final out = Wave.seconds(rate, 0.72);
+
+    // 시작의 상승음이 마력이 모이는 방향을 말한다.
+    _tone(
+      out,
+      seed: seed * 3,
+      from: 310 * r.range(0.94, 1.06),
+      to: 1280 * r.range(0.96, 1.05),
+      pitchCurve: 1.8,
+      env: Env.perc(attack: 0.018, decay: 0.42, curve: 2.2),
+      gain: 0.42,
+    );
+    // 유리처럼 깨끗한 비정수 공명이 화살의 시위와 다른 재질을 만든다.
+    _ring(
+      out,
+      seed: seed * 7,
+      f0: 720 * r.range(0.95, 1.08),
+      ratios: const [1.0, 1.41, 2.17, 3.03],
+      decay: 0.48,
+      gain: 0.34,
+    );
+    _sweepNoise(
+      out,
+      seed: seed * 11,
+      env: Env(attack: 0.004, decay: 0.24, curve: 2.8),
+      freq: (u) => lerpd(5200, 1500, u),
+      q: 3.8,
+      gain: 0.18,
+      at: 0.05,
+    );
+    return reverb(
+      out,
+      size: 0.62,
+      damp: 0.28,
+      mix: 0.34,
+      tail: 0.55,
+    ).normalize(0.82);
   }
 
   // ── 몸이 쓰러진다 ───────────────────────────────────────────────────────
@@ -483,30 +610,41 @@ class Sfx {
     final r = Rng(seed);
     final w = weight.clamp(0.0, 1.0);
     final out = Wave.seconds(rate, 0.9);
-    _tone(out,
-        seed: seed * 3,
-        from: lerpd(120, 74, w),
-        to: lerpd(44, 30, w),
-        pitchCurve: 8,
-        env: Env.perc(attack: 0.004, decay: 0.26, curve: 3.4),
-        gain: 0.70);
-    _sweepNoise(out,
-        seed: seed * 7,
-        pink: true,
-        env: Env(attack: 0.006, decay: 0.30, curve: 2.8),
-        freq: (u) => lerpd(1300, 260, u),
-        q: 0.8,
-        gain: 0.40);
+    _tone(
+      out,
+      seed: seed * 3,
+      from: lerpd(120, 74, w),
+      to: lerpd(44, 30, w),
+      pitchCurve: 8,
+      env: Env.perc(attack: 0.004, decay: 0.26, curve: 3.4),
+      gain: 0.70,
+    );
+    _sweepNoise(
+      out,
+      seed: seed * 7,
+      pink: true,
+      env: Env(attack: 0.006, decay: 0.30, curve: 2.8),
+      freq: (u) => lerpd(1300, 260, u),
+      q: 0.8,
+      gain: 0.40,
+    );
     // 흙과 장비가 흩어진다.
-    _grains(out,
-        seed: seed * 11,
-        count: 6 + r.intRange(0, 5),
-        spread: 0.42,
-        freq: 3400,
-        q: 6,
-        gain: 0.14);
-    return reverb(out, size: 0.5, damp: 0.5, mix: 0.18, tail: 0.5)
-        .normalize(0.86);
+    _grains(
+      out,
+      seed: seed * 11,
+      count: 6 + r.intRange(0, 5),
+      spread: 0.42,
+      freq: 3400,
+      q: 6,
+      gain: 0.14,
+    );
+    return reverb(
+      out,
+      size: 0.5,
+      damp: 0.5,
+      mix: 0.18,
+      tail: 0.5,
+    ).normalize(0.86);
   }
 
   // ── UI ──────────────────────────────────────────────────────────────────
@@ -514,42 +652,54 @@ class Sfx {
   /// 클릭 표식이 지면에 찍힐 때. `MoveMarker.ping` 과 짝이다.
   static Wave moveMark({int seed = 1, int rate = kSfxRate}) {
     final out = Wave.seconds(rate, 0.24);
-    _tone(out,
-        seed: seed,
-        from: 1180,
-        to: 1760,
-        pitchCurve: -3.0,
-        env: Env(attack: 0.002, decay: 0.13, curve: 4),
-        gain: 0.30);
-    _tone(out,
-        seed: seed + 1,
-        from: 2360,
-        to: 3520,
-        pitchCurve: -3.0,
-        env: Env(attack: 0.002, decay: 0.07, curve: 5),
-        gain: 0.10);
+    _tone(
+      out,
+      seed: seed,
+      from: 1180,
+      to: 1760,
+      pitchCurve: -3.0,
+      env: Env(attack: 0.002, decay: 0.13, curve: 4),
+      gain: 0.30,
+    );
+    _tone(
+      out,
+      seed: seed + 1,
+      from: 2360,
+      to: 3520,
+      pitchCurve: -3.0,
+      env: Env(attack: 0.002, decay: 0.07, curve: 5),
+      gain: 0.10,
+    );
     return out.normalize(0.30);
   }
 
   /// 버튼.
-  static Wave uiClick({int seed = 1, bool confirm = false, int rate = kSfxRate}) {
+  static Wave uiClick({
+    int seed = 1,
+    bool confirm = false,
+    int rate = kSfxRate,
+  }) {
     final out = Wave.seconds(rate, confirm ? 0.34 : 0.14);
-    _tone(out,
-        seed: seed,
-        from: confirm ? 620 : 900,
-        to: confirm ? 930 : 900,
-        pitchCurve: -4,
-        env: Env(attack: 0.001, decay: confirm ? 0.10 : 0.05, curve: 5),
-        gain: 0.34);
+    _tone(
+      out,
+      seed: seed,
+      from: confirm ? 620 : 900,
+      to: confirm ? 930 : 900,
+      pitchCurve: -4,
+      env: Env(attack: 0.001, decay: confirm ? 0.10 : 0.05, curve: 5),
+      gain: 0.34,
+    );
     if (confirm) {
-      _tone(out,
-          seed: seed + 1,
-          from: 1240,
-          to: 1860,
-          pitchCurve: -4,
-          env: Env(attack: 0.002, decay: 0.16, curve: 4),
-          gain: 0.22,
-          at: 0.07);
+      _tone(
+        out,
+        seed: seed + 1,
+        from: 1240,
+        to: 1860,
+        pitchCurve: -4,
+        env: Env(attack: 0.002, decay: 0.16, curve: 4),
+        gain: 0.22,
+        at: 0.07,
+      );
     }
     return out.normalize(0.34);
   }
@@ -668,13 +818,15 @@ void _grains(
 }) {
   final r = Rng(seed);
   for (var i = 0; i < count; i++) {
-    _sweepNoise(out,
-        seed: seed * 131 + i * 17,
-        env: Env(attack: 0.0004, decay: r.range(0.008, 0.026), curve: 6),
-        freq: (u) => freq * r.range(0.7, 1.45),
-        q: q,
-        gain: gain * r.range(0.5, 1.2),
-        at: at + r.range(0.0, spread));
+    _sweepNoise(
+      out,
+      seed: seed * 131 + i * 17,
+      env: Env(attack: 0.0004, decay: r.range(0.008, 0.026), curve: 6),
+      freq: (u) => freq * r.range(0.7, 1.45),
+      q: q,
+      gain: gain * r.range(0.5, 1.2),
+      at: at + r.range(0.0, spread),
+    );
   }
 }
 

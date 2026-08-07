@@ -41,10 +41,8 @@ class SoundBank {
   int variants(String key) => _recipes[key]?.length ?? 0;
 
   /// 이미 구워 둔 표본의 수. 로딩 진행도 표시에 쓴다.
-  int get bakedCount => _cache.values
-      .expand((v) => v)
-      .where((b) => b != null)
-      .length;
+  int get bakedCount =>
+      _cache.values.expand((v) => v).where((b) => b != null).length;
 
   /// 변주를 하나 등록한다. 같은 이름으로 여러 번 부르면 변주가 쌓인다.
   void add(String key, Wave Function() bake) {
@@ -116,32 +114,81 @@ class SoundBank {
     }
 
     for (final w in WeaponKind.values) {
-      bank.addVariants(SfxKeys.swing(w), 3,
-          (s) => Sfx.swing(seed: s, weapon: w, power: Rng(s).bell(0.45, 0.85),
-              rate: rate));
+      bank.addVariants(
+        SfxKeys.swing(w),
+        3,
+        (s) => Sfx.swing(
+          seed: s,
+          weapon: w,
+          power: Rng(s).bell(0.45, 0.85),
+          rate: rate,
+        ),
+      );
     }
 
-    bank.addVariants(SfxKeys.impactFlesh, 3,
-        (s) => Sfx.impact(seed: s, weight: Rng(s).bell(0.4, 0.75), rate: rate));
-    bank.addVariants(SfxKeys.impactArmor, 3,
-        (s) => Sfx.impact(
-            seed: s, weight: Rng(s).bell(0.5, 0.85), armored: true, rate: rate));
+    bank.addVariants(
+      SfxKeys.impactFlesh,
+      3,
+      (s) => Sfx.impact(seed: s, weight: Rng(s).bell(0.4, 0.75), rate: rate),
+    );
+    bank.addVariants(
+      SfxKeys.impactArmor,
+      3,
+      (s) => Sfx.impact(
+        seed: s,
+        weight: Rng(s).bell(0.5, 0.85),
+        armored: true,
+        rate: rate,
+      ),
+    );
 
-    bank.addVariants(SfxKeys.blockMetal, 3,
-        (s) => Sfx.block(seed: s, power: Rng(s).bell(0.5, 0.9), rate: rate));
-    bank.addVariants(SfxKeys.blockWood, 2,
-        (s) => Sfx.block(seed: s, metal: false, rate: rate));
+    bank.addVariants(
+      SfxKeys.blockMetal,
+      3,
+      (s) => Sfx.block(seed: s, power: Rng(s).bell(0.5, 0.9), rate: rate),
+    );
+    bank.addVariants(
+      SfxKeys.blockWood,
+      2,
+      (s) => Sfx.block(seed: s, metal: false, rate: rate),
+    );
     bank.addVariants(SfxKeys.parry, 2, (s) => Sfx.parry(seed: s, rate: rate));
-    bank.addVariants(SfxKeys.guardUp, 2, (s) => Sfx.guardUp(seed: s, rate: rate));
+    bank.addVariants(
+      SfxKeys.guardUp,
+      2,
+      (s) => Sfx.guardUp(seed: s, rate: rate),
+    );
 
-    bank.addVariants(SfxKeys.bowShot, 2, (s) => Sfx.bowShot(seed: s, rate: rate));
-    bank.addVariants(SfxKeys.bodyFall, 2,
-        (s) => Sfx.bodyFall(seed: s, weight: Rng(s).bell(0.35, 0.8), rate: rate));
+    bank.addVariants(
+      SfxKeys.bowShot,
+      2,
+      (s) => Sfx.bowShot(seed: s, rate: rate),
+    );
+    bank.addVariants(
+      SfxKeys.magicCast,
+      2,
+      (s) => Sfx.magicCast(seed: s, rate: rate),
+    );
+    bank.addVariants(
+      SfxKeys.bodyFall,
+      2,
+      (s) => Sfx.bodyFall(seed: s, weight: Rng(s).bell(0.35, 0.8), rate: rate),
+    );
 
-    bank.add(SfxKeys.uiClick, () => Sfx.uiClick(seed: r.intRange(1, 1 << 20), rate: rate));
-    bank.add(SfxKeys.uiConfirm,
-        () => Sfx.uiClick(seed: r.intRange(1, 1 << 20), confirm: true, rate: rate));
-    bank.addVariants(SfxKeys.moveMark, 2, (s) => Sfx.moveMark(seed: s, rate: rate));
+    bank.add(
+      SfxKeys.uiClick,
+      () => Sfx.uiClick(seed: r.intRange(1, 1 << 20), rate: rate),
+    );
+    bank.add(
+      SfxKeys.uiConfirm,
+      () =>
+          Sfx.uiClick(seed: r.intRange(1, 1 << 20), confirm: true, rate: rate),
+    );
+    bank.addVariants(
+      SfxKeys.moveMark,
+      2,
+      (s) => Sfx.moveMark(seed: s, rate: rate),
+    );
 
     return bank;
   }
@@ -179,6 +226,7 @@ class SfxKeys {
   static const parry = 'parry';
   static const guardUp = 'guard.up';
   static const bowShot = 'bow.shot';
+  static const magicCast = 'magic.cast';
   static const bodyFall = 'body.fall';
   static const uiClick = 'ui.click';
   static const uiConfirm = 'ui.confirm';

@@ -16,9 +16,10 @@ void main() {
   test('주문서가 격리 스레드를 건너가 WAV 를 들고 돌아온다', () async {
     final order = BakeOrder(
       seed: 3,
-      grounds: const [StepGround.grass, StepGround.stone]
-          .map((g) => g.index)
-          .toList(),
+      grounds: const [
+        StepGround.grass,
+        StepGround.stone,
+      ].map((g) => g.index).toList(),
       weapons: const [WeaponKind.sword].map((w) => w.index).toList(),
       voices: [VoiceSpec.of(monsters.first, kind: VoiceKind.growl)],
     );
@@ -27,18 +28,31 @@ void main() {
 
     expect(clips, isNotEmpty);
     expect(clips.containsKey(SfxKeys.step(StepGround.grass)), isTrue);
-    expect(clips.containsKey(SfxKeys.step(StepGround.stone, running: true)),
-        isTrue);
+    expect(
+      clips.containsKey(SfxKeys.step(StepGround.stone, running: true)),
+      isTrue,
+    );
     expect(clips.containsKey(SfxKeys.swing(WeaponKind.sword)), isTrue);
-    expect(clips.containsKey(SfxKeys.blockMetal), isTrue,
-        reason: '방어 소리가 없으면 막았는지 알 수 없다');
+    expect(
+      clips.containsKey(SfxKeys.blockMetal),
+      isTrue,
+      reason: '방어 소리가 없으면 막았는지 알 수 없다',
+    );
+    expect(
+      clips.containsKey(SfxKeys.magicCast),
+      isTrue,
+      reason: '마법사의 release 이벤트가 무음이면 안 된다',
+    );
     expect(clips.containsKey(VoiceKeys.attack(monsters.first.id)), isTrue);
 
     for (final e in clips.entries) {
       expect(e.value, isNotEmpty, reason: '${e.key}: 변주가 없다');
       for (final wav in e.value) {
-        expect(String.fromCharCodes(wav.sublist(0, 4)), 'RIFF',
-            reason: '${e.key}: WAV 헤더가 아니다');
+        expect(
+          String.fromCharCodes(wav.sublist(0, 4)),
+          'RIFF',
+          reason: '${e.key}: WAV 헤더가 아니다',
+        );
         expect(wav.length, greaterThan(44), reason: '${e.key}: 표본이 비었다');
       }
     }
@@ -55,8 +69,11 @@ void main() {
   test('명부의 몬스터마다 서로 다른 목이 배정된다', () {
     // 목소리가 겹치면 화면 밖에서 무엇이 오는지 구분할 수 없다.
     final specs = [for (final m in monsters) VoiceSpec.of(m)];
-    expect(specs.map((s) => s.seed).toSet(), hasLength(monsters.length),
-        reason: '몬스터들이 같은 시드를 공유한다');
+    expect(
+      specs.map((s) => s.seed).toSet(),
+      hasLength(monsters.length),
+      reason: '몬스터들이 같은 시드를 공유한다',
+    );
     for (final s in specs) {
       expect(s.size, inInclusiveRange(0.0, 1.0));
       expect(s.rasp, inInclusiveRange(0.0, 1.0));

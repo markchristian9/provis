@@ -88,8 +88,8 @@ class Strings {
   String get backToRoster => _pick('← 명부', '← Roster');
 
   String mapHint(int kinds) => _pick(
-        '맵을 클릭해 이동  ·  몬스터를 클릭해 공격  ·  몬스터 $kinds종 출현',
-        'Click to move  ·  click a monster to strike  ·  $kinds kinds afield',
+        '맵을 클릭해 이동  ·  공격 중 한 번 더 눌러 3단 콤보  ·  몬스터 $kinds종 출현',
+        'Click to move  ·  press Attack again mid-strike for a 3-hit combo  ·  $kinds kinds afield',
       );
 
   String get regenerateMap => _pick('맵 다시 생성', 'Regenerate map');
