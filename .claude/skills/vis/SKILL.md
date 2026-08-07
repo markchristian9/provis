@@ -232,8 +232,10 @@ CharacterBuild get build => CharacterBuild(
 scene.rigged.add(RiggedIsoActor(
   renderer: HumanoidRenderer(HumanoidSpec.generate(seed)),
   tile: start, height: 195,
+  iso: iso,          // ← 맵과 같은 것. 없으면 보폭이 어긋나 발이 미끄러진다
 ));
-// 매 프레임: 위치·방향·클립(idle/walk/run)을 한 번에
+// 매 프레임: 위치·방향·클립(idle/walk/run)·보폭을 한 번에.
+// 씬이 시간을 이미 밀었으므로 follow 는 입력만 갱신한다.
 actor.follow(controller, dt);
 
 // 연출 — 정지 상태 품질이 최우선
@@ -312,6 +314,9 @@ actor.facesLeft = hero.facesLeft;
 - [ ] 정지 상태에 호흡이 있는가 (`breathe`)
 - [ ] 좌우 팔다리에 위상차가 있는가 (완전 대칭 = 마네킹)
 - [ ] 공격이 **예비 35% / 타격 12% / 회복 53%** 비대칭인가
+- [ ] 액터에 맵의 `IsoView` 를 넘겼는가 — 안 넘기면 발이 미끄러진다
+- [ ] 판정·소리·이펙트를 `ClipEvent` 로 걸었는가 (프레임 번호가 아니라)
+- [ ] 30fps 와 120fps 에서 같은 속도로 재생되는가 (`test/anim_timing_test.dart`)
 
 **분포** (시드 생성 시)
 - [ ] 시드 24개가 서로 구별되는가
@@ -384,6 +389,10 @@ flutter test test/identity_sheet_test.dart && open build/art/identity_*.png
 | 여덟 방향이 전부 옆모습이다 | `solve` 에 `yaw` 미전달 | `solve(body, pose, yaw: facing.yaw)` |
 | 3/4 에서 얼굴이 갑자기 사라진다 | `toCamera` 로 이진 판정 | `faceVisible`·`bothEyes` 로 연속 알파 |
 | 공격 자세로 굳어 걸어 다닌다 | 한 번짜리 클립이 안 끝남 | `update` 가 자동 복귀시킨다 — `play()` 로만 전환 |
+| 발이 얼음판처럼 미끄러진다 | 액터에 맵의 `IsoView` 미전달 | `RiggedIsoActor(iso: iso)` |
+| 모든 동작이 두 배로 빠르다 | 씬과 `follow` 가 각자 시간을 밈 | 씬이 주인 — `follow` 는 입력만 |
+| 연타하면 포즈가 튄다 | 전환 도중 전환에서 혼합을 버림 | 화면에 있던 포즈에서 잇는다 |
+| 판정이 그림과 어긋난다 | 프레임 번호로 타이밍 | `ClipEvent` + `animator.fired` |
 | 명부와 게임 화면이 다른 인물 | `Artist.build` 미오버라이드 | `build` 에 실제 색·장비 선언 → [character-creation.md](references/character-creation.md) |
 | 마법사가 원치 않은 후드를 쓴다 | `headGear` 미지정 → 시드가 결정 | `headGear: HeadGear.none` 을 **명시** |
 | 게임 액터의 얼굴이 매끈한 공 | 머리카락·후드를 얼굴 **위에** 그림 | 뒤통수는 얼굴 전, 앞머리는 얼굴 후 (`_hairBack`/`_hairFront`) |

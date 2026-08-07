@@ -5,6 +5,7 @@ import '../art/creature.dart';
 import '../core/rng.dart';
 import '../rig/body.dart';
 import 'iso_stage.dart';
+import 'iso_view.dart';
 
 /// 초상용 [Artist] 를 게임 맵에서 걷는 액터로 바꾼다.
 ///
@@ -30,6 +31,7 @@ RiggedIsoActor riggedFromArtist(
   Artist a, {
   required Offset tile,
   double height = 200,
+  IsoView iso = kIso,
 }) {
   final build = a.build;
   final fallback = Rng.fromString(a.id).intRange(1, 0x7FFFFFF);
@@ -46,5 +48,8 @@ RiggedIsoActor riggedFromArtist(
     ),
     tile: tile,
     height: height,
+    // 보폭 동기화는 타일이 얼마나 큰지 알아야 한다. 맵의 카메라를 넘기지
+    // 않으면 기본 타일 크기로 계산해 발이 미끄러진다.
+    iso: iso,
   );
 }

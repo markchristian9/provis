@@ -1,12 +1,15 @@
-import 'dart:ui';
+import 'dart:math' as math;
+import 'dart:ui' hide Clip;
 
 import 'package:flame/components.dart' hide mix;
 
+import '../anim/clip.dart' show kMaxFrameStep;
 import '../core/shading.dart';
 import '../iso/iso_input.dart';
 import '../iso/iso_stage.dart';
 import '../iso/iso_view.dart';
 import '../props/prop.dart';
+import 'scene_profile.dart';
 
 /// 아이소 씬에 놓이는 모든 것의 공통 인터페이스.
 ///
@@ -53,7 +56,9 @@ void paintScene(
   double detail = 1.0,
 }) {
   final sorted = [...items]..sort((a, b) => a.depth.compareTo(b.depth));
+  final sw = SceneProfile.enabled ? (Stopwatch()..start()) : null;
   for (final it in sorted) {
+    final t0 = sw?.elapsedMicroseconds ?? 0;
     switch (it) {
       case PropItem(:final instance):
         paintProp(canvas, instance, iso, light, time, detail: detail);
@@ -61,6 +66,14 @@ void paintScene(
         paintIsoActor(canvas, actor, iso, time, detail: detail);
       case RiggedItem(:final actor):
         paintRiggedActor(canvas, actor, iso, light, time, detail: detail);
+    }
+    if (sw != null) {
+      final key = switch (it) {
+        PropItem(:final instance) => instance.prop.runtimeType.toString(),
+        ActorItem() => 'IsoActor',
+        RiggedItem() => 'RiggedActor',
+      };
+      SceneProfile.add(key, sw.elapsedMicroseconds - t0);
     }
   }
 }
@@ -115,8 +128,71 @@ class IsoSceneComponent extends Component {
   /// 씬 원점(카메라). 화면 좌표 ↔ 타일 변환에도 **같은 값**을 써야 한다.
   Offset cameraOffset = Offset.zero;
 
+  /// 카메라가 따라갈 목표 원점. `null` 이면 [cameraOffset] 을 직접 쓴다.
+  ///
+  /// 매 프레임 목표만 갱신하면 [cameraLag] 에 걸쳐 부드럽게 따라붙는다.
+  Offset? cameraTarget;
+
+  /// 카메라가 목표를 따라잡는 데 걸리는 시간(초). 0 이면 즉시 붙는다.
+  ///
+  /// 지수 감쇠라 프레임률이 흔들려도 같은 속도로 붙는다. **0.2 를 넘기지
+  /// 않는다** — 그 이상이면 캐릭터가 화면 가장자리로 밀려 조작이 늦게
+  /// 반응하는 것처럼 느껴진다. 입력은 어차피 [tileAt] 이 현재 오프셋으로
+  /// 풀기 때문에 클릭 지점은 언제나 정확하다.
+  double cameraLag = 0.15;
+
+  /// 화면 밖 기물을 건너뛴다.
+  ///
+  /// ## 왜 필요해졌는가
+  ///
+  /// 맵이 15×15 타일이던 시절에는 전체가 한 화면에 들어와 컬링할 것이 없었다.
+  /// 기물이 제 크기를 찾으면서 맵은 40×34 m 가 되었고, 화면상 폭은 5,550 px —
+  /// 1600×900 창에 들어오는 것은 그중 일부다. 나머지를 그리는 비용은 전부
+  /// 버려지는데, 기물 한 개는 `paintSurface` 안에서 `saveLayer` 와 블러를
+  /// 여러 번 태우므로 **버려지는 비용이 프레임 예산을 통째로 먹는다.**
+  ///
+  /// [viewport] 가 `null` 이면 아무것도 걸러내지 않는다.
+  bool cullToViewport = false;
+
+  /// 화면 사각형(씬을 그리는 캔버스의 좌표계). [cullToViewport] 가 쓴다.
+  Rect? viewport;
+
+  /// 이 기물이 화면에 걸치는가.
+  ///
+  /// 정확한 경계 대신 **넉넉한 상한**을 쓴다. 기물은 자기 폭을 알려 주지
+  /// 않으므로 높이와 타일 폭으로 반경을 잡는다. 조금 더 그리는 것은 싸지만,
+  /// 화면 안의 것을 빠뜨리면 기물이 깜빡이며 사라져 즉시 눈에 띈다.
+  bool _onScreen(Offset tile, double height) {
+    final v = viewport;
+    if (v == null) return true;
+    final a = iso.project(tile.dx, tile.dy) + cameraOffset;
+    final pad = height * iso.squash + iso.tileWidth;
+    return a.dx + pad >= v.left &&
+        a.dx - pad <= v.right &&
+        a.dy + iso.tileHeight >= v.top &&
+        a.dy - pad <= v.bottom;
+  }
+
+  /// 지금 화면에 걸리는 기물 수. 컬링이 실제로 걸러내는지 확인하는 데 쓴다.
+  int visiblePropCount() {
+    if (!cullToViewport || viewport == null) return props.length;
+    var n = 0;
+    for (final it in props) {
+      if (_onScreen(it.tile, it.prop.height * it.scale)) n++;
+    }
+    return n;
+  }
+
   double _clock = 0;
   double get clock => _clock;
+
+  /// 깊이 정렬 목록. `(리스트 안의 첨자 << 2) | 종류` 로 인코딩한다.
+  ///
+  /// 매 프레임 래퍼 객체를 새로 만들면 기물 100개짜리 씬에서 프레임마다
+  /// 100번 이상 할당이 일어나 GC 가 주기적으로 프레임을 밀어낸다. 정수만
+  /// 담으면 목록을 재사용할 수 있고, 첨자는 목록을 다시 채워도 유효하므로
+  /// 낡은 참조가 남지 않는다.
+  final List<int> _order = [];
 
   /// 화면 좌표를 타일 좌표로 되돌린다. 탭 처리에서 그대로 쓴다.
   Offset tileAt(Offset screen) => screenToTile(screen, iso, cameraOffset);
@@ -137,10 +213,24 @@ class IsoSceneComponent extends Component {
   @override
   void update(double dt) {
     super.update(dt);
+    // 히치 한 번에 씬 전체가 건너뛰지 않도록, 액터·마커·카메라가 모두 같은
+    // 상한을 쓴다. 서로 다른 dt 를 먹으면 그림자와 발이 어긋난다.
+    if (dt > kMaxFrameStep) dt = kMaxFrameStep;
+
     _clock += dt;
     marker?.update(dt);
+
+    // 시간의 주인은 씬이다. 게임 코드가 같은 프레임에 `follow` 를 불러도
+    // 여기서 이미 진행시켰다는 사실을 알고 시간은 건드리지 않는다.
     for (final a in rigged) {
-      a.update(dt);
+      a.driveByScene(dt);
+    }
+
+    final target = cameraTarget;
+    if (target != null) {
+      cameraOffset = cameraLag <= 0
+          ? target
+          : Offset.lerp(cameraOffset, target, 1 - math.exp(-dt / cameraLag))!;
     }
   }
 
@@ -153,6 +243,7 @@ class IsoSceneComponent extends Component {
     // 좌표를 확인하는 개발 도구이지 땅이 아니며, 그것을 껐다고 캐릭터가
     // 허공에 뜨면 안 된다.
     final g = grid;
+    final gsw = SceneProfile.enabled ? (Stopwatch()..start()) : null;
     paintIsoGround(
       canvas,
       iso,
@@ -162,20 +253,57 @@ class IsoSceneComponent extends Component {
       lineAlpha: showGrid ? 0.10 : 0.0,
       seed: groundSeed,
     );
+    if (gsw != null) SceneProfile.add('#ground', gsw.elapsedMicroseconds);
     marker?.paint(canvas, iso);
-
-    paintScene(
-      canvas,
-      [
-        ...props.map(PropItem.new),
-        ...actors.map(ActorItem.new),
-        ...rigged.map(RiggedItem.new),
-      ],
-      iso,
-      light,
-      _clock,
-    );
+    _paintSorted(canvas);
+    if (SceneProfile.enabled) SceneProfile.endFrame();
 
     canvas.restore();
+  }
+
+  /// 기물·액터를 하나의 깊이 순서로 그린다.
+  ///
+  /// [paintScene] 과 결과는 같지만 목록과 래퍼를 매 프레임 새로 만들지 않는다.
+  /// 깊이는 액터가 움직이면 바뀌므로 정렬 자체는 매 프레임 해야 하지만,
+  /// 거의 정렬된 목록이라 실제 비교 횟수는 적다.
+  void _paintSorted(Canvas canvas) {
+    final n = props.length + actors.length + rigged.length;
+    if (_order.length != n) {
+      _order.clear();
+      for (var i = 0; i < props.length; i++) {
+        _order.add(i << 2);
+      }
+      for (var i = 0; i < actors.length; i++) {
+        _order.add((i << 2) | 1);
+      }
+      for (var i = 0; i < rigged.length; i++) {
+        _order.add((i << 2) | 2);
+      }
+    }
+
+    double depthOf(int k) => switch (k & 3) {
+          0 => props[k >> 2].depth,
+          1 => actors[k >> 2].depth,
+          _ => rigged[k >> 2].depth,
+        };
+
+    _order.sort((a, b) => depthOf(a).compareTo(depthOf(b)));
+
+    final cull = cullToViewport && viewport != null;
+    for (final k in _order) {
+      final i = k >> 2;
+      switch (k & 3) {
+        case 0:
+          final it = props[i];
+          // 액터는 거르지 않는다. 수가 적어 이득이 없고, 화면 밖에 있어도
+          // 애니메이션 상태는 계속 흘러야 하기 때문이다.
+          if (cull && !_onScreen(it.tile, it.prop.height * it.scale)) continue;
+          paintProp(canvas, it, iso, light, _clock);
+        case 1:
+          paintIsoActor(canvas, actors[i], iso, _clock);
+        default:
+          paintRiggedActor(canvas, rigged[i], iso, light, _clock);
+      }
+    }
   }
 }

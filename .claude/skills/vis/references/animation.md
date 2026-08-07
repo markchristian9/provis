@@ -527,14 +527,66 @@ double yawFromVelocity(Offset worldVelocity) =>
 _yaw = lerpAngle(_yaw, targetYaw, 1 - math.exp(-dt / 0.15));
 ```
 
-**보행 속도와 클립 속도 동기화** (발 미끄러짐 방지):
+**보행 속도와 클립 속도 동기화** (발 미끄러짐 방지) — **`RiggedIsoActor` 가 자동으로 한다.**
+
+`period` 를 고정하고 속도만 올리면 발이 얼음판에서 미끄러진다. `follow()` 가 매 프레임 이 계산을 하므로 게임 쪽에서는 **액터에 맵의 `IsoView` 만 넘기면 된다.**
 
 ```dart
-// 걸음 한 번에 이동하는 거리 = strideLength
-final period = strideLength / math.max(speed, 1e-3);
+final actor = riggedFromArtist(hero, tile: start, height: 200, iso: iso);
+//                                                             ^^^^^^^^^
+// 없으면 기본 타일 크기(kIso, 128px)로 보폭을 재서 걸음 수가 어긋난다.
 ```
 
-`period` 를 고정하고 속도만 올리면 발이 얼음판에서 미끄러진다. 아이소 게임은 캐릭터가 작아 눈에 덜 띄지만, AAA 품질을 노린다면 반드시 맞춘다.
+계산의 계보는 이렇다.
+
+```
+Clip.strideCycle   한 사이클이 나아가는 거리 — 다리 길이의 배수 (walk 1.83)
+      ↓ × body.legLength × (height / body.height)      화면 px
+      ↓ ÷ iso.worldScale  (= tileWidth / √2)           타일
+RiggedIsoActor.cycleTiles(clip)
+      ↓ ÷ clip.duration
+RiggedIsoActor.naturalSpeed(clip)   이 클립이 발을 붙인 채 낼 수 있는 속도
+```
+
+- **보폭을 다리 길이의 배수로 적는 이유**는 클립이 각도만 담는다는 규약과 같다. 다리가 짧은 몬스터와 8등신 영웅이 같은 클립으로 각자의 보폭을 낸다.
+- **`worldScale` 이 화면상 길이가 아닌 이유**: 아이소 지면은 방향마다 단축률이 다르다(축 방향과 대각선이 다르게 줄어든다). 캐릭터 카드는 단축 없이 서 있으므로 그 픽셀이 곧 실제 길이이고, 지면도 같은 자로 재야 맞는다.
+- **걷기/달리기 전환도 보폭에서 갈린다** (`gaitCrossover` = 두 클립 자연 속도의 기하 평균). 고정 임계값을 기본으로 두지 않는 이유는 타일 크기나 키가 바뀌면 그 숫자가 반드시 틀리기 때문이다. 명시하고 싶으면 `runThreshold` 에 값을 넣는다.
+- 배속은 `[0.55, 1.9]` 로 자른다. 걷기를 두 배로 돌리면 종종걸음이 되고, 절반으로 돌리면 발이 공중에 멎는다.
+- **제자리 동작(`strideCycle == 0`)에는 걸지 않는다.** 빨리 걷는다고 칼이 빨리 나가면 판정 타이밍이 이동 속도에 따라 달라진다.
+
+---
+
+## 타이밍을 그림에 붙인다 — `ClipEvent`
+
+판정·타격음·이펙트를 프레임 번호로 걸면 프레임률이 흔들리는 순간 어긋난다. 클립 위의 **시점**에 걸면 배속이 바뀌어도 언제나 같은 자세에서 정확히 한 번 터진다.
+
+```dart
+static const attack = Clip(
+  name: 'attack', duration: 0.86, loop: false,
+  events: [ClipEvent('strike', 0.5)],   // weaponSwing 이 최대인 지점
+  …
+);
+
+// 매 프레임
+if (actor.animator.fired.contains('strike')) {
+  world.applyHit(actor);
+  actor.animator.hitstop(0.06);      // 타격 프레임에서 시간을 멈춘다
+}
+```
+
+- 발화 구간은 반열림 `(from, to]` 다. 양끝을 다 포함하면 프레임 경계에서 두 번 터지고, 다 빼면 배속이 낮을 때 영영 안 터진다.
+- `fired` 는 리스트를 재사용하므로 이벤트가 없는 프레임에서 할당이 0 이다.
+- `hitstop` 은 남은 정지가 한 프레임보다 짧으면 **나머지로 진행한다.** 통째로 삼키면 0.06초가 프레임 경계에 따라 0.05~0.08초로 흔들려, 같은 공격의 회복 타이밍이 매번 달라진다.
+
+---
+
+## 시간은 누가 미는가
+
+**`IsoSceneComponent` 를 쓰면 씬이 시간의 주인이다.** `follow()` 는 위치·방향·클립·보폭만 갱신하고 시간은 건드리지 않는다(`driveByScene` 이 남긴 표시를 본다). 이 규약이 없던 시절 씬과 `follow` 가 각자 `dt` 를 밀어 **모든 동작이 정확히 두 배 빨라졌다.**
+
+씬 없이 쓰면 `follow(ctrl, dt)` 가 시간까지 민다 — 그대로 한 줄이면 된다.
+
+**`dt` 는 세 곳에서 같은 상한(`kMaxFrameStep`, 1/20초)으로 잘린다** — `Animator`·`IsoController`·`IsoSceneComponent`. 서로 다른 값을 쓰면 이동 거리와 걸음 수가 어긋난다. 400ms 짜리 프레임 하나가 공격의 예비동작을 삼키거나 캐릭터를 몇 타일 순간이동시키는 것보다, 잠깐 느려지는 편이 훨씬 낫다.
 
 **아이소 이동 시 추가 처리**:
 - `carry` 는 **화면 공간** 이동량으로 준다 (`iso.project` 후의 차분). 월드 좌표로 주면 망토가 엉뚱한 방향으로 날린다.
@@ -569,7 +621,11 @@ final period = strideLength / math.max(speed, 1e-3);
 |------|------|------|
 | 관절이 한 바퀴 돈다 | `Pose.lerp` 의 선형 보간 | 해당 각도만 `lerpAngle` |
 | 무릎이 반대로 꺾인다 | `knee` 가 음수 | `math.max(0, ...)` 로 클램프 |
-| 발이 미끄러진다 | 클립 주기와 이동 속도 불일치 | `period = stride / speed` |
+| 발이 미끄러진다 | 액터에 맵의 `IsoView` 를 안 넘김 | `riggedFromArtist(…, iso: iso)` |
+| 모든 동작이 두 배로 빠르다 | 씬과 `follow` 가 각자 시간을 밈 | `driveByScene` 규약 — 씬이 주인 |
+| 연타하면 포즈가 튄다 | 전환 도중 전환에서 혼합 결과를 버림 | 화면에 있던 포즈에서 잇는다 |
+| 히치 뒤 공격이 건너뛴다 | `dt` 미클램프 | `kMaxFrameStep` 로 자른다 |
+| 판정이 그림보다 이르다/늦다 | 프레임 번호로 판정 | `ClipEvent` + `animator.fired` |
 | 마네킹처럼 뻣뻣하다 | 좌우 완전 대칭 | 팔·다리에 위상차, `wobble` 추가 |
 | 망토가 안 날린다 | `carry` 미전달 | 앵커 이동량을 `step` 에 전달 |
 | 망토가 폭발한다 | `dt` 미클램프 / `teleport` 누락 | `min(dt, 1/30)`, 스폰 시 teleport |

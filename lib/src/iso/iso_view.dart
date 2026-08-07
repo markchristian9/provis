@@ -39,6 +39,17 @@ class IsoView {
   /// 접지 그림자 타원의 세로/가로 비.
   double get shadowRatio => elevationSin;
 
+  /// 타일 한 변의 **실제** 길이(px). 화면상 길이가 아니다.
+  ///
+  /// 유도: 표준 아이소 구성은 한 변 `s` 인 정사각 격자를 45° 돌리고 세로만
+  /// sin(고도각)으로 누른 것이다. 그러면 화면 x = (wx-wy)·s/√2 이므로
+  /// `s/√2 = tileWidth/2`, 즉 `s = tileWidth/√2` 다.
+  ///
+  /// 보폭 동기화가 이 값을 쓴다. 캐릭터는 화면에 수직으로 선 카드라 그 픽셀이
+  /// 곧 실제 길이이므로, 지면 이동도 같은 자로 재야 발과 땅이 같은 속도로
+  /// 흐른다 — 화면상 길이(방향마다 단축률이 다르다)로 재면 어긋난다.
+  double get worldScale => tileWidth / math.sqrt2;
+
   /// 월드 타일 좌표 → 화면 좌표. [wz] 는 지면 위 높이(양수가 위).
   Offset project(double wx, double wy, [double wz = 0]) => Offset(
         (wx - wy) * tileWidth * 0.5,

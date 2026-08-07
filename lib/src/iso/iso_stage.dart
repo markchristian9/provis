@@ -1,5 +1,7 @@
 import 'dart:math' as math;
-import 'dart:ui';
+// dart:ui 의 Clip 은 클리핑 동작 열거형이라 애니메이션 클립과 이름이 겹친다.
+// 이 파일은 전자를 쓰지 않으므로 감춘다.
+import 'dart:ui' hide Clip;
 
 import '../art/creature.dart';
 import '../core/noise.dart';
@@ -7,6 +9,7 @@ import '../core/palette.dart';
 import '../core/rng.dart';
 import '../actor/humanoid_renderer.dart';
 import '../anim/animator.dart';
+import '../anim/clip.dart';
 import '../core/shading.dart';
 import 'iso_input.dart';
 import 'iso_view.dart';
@@ -399,7 +402,8 @@ class RiggedIsoActor {
     this.height = 200,
     Animator? animator,
     this.yaw = 0,
-    this.runThreshold = 4.2,
+    this.runThreshold,
+    this.iso = kIso,
   }) : animator = animator ?? Animator();
 
   final HumanoidRenderer renderer;
@@ -413,8 +417,20 @@ class RiggedIsoActor {
   /// 화면상 키(px). 타일 폭의 1.2~1.6배가 표준이다.
   double height;
 
+  /// 보폭 동기화가 쓰는 카메라. **맵과 같은 것을 준다.**
+  ///
+  /// 타일이 얼마나 큰지 모르면 "초당 3 타일"이 빠른 것인지 느린 것인지 알
+  /// 수 없고, 그러면 클립을 실제 이동에 맞출 수 없다. 기본값은 [kIso] 이므로
+  /// 다른 타일 크기를 쓰는 맵은 반드시 넘겨야 한다.
+  IsoView iso;
+
   /// 이 속도(타일/초)를 넘으면 걷기 대신 달리기 클립을 쓴다.
-  double runThreshold;
+  ///
+  /// `null`(기본)이면 [gaitCrossover] 로 **골격에서 자동으로 정한다**. 고정
+  /// 임계값을 기본으로 두지 않는 이유는, 타일 크기나 캐릭터 키가 바뀌는
+  /// 순간 그 숫자가 반드시 틀리기 때문이다 — 다리가 짧은 몬스터는 같은
+  /// 속도에서 더 일찍 뛰어야 한다.
+  double? runThreshold;
 
   /// 바라보는 각도(라디안). 0 이 카메라 정면(남).
   double yaw;
@@ -429,24 +445,70 @@ class RiggedIsoActor {
 
   String _state = 'idle';
 
+  /// 시간을 씬이 대신 돌리고 있는가.
+  ///
+  /// [IsoSceneComponent] 는 자기 목록의 액터를 매 프레임 진행시키고, 게임
+  /// 코드는 같은 프레임에 [follow] 를 부른다. **둘 다 시간을 밀면 모든 동작이
+  /// 정확히 두 배 빨라진다** — 걷기가 종종걸음이 되고 공격이 절반 시간에
+  /// 끝난다. 씬이 표시를 남기면 [follow] 는 입력만 갱신하고 시간은 건드리지
+  /// 않는다.
+  bool _sceneDriven = false;
+
   /// 현재 재생 중인 상태 이름.
   String get state => _state;
 
-  /// 이동 컨트롤러를 그대로 따라간다 — 위치·방향·클립을 한 번에 맞춘다.
+  /// 걷기와 달리기가 갈리는 속도(타일/초).
   ///
-  /// 이동 여부에 따라 걷기/달리기/대기로 자동 전환하므로, 게임 쪽에서는
-  /// 컨트롤러만 조작하면 된다. 공격·피격처럼 이동과 무관한 동작은
-  /// [play] 로 끼워 넣는다.
+  /// 두 클립이 발을 미끄러뜨리지 않고 낼 수 있는 속도([naturalSpeed])를
+  /// 로그 축에서 가른 값이다. 이 아래로는 걷기를 조금 빠르게 돌리는 것이,
+  /// 위로는 달리기를 조금 느리게 돌리는 것이 자연스럽다.
+  double get gaitCrossover {
+    final w = naturalSpeed(animator.byName('walk'));
+    final r = naturalSpeed(animator.byName('run'));
+    if (w <= 0 || r <= 0) return double.infinity;
+    return math.sqrt(w * r);
+  }
+
+  /// [c] 를 저작된 속도 그대로 재생했을 때 나오는 이동 속도(타일/초).
+  double naturalSpeed(Clip c) =>
+      c.duration <= 0 ? 0 : cycleTiles(c) / c.duration;
+
+  /// [c] 한 사이클이 나아가는 거리(타일).
+  ///
+  /// 클립은 다리 길이의 배수로 보폭을 적고([Clip.strideCycle]), 여기서 이
+  /// 액터의 실제 다리 길이와 타일 크기로 환산한다.
+  double cycleTiles(Clip c) {
+    if (c.strideCycle <= 0) return 0;
+    final b = renderer.body;
+    final scale = iso.worldScale;
+    if (b.height <= 0 || scale <= 0) return 0;
+    // 화면상 다리 길이 — 렌더러가 body.height 를 this.height 로 스케일한다.
+    final legPx = b.legLength * (height / b.height);
+    return c.strideCycle * legPx / scale;
+  }
+
+  /// 이동 컨트롤러를 그대로 따라간다 — 위치·방향·클립·보폭을 한 번에 맞춘다.
+  ///
+  /// 이동 여부와 속도에 따라 걷기/달리기/대기로 자동 전환하고, 클립의 재생
+  /// 배속을 실제 이동 속도에 맞춘다. 게임 쪽에서는 컨트롤러만 조작하면 된다.
+  /// 공격·피격처럼 이동과 무관한 동작은 [play] 로 끼워 넣는다.
   void follow(IsoController c, double dt) {
     tile = c.tile;
     yaw = c.yaw;
-    final want = !c.isMoving
-        ? 'idle'
-        : (c.speed >= runThreshold ? 'run' : 'walk');
-    if (want != _state && !_isOneShot(_state)) {
-      play(want);
+
+    if (c.isMoving) {
+      final want = _gaitFor(c.speed);
+      if (want != _state && !_isOneShot(_state)) play(want);
+      // 클립 한 사이클이 나아가는 거리를 실제 이동 거리에 맞춘다. 이걸
+      // 빼먹으면 캐릭터가 얼음판을 지치듯 미끄러진다.
+      animator.rate = _rateFor(animator.current, c.speed);
+    } else {
+      animator.rate = 1.0;
+      if (_state != 'idle' && !_isOneShot(_state)) play('idle');
     }
-    update(dt);
+
+    // 씬이 시간의 주인이면 여기서 또 밀지 않는다.
+    if (!_sceneDriven) update(dt);
   }
 
   /// 클립을 이름으로 재생한다. `idle`·`wait`·`walk`·`run`·`dash`·`attack`·
@@ -463,6 +525,29 @@ class RiggedIsoActor {
     if (_isOneShot(_state) && animator.progress >= 1.0) {
       play('idle');
     }
+  }
+
+  /// [IsoSceneComponent] 전용 진입점. 게임 코드는 [follow] 나 [update] 를 쓴다.
+  void driveByScene(double dt) {
+    _sceneDriven = true;
+    update(dt);
+  }
+
+  String _gaitFor(double speed) {
+    final t = runThreshold ?? gaitCrossover;
+    return speed >= t ? 'run' : 'walk';
+  }
+
+  /// 이동 속도에 맞춘 재생 배속.
+  ///
+  /// 제자리 동작(공격·피격)에는 걸지 않는다 — 빨리 걷는다고 칼이 빨리
+  /// 나가면 판정 타이밍이 속도에 따라 달라진다.
+  double _rateFor(Clip c, double speed) {
+    final cycle = cycleTiles(c);
+    if (cycle <= 1e-6) return 1.0;
+    // 대역을 열어 두면 극단에서 클립이 무너진다. 걷기를 두 배로 돌리면
+    // 종종걸음이 되고, 절반으로 돌리면 발이 공중에 멎는다.
+    return (c.duration * speed / cycle).clamp(0.55, 1.9);
   }
 
   bool _isOneShot(String name) =>

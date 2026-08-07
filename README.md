@@ -140,7 +140,7 @@ void onTapDown(Offset localPosition) {
 
 // 매 프레임
 hero.update(dt);
-actor.follow(hero, dt);   // 위치·방향·클립(대기/걷기/달리기)을 한 번에
+actor.follow(hero, dt);   // 위치·방향·클립·보폭을 한 번에
 ```
 
 목표가 벽이면 **가장 가까운 통행 가능한 타일**로 갑니다 — 벽을 눌렀다고 아무
@@ -148,6 +148,29 @@ actor.follow(hero, dt);   // 위치·방향·클립(대기/걷기/달리기)을 
 
 방향 전환은 `turnTime`(기본 0.14초)에 걸쳐 최단 경로로 보간됩니다. 8방향으로
 즉시 스냅하지 않는 이유는, 절차적 렌더러가 중간 각도를 그릴 수 있기 때문입니다.
+
+`follow` 는 걷기/달리기를 **보폭에서** 고르고, 클립의 재생 배속을 실제 이동
+속도에 맞춥니다 — 그래서 속도를 바꿔도 발이 미끄러지지 않습니다. 다만 보폭은
+타일이 얼마나 큰지 알아야 계산되므로 액터에 맵과 **같은 `IsoView`** 를 줍니다.
+
+```dart
+final actor = riggedFromArtist(hero, tile: start, height: 200, iso: iso);
+```
+
+### 타격을 그림과 맞춘다
+
+판정·타격음·이펙트를 프레임 번호가 아니라 **클립 위의 시점**에 겁니다.
+프레임률이 흔들려도, 보폭 동기화로 배속이 바뀌어도 정확히 한 번 터집니다.
+
+```dart
+actor.play('attack');
+
+// 매 프레임
+if (actor.animator.fired.contains('strike')) {
+  world.applyHit(actor);
+  actor.animator.hitstop(0.06);   // 타격 프레임에서 시간을 잠깐 멈춘다
+}
+```
 
 ### 3. 캐릭터를 만든다
 

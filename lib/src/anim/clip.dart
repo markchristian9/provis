@@ -46,6 +46,39 @@ double sampleOnce(List<double> keys, double t) {
   return _catmull(at(i - 1), at(i), at(i + 1), at(i + 2), f);
 }
 
+/// 한 프레임에 소비할 수 있는 최대 시간(초).
+///
+/// 프레임이 한 번 크게 밀리면(에셋 로드·GC·창 전환·브레이크포인트) 그 `dt` 를
+/// 그대로 먹은 애니메이션은 예비동작을 통째로 건너뛰고 타격 자세에서 순간이동
+/// 하며, 이동 컨트롤러는 몇 타일을 한 번에 넘어간다. 잘라 두면 최악의 경우
+/// 재생이 잠깐 느려질 뿐 **포즈가 튀지 않는다** — 눈에는 후자가 훨씬 낫다.
+///
+/// 1/20 초는 60fps 세 프레임이다. 이보다 짧게 잡으면 30fps 기기에서 상시
+/// 슬로모션이 되고, 길게 잡으면 히치 한 번에 동작이 건너뛴다.
+const double kMaxFrameStep = 1 / 20;
+
+/// 클립 위의 한 시점 표식.
+///
+/// 히트박스·사운드·이펙트를 "몇 번째 프레임"이 아니라 **클립의 어느 지점**에
+/// 건다. 프레임률이 흔들려도, 보폭 동기화로 재생 배속이 바뀌어도 언제나 같은
+/// 자세에서 정확히 한 번 터지므로 타격과 그림이 어긋나지 않는다.
+///
+/// ```dart
+/// if (actor.animator.fired.contains('strike')) {
+///   world.applyHit(actor);
+///   actor.animator.hitstop(0.06);
+/// }
+/// ```
+class ClipEvent {
+  const ClipEvent(this.name, this.at);
+
+  /// 게임 쪽에서 비교하는 식별자.
+  final String name;
+
+  /// 클립 안의 정규화 시각 0..1.
+  final double at;
+}
+
 /// 관절별 키프레임 트랙의 묶음.
 ///
 /// 클립은 [Pose] 와 같은 필드를 리스트로 갖는다. 지정하지 않은 트랙은
@@ -61,6 +94,8 @@ class Clip {
     this.autoSeconds = 3.2,
     this.holdAtEnd = false,
     this.repeatDelay = 0.28,
+    this.events = const [],
+    this.strideCycle = 0,
     this.rootX,
     this.rootY,
     this.rootRot,
@@ -113,6 +148,22 @@ class Clip {
   /// 원샷을 자동 반복할 때 끝과 다음 시작 사이의 정지 시간(초).
   /// 뷰어에서 동작을 반복해 관찰할 수 있도록 두는 여백이다.
   final double repeatDelay;
+
+  /// 이 클립이 지나가며 알리는 시점들. [Animator.fired] 로 읽는다.
+  final List<ClipEvent> events;
+
+  /// 한 사이클이 나아가는 거리 — **다리 길이의 배수**. 0 이면 제자리 동작이다.
+  ///
+  /// 길이를 픽셀이나 타일이 아니라 다리 길이로 적는 이유는 클립 데이터가
+  /// 관절 각도만 담는다는 규약과 같다 — 다리가 짧은 몬스터와 8등신 영웅이
+  /// 같은 클립을 써도 각자의 보폭으로 걷는다.
+  ///
+  /// 값의 근거는 클립의 고관절 스윙이다. 걷기의 `nearHip` 은 `+0.50 … -0.45`
+  /// 라디안이므로 한 걸음의 발 이동은 `2·L·sin(0.95/2) ≈ 0.92·L`, 한 사이클은
+  /// 두 걸음이라 `1.83·L`. 달리기·전력질주는 여기에 체공 구간이 더해진다.
+  ///
+  /// [RiggedIsoActor] 가 이 값으로 재생 배속을 정해 발 미끄러짐을 없앤다.
+  final double strideCycle;
 
   final List<double>? rootX;
   final List<double>? rootY;

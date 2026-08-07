@@ -1,7 +1,8 @@
 import 'dart:collection';
 import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:ui' hide Clip;
 
+import '../anim/clip.dart' show kMaxFrameStep;
 import 'iso_view.dart';
 
 /// 화면 좌표를 월드 타일 좌표로 되돌린다.
@@ -92,12 +93,29 @@ class IsoGrid {
 
   /// 기물이 차지한 타일을 한꺼번에 막는다.
   ///
-  /// [footprint] 는 타일 단위 크기이며, 기물의 접지 타일을 좌상단으로 삼는다.
+  /// [footprint] 는 타일 단위 크기이며, [tile] 은 기물의 **접지 중심**이다.
+  ///
+  /// ## 왜 중심인가
+  ///
+  /// 기물은 예외 없이 접지 중심을 원점으로 그린다 — `BuildingProp._diamond()`
+  /// 는 밑면을 `±tiles/2` 로 잡고, 나무·바위도 원점을 밑동에 둔다. 그런데
+  /// 예전 이 함수는 [tile] 을 **좌상단**으로 삼아 `floor(tile) … +footprint`
+  /// 를 막았다. 그래서 n×n 기물의 통행 판정이 그림보다 **반 발자국 오른쪽-
+  /// 아래로 밀려** 있었다.
+  ///
+  /// 증상은 "가끔 벽을 통과한다"로 나타난다. 건물 한쪽 면은 그림이 있는데
+  /// 격자가 비어 통과되고, 반대쪽은 아무것도 없는 땅이 막힌다. 2×2 에서는
+  /// 한 칸이라 눈에 잘 안 띄지만, 기물이 제 크기를 찾아 5×6 이 되면 즉시
+  /// 게임이 고장난 것으로 보인다.
   void blockFootprint(Offset tile, Size footprint) {
-    final x0 = tile.dx.floor();
-    final y0 = tile.dy.floor();
-    for (var dy = 0; dy < footprint.height.ceil(); dy++) {
-      for (var dx = 0; dx < footprint.width.ceil(); dx++) {
+    final w = footprint.width.ceil();
+    final h = footprint.height.ceil();
+    // 중심에서 좌상단으로 되돌린다. 홀수 폭이면 중심 타일이 하나 남으므로
+    // round 가 아니라 floor 로 내려 기물이 놓인 칸을 반드시 포함시킨다.
+    final x0 = (tile.dx - w / 2).floor();
+    final y0 = (tile.dy - h / 2).floor();
+    for (var dy = 0; dy < h; dy++) {
+      for (var dx = 0; dx < w; dx++) {
         block(x0 + dx, y0 + dy);
       }
     }
@@ -342,6 +360,9 @@ class IsoController {
 
   void update(double dt) {
     if (dt <= 0) return;
+    // 히치 한 번에 몇 타일을 건너뛰지 않도록 자른다. 애니메이션과 **같은**
+    // 상한을 써야 이동 거리와 걸음 수가 어긋나지 않는다.
+    if (dt > kMaxFrameStep) dt = kMaxFrameStep;
 
     if (_path.isNotEmpty) {
       var budget = speed * dt;
@@ -367,14 +388,29 @@ class IsoController {
     }
 
     // 최단 경로로 회전. π 를 넘나들 때 한 바퀴 도는 것을 막는다.
+    //
+    // 지수 감쇠라 프레임률과 무관하게 같은 시간에 같은 각도만큼 돈다 —
+    // `_yaw += diff * k` 처럼 상수 비율을 쓰면 120fps 에서 두 배로 빨리
+    // 돌아 조작감이 기기마다 달라진다.
     if (turnTime <= 0) {
       _yaw = _targetYaw;
     } else {
-      var diff = (_targetYaw - _yaw) % (math.pi * 2);
-      if (diff > math.pi) diff -= math.pi * 2;
-      if (diff < -math.pi) diff += math.pi * 2;
-      _yaw += diff * (1 - math.exp(-dt / turnTime));
+      _yaw += _shortest(_targetYaw - _yaw) * (1 - math.exp(-dt / turnTime));
     }
+    // 누적 회전이 무한정 커지면 부동소수 정밀도가 떨어져 각도가 계단처럼
+    // 끊긴다. 한 바퀴 안으로 되감아 둔다.
+    if (_yaw.abs() > math.pi * 2) {
+      _yaw = _shortest(_yaw);
+      _targetYaw = _shortest(_targetYaw);
+    }
+  }
+
+  /// 각도차를 -π..π 로 접는다.
+  static double _shortest(double a) {
+    var d = a % (math.pi * 2);
+    if (d > math.pi) d -= math.pi * 2;
+    if (d < -math.pi) d += math.pi * 2;
+    return d;
   }
 
   /// 경로에서 불필요한 꺾임을 제거한다.

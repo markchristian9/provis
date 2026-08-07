@@ -13,7 +13,7 @@ import 'package:provis/provis.dart';
 ///
 ///   flutter test test/snapshot_test.dart
 ///
-/// 결과는 /private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/9b49c4f1-d75a-46f9-a56b-81e8fd36373f/scratchpad/snapshots/ 에 떨어진다.
+/// 결과는 build/art/ 에 떨어진다.
 void main() {
   const cell = Size(190, 300);
   const phases = [0.0, 0.25, 0.5, 0.75];
@@ -69,7 +69,7 @@ void main() {
     final picture = recorder.endRecording();
     final image = await picture.toImage(w.round(), h.round());
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    final dir = Directory('/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/9b49c4f1-d75a-46f9-a56b-81e8fd36373f/scratchpad/snapshots')..createSync(recursive: true);
+    final dir = Directory('build/art')..createSync(recursive: true);
     File('${dir.path}/$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
   }
 
@@ -121,8 +121,8 @@ void main() {
       }
       final image = await recorder.endRecording().toImage(w.round(), h.round());
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-      Directory('/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/9b49c4f1-d75a-46f9-a56b-81e8fd36373f/scratchpad/snapshots').createSync(recursive: true);
-      File('/private/tmp/claude-501/-Users-thruthesky-tmp-games-vis/d83a6054-46af-4fe1-ad43-82da4277d273/scratchpad/facing.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+      Directory('build/art').createSync(recursive: true);
+      File('build/art/facing.png').writeAsBytesSync(bytes!.buffer.asUint8List());
       });
 });
 }

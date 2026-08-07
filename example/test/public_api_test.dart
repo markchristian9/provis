@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -294,10 +295,43 @@ void main() {
       }
       expect(actor.state, 'idle', reason: '공격 자세로 굳으면 안 된다');
 
-      // Artist 를 골격 액터로 옮기는 헬퍼
-      final rigged =
-          riggedFromArtist(_MyHero(), tile: const Offset(2, 2), height: 200);
+      // 보폭 동기화 — 클립 배속을 이동 속도에 맞춰 발 미끄러짐을 없앤다.
+      const map = IsoView(tileWidth: 150, tileHeight: 75);
+      expect(map.worldScale, closeTo(150 / math.sqrt2, 1e-9));
+      final walker = RiggedIsoActor(
+        renderer: HumanoidRenderer(HumanoidSpec.generate(5)),
+        tile: const Offset(1, 1),
+        iso: map,
+      );
+      expect(walker.cycleTiles(Anims.walk), greaterThan(0));
+      expect(walker.naturalSpeed(Anims.walk), greaterThan(0));
+      expect(walker.gaitCrossover, greaterThan(walker.naturalSpeed(Anims.walk)));
+      walker.runThreshold = 2.0; // 자동 대신 고정 임계값도 쓸 수 있다
+      walker.follow(ctrl, 1 / 60);
+      expect(walker.state, 'run');
+      expect(walker.animator.rate, greaterThan(0));
+
+      // 클립 이벤트와 히트스톱 — 판정·소리·이펙트를 그림에 붙인다.
+      final anim = Animator()..playByName('attack');
+      expect(anim.byName('walk').name, 'walk');
+      expect(Anims.attack.events.first, isA<ClipEvent>());
+      var struck = false;
+      for (var i = 0; i < (Anims.attack.duration * 60).round(); i++) {
+        anim.update(1 / 60);
+        if (anim.fired.contains('strike')) {
+          struck = true;
+          anim.hitstop(0.06);
+          expect(anim.frozen, isTrue);
+        }
+      }
+      expect(struck, isTrue);
+      expect(kMaxFrameStep, greaterThan(0));
+
+      // Artist 를 골격 액터로 옮기는 헬퍼 — 맵의 카메라를 함께 넘긴다.
+      final rigged = riggedFromArtist(_MyHero(),
+          tile: const Offset(2, 2), height: 200, iso: map);
       expect(rigged.renderer, isA<HumanoidRenderer>());
+      expect(rigged.iso.tileWidth, 150);
 
       paintRiggedActor(scratch(), rigged,
           const IsoView(tileWidth: 150, tileHeight: 75), LightRig.daylight, 0.5);
