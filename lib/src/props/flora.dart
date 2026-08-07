@@ -219,6 +219,14 @@ class StumpProp extends Prop {
   @override
   double get height => _h;
 
+  // 형상이 시간에 따라 바뀌지 않는다 — 한 번 굽고 재생만 한다.
+  @override
+  bool get bakeable => true;
+
+  @override
+  Rect get bakeBounds =>
+      Rect.fromLTRB(-size * 2.2, -(_h + size * 0.6), size * 2.2, size * 1.1);
+
   @override
   bool get walkable => false;
 
@@ -373,6 +381,16 @@ class LogProp extends Prop {
 
   @override
   double get height => _rad * 2;
+
+  // 형상이 시간에 따라 바뀌지 않는다 — 한 번 굽고 재생만 한다.
+  @override
+  bool get bakeable => true;
+
+  @override
+  Rect get bakeBounds {
+    final w = length * 0.75 + _rad * 3;
+    return Rect.fromLTRB(-w, -(_rad * 4 + length * 0.25), w, length * 0.35 + _rad * 2);
+  }
 
   @override
   bool get walkable => false;
@@ -562,6 +580,17 @@ class FenceProp extends Prop {
 
   @override
   bool get walkable => false;
+
+  /// 울타리도 시간을 쓰지 않는다. 담장과 같은 이유로 굽는다.
+  @override
+  bool get bakeable => true;
+
+  /// 진행 방향으로 한 타일을 가로지르므로 기본 경계로는 끝이 잘린다.
+  @override
+  Rect get bakeBounds {
+    final w = tileWidth * 0.72;
+    return Rect.fromLTRB(-w, -fenceHeight * 1.5, w, tileWidth * 0.42);
+  }
 
   @override
   void paint(Canvas c, double t, LightRig light, {double detail = 1.0}) {

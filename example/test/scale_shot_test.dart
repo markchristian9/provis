@@ -36,17 +36,32 @@ Future<void> dump(String name, int w, int h, void Function(Canvas) body) async {
   print('wrote ${f.path} (${w}x$h)');
 }
 
-void label(Canvas c, String text, Offset at,
-    {double size = 15, Color color = const Color(0xFFCFE0FF)}) {
-  final tp = TextPainter(
-    text: TextSpan(
-      text: text,
-      style: TextStyle(
-          fontSize: size, letterSpacing: 0.6, color: color, height: 1.35),
-    ),
-    textDirection: TextDirection.ltr,
-  )..layout();
-  tp.paint(c, at);
+/// 텍스트 대신 **눈금자**를 그린다.
+///
+/// `flutter test` 의 렌더러에는 폰트가 실려 있지 않아 어떤 글자를 넣어도
+/// 두부(□)로 나온다 — ASCII 도 마찬가지다. 그래서 설명은 벡터로 그린다.
+/// 어차피 스케일을 말하는 데는 글자보다 눈금이 정확하다.
+///
+/// [zoom] 은 그림에 걸린 축소율, [metres] 는 눈금 개수다.
+void ruler(Canvas c, Offset at, double zoom, int metres, Color color) {
+  // 화면에서 1 m 가 차지하는 세로 픽셀 = pxPerMeter × squash × zoom.
+  final unit = scale.pxPerMeter * iso.squash * zoom;
+  final p = Paint()
+    ..color = color
+    ..strokeWidth = 2
+    ..isAntiAlias = true;
+  c.drawLine(at, at.translate(0, -unit * metres), p);
+  for (var i = 0; i <= metres; i++) {
+    final y = at.dy - unit * i;
+    // 매 미터마다 짧은 눈금, 5 m 마다 길게.
+    final len = i % 5 == 0 ? 18.0 : 9.0;
+    c.drawLine(Offset(at.dx, y), Offset(at.dx + len, y), p);
+  }
+}
+
+/// 칸을 구분하는 색 띠. 어느 쪽이 전/후인지 글자 없이 알린다.
+void banner(Canvas c, Rect box, Color color) {
+  c.drawRect(box, Paint()..color = color);
 }
 
 /// 사람 하나를 기준자로 세운다. 모든 비교의 기준이다.
@@ -71,7 +86,7 @@ void main() {
   testWidgets('고치기 전/후 대조 시트', (tester) async {
     const w = 1560, h = 820;
     // 두 칸 모두 **같은 줌**으로 그린다. 각자 맞춰 그리면 비교가 거짓말이 된다.
-    const zoom = 0.42;
+    const zoom = 0.30;
 
     await dump('before_after', w, h, (c) {
       c.drawRect(Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()),
@@ -80,7 +95,7 @@ void main() {
       for (final (side, isBefore) in [(0.0, true), (780.0, false)]) {
         c.save();
         c.clipRect(Rect.fromLTWH(side, 0, 780, h.toDouble()));
-        c.translate(side + 390, 690);
+        c.translate(side + 300, 700);
         c.scale(zoom);
         paintIsoGround(c, iso, 7, 7, light, lineAlpha: 0.05);
 
@@ -122,24 +137,16 @@ void main() {
         human(c, light, const Offset(5.4, 5.6), scale.humanPx, 7);
         c.restore();
 
-        label(
-          c,
-          isBefore
-              ? 'BEFORE\n2-storey house 1.74 m  ·  wall 0.49 m  ·  tree 3.0 m\n'
-                  'The 1.8 m hero is TALLER than the whole house.'
-              : 'AFTER\n2-storey house 8.4 m  ·  wall 2.6 m  ·  tree 9.8 m\n'
-                  'The same 1.8 m hero now stands at the doorway.',
-          Offset(side + 26, 24),
-          size: 16,
-          color: isBefore ? const Color(0xFFFF9B9B) : const Color(0xFF9BFFC4),
-        );
+        // 같은 눈금자를 두 칸에 똑같이 세운다. 기물만 달라졌다는 사실이
+        // 눈금 대비 높이로 즉시 보인다.
+        ruler(c, Offset(side + 60, 760), zoom, 10,
+            isBefore ? const Color(0xFFFF9B9B) : const Color(0xFF9BFFC4));
+        banner(c, Rect.fromLTWH(side, 0, 780, 10),
+            isBefore ? const Color(0xFFFF5A5A) : const Color(0xFF3FD98A));
       }
 
       c.drawLine(const Offset(780, 0), Offset(780, h.toDouble()),
           Paint()..color = const Color(0x33FFFFFF));
-      label(c, 'same camera  ·  same light  ·  same hero  ·  1 tile = 1 m',
-          const Offset(26, 782),
-          size: 13, color: const Color(0x88CFE0FF));
     });
   });
 
@@ -177,13 +184,7 @@ void main() {
       human(c, light, const Offset(3.0, 5.8), scale.humanPx, 7);
       c.restore();
 
-      label(
-        c,
-        'Hero 1.80 m  vs  door 2.05 m  ·  storey 2.9 m\n'
-        'The doorway clears the head; shoulders clear the jambs.',
-        const Offset(26, 24),
-        size: 16,
-      );
+      ruler(c, const Offset(60, 770), 0.62, 4, const Color(0xFF9BFFC4));
     });
   });
 
@@ -228,14 +229,6 @@ void main() {
       scene.cullToViewport = false;
       scene.render(c);
       c.restore();
-      label(
-        c,
-        'Village ${kVillageCols}x$kVillageRows m  ·  1 tile = 1 m  ·  '
-        '${scene.props.length} props  ·  ${scene.rigged.length} actors\n'
-        'Road 3 m wide, 7 buildings 5x5..9x6 m, every doorway reachable.',
-        const Offset(26, 24),
-        size: 16,
-      );
     });
   });
 }

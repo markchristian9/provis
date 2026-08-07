@@ -194,6 +194,25 @@ class IsoSceneComponent extends Component {
   /// 낡은 참조가 남지 않는다.
   final List<int> _order = [];
 
+  /// 정적 기물의 텍스처 캐시. `null` 을 넣으면 매 프레임 다시 그린다.
+  ///
+  /// 나무·바위·건물처럼 [Prop.bakeable] 인 것만 구워진다. 실측에서 이 한 줄이
+  /// 프레임의 대부분을 차지하던 수관 렌더를 없앴다.
+  PropCache? propCache = PropCache();
+
+  /// 맵을 다시 생성할 때처럼 기물 목록을 통째로 갈아엎었음을 알린다.
+  /// 못 쓰는 텍스처를 붙들고 있지 않도록 캐시를 비운다.
+  void invalidateProps() {
+    propCache?.clear();
+    _order.clear();
+  }
+
+  @override
+  void onRemove() {
+    propCache?.clear();
+    super.onRemove();
+  }
+
   /// 화면 좌표를 타일 좌표로 되돌린다. 탭 처리에서 그대로 쓴다.
   Offset tileAt(Offset screen) => screenToTile(screen, iso, cameraOffset);
 
@@ -252,6 +271,9 @@ class IsoSceneComponent extends Component {
       light,
       lineAlpha: showGrid ? 0.10 : 0.0,
       seed: groundSeed,
+      // 지면 얼룩도 화면 밖은 그리지 않는다. 캔버스는 이미 카메라만큼
+      // 옮겨져 있으므로 뷰포트를 그 반대로 되돌려 넘긴다.
+      visible: viewport?.shift(-cameraOffset),
     );
     if (gsw != null) SceneProfile.add('#ground', gsw.elapsedMicroseconds);
     marker?.paint(canvas, iso);
@@ -302,7 +324,7 @@ class IsoSceneComponent extends Component {
           // 액터는 거르지 않는다. 수가 적어 이득이 없고, 화면 밖에 있어도
           // 애니메이션 상태는 계속 흘러야 하기 때문이다.
           if (cull && !_onScreen(it.tile, it.prop.height * it.scale)) continue;
-          paintProp(canvas, it, iso, light, _clock);
+          paintProp(canvas, it, iso, light, _clock, cache: propCache);
           if (sw != null) key = it.prop.runtimeType.toString();
         case 1:
           paintIsoActor(canvas, actors[i], iso, _clock);

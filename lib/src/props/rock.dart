@@ -76,6 +76,16 @@ class RockProp extends Prop {
   @override
   double get height => _h * 2;
 
+  // 형상이 시간에 따라 바뀌지 않는다 — 한 번 굽고 재생만 한다.
+  @override
+  bool get bakeable => true;
+
+  @override
+  Rect get bakeBounds {
+    final w = _w * 2.6 + size;
+    return Rect.fromLTRB(-w, -(_h * 2.4 + size * 0.3), w, size * 0.9);
+  }
+
   @override
   bool get walkable => false;
 
@@ -345,6 +355,14 @@ class PebbleField extends Prop {
 
   @override
   double get height => 6;
+
+  // 형상이 시간에 따라 바뀌지 않는다 — 한 번 굽고 재생만 한다.
+  @override
+  bool get bakeable => true;
+
+  @override
+  Rect get bakeBounds =>
+      Rect.fromLTRB(-radius * 1.3, -radius * 0.9, radius * 1.3, radius * 0.9);
 
   @override
   bool get walkable => true;

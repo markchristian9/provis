@@ -45,7 +45,138 @@ abstract class Prop {
   ///
   /// [detail] 은 0..1 이며, 멀리 있는 기물은 낮춰 미세 텍스처를 생략한다.
   void paint(Canvas c, double t, LightRig light, {double detail = 1.0});
+
+  // ── 굽기 ────────────────────────────────────────────────────────────────
+  //
+  // 실측이 이 절을 만들었다. 40×34 마을에서 화면에 든 나무 21그루가 프레임의
+  // **87.5%** 를 먹고 있었다(그루당 6.1ms). 나무 하나가 잎 덩어리 여럿 ×
+  // 다패스 셰이딩 × 투과·림이므로, 매 프레임 다시 그리면 그렇게 된다.
+  //
+  // 그런데 그 그림은 프레임마다 **거의 같다.** 한 번 텍스처로 구워 두면
+  // 재생은 사각형 하나이고, 실측으로 그루당 6119µs → 2.7µs 다.
+
+  /// 형상이 시간에 따라 바뀌지 않는가.
+  ///
+  /// `true` 면 [PropCache] 가 이 기물을 한 번만 그려 텍스처로 굽고, 이후
+  /// 프레임에는 그 텍스처만 그린다.
+  ///
+  /// **바람에 흔들리는 것도 여기 해당할 수 있다.** 흔들림을 형상이 아니라
+  /// [motion] 의 변환으로 표현하면 형상 자체는 고정이기 때문이다. 나무가
+  /// 그렇게 한다 — 밑동을 축으로 한 전단은 변환으로 정확히 재현된다.
+  ///
+  /// 기본이 `false` 인 이유는 안전이다. 모르는 기물을 얼려 버리는 것보다
+  /// 느린 편이 낫다 — 얼어붙은 물결은 조용한 버그이고, 느린 프레임은
+  /// 눈에 보이는 문제다.
+  bool get bakeable => false;
+
+  /// 구운 텍스처에 매 프레임 거는 변환. [bakeable] 이 `true` 일 때만 불린다.
+  ///
+  /// 접지 중심이 원점이고 `-y` 가 위이므로, 밑동을 고정하고 위를 흔들려면
+  /// y 에 비례하는 수평 이동(전단)을 건다.
+  void motion(Canvas c, double t) {}
+
+  /// 구울 수 없는 **살아 있는 한 겹**. [paint] 뒤에(구웠으면 텍스처 위에) 그린다.
+  ///
+  /// 굴뚝 연기처럼 기물의 대부분은 고정인데 아주 일부만 움직이는 경우가 있다.
+  /// 그 하나 때문에 기물 전체를 매 프레임 다시 그리면 손해가 크므로, 형상은
+  /// [paint] 에 두어 굽고 움직이는 것만 여기로 뺀다.
+  ///
+  /// [motion] 의 변환 **밖에서** 그려진다 — 연기는 나무처럼 기울지 않는다.
+  void live(Canvas c, double t, LightRig light, {double detail = 1.0}) {}
+
+  /// 구울 때 쓰는 국소 경계. 이 밖으로 그린 것은 잘린다.
+  ///
+  /// 기본값은 [height] 에서 넉넉하게 잡은 상자다. 접지 그림자가 옆으로
+  /// 퍼지므로 아래로도 여유를 둔다. 실루엣이 유난히 옆으로 퍼지는 기물은
+  /// 직접 주는 편이 텍스처 메모리에 이롭다.
+  Rect get bakeBounds {
+    final h = height;
+    return Rect.fromLTRB(-h * 0.95, -h * 1.28, h * 0.95, h * 0.42);
+  }
 }
+
+/// 정적 기물을 텍스처로 한 번 굽고 재생한다.
+///
+/// ## 무엇이 캐시를 무효로 만드는가
+///
+/// 구운 그림에는 **조명이 이미 칠해져 있다.** 광원이 바뀌면(정오 → 황혼)
+/// 전부 버려야 한다. [of] 가 [LightRig] 의 동일성을 보고 알아서 처리하므로
+/// 호출부는 신경 쓰지 않아도 된다. 맵을 다시 생성해 기물 목록이 통째로
+/// 바뀔 때는 [clear] 를 부른다 — 안 부르면 못 쓰는 텍스처가 남는다.
+class PropCache {
+  PropCache({this.pixelRatio = 1.0, this.maxEntries = 160});
+
+  /// 굽는 해상도 배수. 기물은 화면 픽셀과 거의 1:1 이므로 1.0 이 기본이다.
+  final double pixelRatio;
+
+  /// 담아 둘 텍스처 수의 상한. 넘으면 가장 오래된 것부터 버린다.
+  final int maxEntries;
+
+  final Map<(Prop, int), BakedProp> _cache = {};
+  LightRig? _light;
+
+  int get length => _cache.length;
+
+  /// 이 기물의 구운 텍스처. 구울 수 없는 기물이면 `null`.
+  BakedProp? of(Prop p, LightRig light, double detail) {
+    if (!p.bakeable) return null;
+    if (!identical(_light, light)) {
+      clear();
+      _light = light;
+    }
+    // detail 은 거리에 따라 연속으로 바뀌므로 그대로 키에 쓰면 캐시가
+    // 매 프레임 갈린다. 네 단계로 뭉쳐 둔다.
+    final step = (detail * 4).round().clamp(0, 4);
+    final key = (p, step);
+    final hit = _cache[key];
+    if (hit != null) return hit;
+
+    if (_cache.length >= maxEntries) {
+      final oldest = _cache.keys.first;
+      _cache.remove(oldest)?.image.dispose();
+    }
+    final made = _bake(p, light, step / 4);
+    _cache[key] = made;
+    return made;
+  }
+
+  BakedProp _bake(Prop p, LightRig light, double detail) {
+    final b = p.bakeBounds;
+    final w = (b.width * pixelRatio).ceil().clamp(1, 2048);
+    final h = (b.height * pixelRatio).ceil().clamp(1, 2048);
+
+    final rec = PictureRecorder();
+    final c = Canvas(rec, Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()));
+    c.scale(pixelRatio);
+    c.translate(-b.left, -b.top);
+    // t = 0 이 기준 자세다. [Prop.motion] 은 이 자세로부터의 차이만 건다.
+    p.paint(c, 0, light, detail: detail);
+    final pic = rec.endRecording();
+    final img = pic.toImageSync(w, h);
+    pic.dispose();
+    return BakedProp(img, b);
+  }
+
+  /// 텍스처를 전부 버린다. 맵을 다시 생성했을 때 부른다.
+  void clear() {
+    for (final b in _cache.values) {
+      b.image.dispose();
+    }
+    _cache.clear();
+  }
+}
+
+/// 구운 기물 하나 — 텍스처와 그것이 차지하는 국소 사각형.
+class BakedProp {
+  BakedProp(this.image, this.bounds);
+  final Image image;
+  final Rect bounds;
+}
+
+/// 구운 텍스처를 그릴 때 쓰는 붓. 매 프레임 새로 만들지 않는다.
+final Paint _bakedPaint = Paint()
+  ..isAntiAlias = true
+  ..filterQuality = FilterQuality.low;
 
 /// 맵 위 특정 타일에 놓인 기물 한 개.
 ///
@@ -89,6 +220,7 @@ void paintProp(
   LightRig light,
   double time, {
   double detail = 1.0,
+  PropCache? cache,
 }) {
   final anchor = iso.project(it.tile.dx, it.tile.dy);
   final s = it.scale;
@@ -101,7 +233,27 @@ void paintProp(
   } else {
     c.scale(s * (it.facesLeft ? -1 : 1), s * iso.squash);
   }
-  it.prop.paint(c, time + it.timeOffset, light, detail: detail);
+
+  final tt = time + it.timeOffset;
+  final baked = cache?.of(it.prop, light, detail);
+  if (baked != null) {
+    // 형상은 구운 그대로, 움직임만 변환으로 얹는다. 텍스처가 국소 좌표계
+    // 안에서 재생되므로 접지점·좌우 반전·크기가 그대로 유지된다.
+    c.save();
+    it.prop.motion(c, tt);
+    final img = baked.image;
+    c.drawImageRect(
+      img,
+      Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
+      baked.bounds,
+      _bakedPaint,
+    );
+    c.restore();
+  } else {
+    it.prop.paint(c, tt, light, detail: detail);
+  }
+  // 살아 있는 한 겹은 구웠든 아니든 언제나 지금 그린다.
+  it.prop.live(c, tt, light, detail: detail);
   c.restore();
 }
 

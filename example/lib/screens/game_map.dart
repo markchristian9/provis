@@ -381,6 +381,10 @@ class FieldGame extends FlameGame with TapCallbacks {
     _pending.clear();
     _target = null;
     _scene.groundSeed = mapSeed;
+    // 구워 둔 기물 텍스처를 놓아 준다. 이걸 빠뜨리면 맵을 다시 생성할 때마다
+    // 못 쓰는 GPU 텍스처가 캐시 상한(160장)까지 쌓인다 — 새 기물은 새
+    // 인스턴스라 옛 항목에 다시 닿을 일이 없기 때문이다.
+    _scene.invalidateProps();
 
     // 맵 생성은 `world/village.dart` 에 있다. 게임과 테스트가 **같은 함수**를
     // 써야 "문 앞까지 걸어갈 수 있는가" 를 테스트가 검사할 수 있다.

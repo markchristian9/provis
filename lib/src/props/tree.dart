@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 
 import '../core/noise.dart';
@@ -169,6 +170,56 @@ class TreeProp extends Prop {
 
   @override
   bool get walkable => kind == TreeKind.bush;
+
+  // ── 굽기 ────────────────────────────────────────────────────────────────
+  //
+  // 나무는 이 씬에서 가장 비싼 기물이다. 잎 덩어리 여럿 × 다패스 셰이딩 ×
+  // 투과·림이라 그루당 6ms 가 들었고, 화면에 든 스물한 그루가 프레임의
+  // 87.5% 를 먹었다.
+  //
+  // 그런데 나무의 **형상은 고정이다.** 바뀌는 것은 바람뿐이고, 바람은
+  // `topX = (_lean + s) * trunkHeight` 로 들어간다 — 밑동은 제자리고 위로
+  // 갈수록 옆으로 밀리는 것, 즉 **밑동을 축으로 한 전단**이다. 그러니
+  // 형상은 한 번 구워 두고 전단만 매 프레임 걸면 그림이 그대로 재현된다.
+  //
+  // 잃는 것은 잎 덩어리마다 달랐던 위상차다. 150px 나무에서 그 차이는 몇
+  // 픽셀이고, 얻는 것은 60fps 다.
+
+  @override
+  bool get bakeable => true;
+
+  @override
+  Rect get bakeBounds {
+    // 넉넉하되 헤프지 않게. 투명한 여백은 그대로 오버드로가 되므로, 실제로
+    // 그리는 것의 크기에서 잡는다 — 수관 반지름 + 기운 양 + 삐져나온 잎.
+    final lean = (_lean.abs() + _maxSway) * trunkHeight;
+    final w = _canopyR * 1.22 + lean + _trunkR * 2.2;
+    // 접지 그림자는 `_canopyR * 0.66` 을 1.35배 늘여 그린다.
+    final shadow = _canopyR * 0.66 * 1.35 * 0.5 + _trunkR * 2;
+    return Rect.fromLTRB(
+        -math.max(w, shadow), -(height + _canopyR * 0.12), math.max(w, shadow),
+        _canopyR * 0.42 + _trunkR * 2);
+  }
+
+  /// 바람이 낼 수 있는 최대 전단량. [sway] 는 진폭 0.7 + 0.3 의 사인 합이다.
+  double get _maxSway => wind * 0.030;
+
+  @override
+  void motion(Canvas c, double t) {
+    // 구운 자세(t=0)로부터의 **차이**만 건다. 그래야 구운 그림이 기준이 된다.
+    final s = wind *
+        (sway(t, seed, speed: 0.85) - sway(0, seed, speed: 0.85)) *
+        0.030;
+    if (s.abs() < 1e-6) return;
+    // x' = x - s·y. y 는 위로 갈수록 음수이므로 꼭대기가 +s·trunkHeight 만큼
+    // 밀린다 — paint 의 topX 와 정확히 같은 값이다.
+    c.transform(Float64List.fromList(<double>[
+      1, 0, 0, 0, //
+      -s, 1, 0, 0, //
+      0, 0, 1, 0, //
+      0, 0, 0, 1, //
+    ]));
+  }
 
   @override
   void paint(Canvas c, double t, LightRig light, {double detail = 1.0}) {

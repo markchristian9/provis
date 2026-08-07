@@ -229,6 +229,16 @@ class PathPatch extends Prop {
   @override
   double get height => 2;
 
+  // 형상이 시간에 따라 바뀌지 않는다 — 한 번 굽고 재생만 한다.
+  @override
+  bool get bakeable => true;
+
+  @override
+  Rect get bakeBounds {
+    final w = tileWidth * (0.75 + width);
+    return Rect.fromLTRB(-w, -w, w, w);
+  }
+
   @override
   bool get walkable => true;
 

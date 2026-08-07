@@ -235,6 +235,20 @@ class BuildingProp extends Prop {
   @override
   double get height => _plinthH + _storeyH * storeys + _roofRise;
 
+  // 형상이 시간에 따라 바뀌지 않는다 — 한 번 굽고 재생만 한다.
+  @override
+  bool get bakeable => true;
+
+  @override
+  Rect get bakeBounds {
+    // 아이소 마름모의 가로 반폭은 (w+h)/2 × 타일폭/2 이고, 처마가 조금 더
+    // 나온다. 아래로는 마름모의 앞 꼭짓점과 드리운 그림자가 퍼진다.
+    final halfW = (tiles.width + tiles.height) * tileWidth * 0.25 + tileWidth * 0.5;
+    final down = (tiles.width + tiles.height) * tileWidth * isoRatio * 0.25 +
+        tileWidth * 0.35;
+    return Rect.fromLTRB(-halfW, -(height + tileWidth * 0.35), halfW, down);
+  }
+
   @override
   bool get walkable => false;
 
@@ -1144,22 +1158,38 @@ class BuildingProp extends Prop {
         detail: detail * 0.5, seed: seed + 52);
     topPlane(c, capTop, l, strength: 0.8, elevationSin: isoRatio);
 
+    // 연기는 굽지 않는다. 형상은 고정인데 연기만 움직이므로, 그 하나 때문에
+    // 건물 전체를 매 프레임 다시 그리면 손해다. 자리만 기억해 두고 [live] 가
+    // 텍스처 위에 얹는다.
+    _smokeAt = at;
+    _smokeW = w;
+    _smokeH = h;
+  }
+
+  Offset? _smokeAt;
+  double _smokeW = 0;
+  double _smokeH = 0;
+
+  @override
+  void live(Canvas c, double t, LightRig light, {double detail = 1.0}) {
     // 연기 — 굴뚝이 살아 있다는 유일한 신호.
-    if (detail > 0.6) {
-      final smoke = Paint()..isAntiAlias = true;
-      for (var i = 0; i < 5; i++) {
-        final phase = (t * 0.16 + i * 0.2) % 1.0;
-        final rad = w * (0.5 + phase * 1.9);
-        final at2 = Offset(
-          at.dx + math.sin(t * 0.6 + i * 1.4) * w * (0.4 + phase),
-          at.dy - h - phase * h * 2.2,
-        );
-        smoke.color = l.ambient
-            .mix(const Color(0xFFBFC8DA), 0.55)
-            .fade(0.22 * (1 - phase));
-        smoke.maskFilter = MaskFilter.blur(BlurStyle.normal, rad * 0.5);
-        c.drawCircle(at2, rad, smoke);
-      }
+    final at = _smokeAt;
+    if (at == null || detail <= 0.6) return;
+    final w = _smokeW, h = _smokeH;
+    final smoke = Paint()..isAntiAlias = true;
+    for (var i = 0; i < 5; i++) {
+      final phase = (t * 0.16 + i * 0.2) % 1.0;
+      final rad = w * (0.5 + phase * 1.9);
+      final at2 = Offset(
+        at.dx + math.sin(t * 0.6 + i * 1.4) * w * (0.4 + phase),
+        at.dy - h - phase * h * 2.2,
+      );
+      smoke.color = light
+          .ambient
+          .mix(const Color(0xFFBFC8DA), 0.55)
+          .fade(0.22 * (1 - phase));
+      smoke.maskFilter = MaskFilter.blur(BlurStyle.normal, rad * 0.5);
+      c.drawCircle(at2, rad, smoke);
     }
   }
 
@@ -1295,9 +1325,23 @@ class WallProp extends Prop {
 
   @override
   double get height => wallHeight;
-
   @override
   bool get walkable => false;
+
+  /// 담은 시간을 전혀 쓰지 않는다 — 구워도 그림이 한 픽셀도 달라지지 않는다.
+  ///
+  /// 실측에서 담장 20장이 프레임당 31.7 ms 를 먹었다(나무 다음으로 큰 항목).
+  /// 마을 경계를 두르느라 개수가 많아진 탓이라 개당 비용을 없애는 편이 옳다.
+  @override
+  bool get bakeable => true;
+
+  /// 담은 **옆으로 길다.** 기본 경계는 높이에서 상자를 잡으므로 진행 방향
+  /// 끝이 잘린다 — 타일 폭까지 넉넉히 넓힌다.
+  @override
+  Rect get bakeBounds {
+    final w = tileWidth * 0.75;
+    return Rect.fromLTRB(-w, -wallHeight * 1.35, w, tileWidth * 0.45);
+  }
 
   double get _planeK {
     final squash = math.sqrt(1 - isoRatio * isoRatio);

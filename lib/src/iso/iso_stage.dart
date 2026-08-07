@@ -125,6 +125,10 @@ void paintIsoActors(
 ///    3D 감각 개선이 가장 큰 한 겹이다.
 ///
 /// [lineAlpha] 를 0 으로 주면 격자선 없이 땅만 그린다 — 인게임 기본값이다.
+///
+/// [visible] 은 지금 화면에 들어오는 영역(이 캔버스와 같은 좌표계)이다. 주면
+/// 그 밖의 얼룩을 그리지 않는다 — 맵이 40×34 로 커지면 얼룩이 수백 개가 되고,
+/// 그 대부분은 화면 밖이다. 안 주면 전부 그린다.
 void paintIsoGround(
   Canvas c,
   IsoView iso,
@@ -137,6 +141,7 @@ void paintIsoGround(
   int seed = 7,
   double detail = 1.0,
   double skirt = 0.55,
+  Rect? visible,
 }) {
   // 땅에는 땅의 고유색이 있다. 환경광을 베이스로 삼으면 지면이 그 시각의
   // 하늘색을 뒤집어써 회보라 장판이 되고, 그 위에 선 모든 것이 떠 보인다.
@@ -227,40 +232,59 @@ void paintIsoGround(
   );
 
   // ── 얼룩 두 층. 타일 경계와 무관하게 번져야 땅이 된다.
+  //
+  // **크기의 기준은 타일이지 필드가 아니다.** 예전에는 필드의 긴 변에
+  // 비례시켰는데, 그러면 맵을 8×8 에서 40×34 로 키우는 순간 얼룩 하나가
+  // 반지름 800px 짜리 블러가 된다. 실측에서 이 한 겹이 지면 래스터의
+  // 거의 전부(36.9ms/프레임)였다. 그림으로도 틀렸다 — 그 크기는 땅의
+  // 결이 아니라 화면을 가로지르는 거대한 얼룩 하나다.
+  //
+  // 개수는 넓이에 비례시켜 밀도를 일정하게 유지한다. 맵이 커지면 얼룩이
+  // 커지는 것이 아니라 많아져야 한다.
   if (detail > 0.25) {
     final r = Rng(seed * 31 + 5);
-    final paint = Paint()..isAntiAlias = true;
-    final span = math.max(fb.width, fb.height);
-    for (var i = 0; i < 9; i++) {
-      final p = Offset(
-        fb.left + r.unit * fb.width,
-        fb.top + r.unit * fb.height,
-      );
-      final s = span * r.range(0.10, 0.26);
-      paint
-        ..color = (r.chance(0.45) ? dirt : ground.darken(0.14))
-            .fade(r.range(0.10, 0.24))
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, s * 0.55);
-      c.drawOval(
-        Rect.fromCenter(center: p, width: s * 2.4, height: s * 1.2),
-        paint,
-      );
+    final unit = iso.tileWidth;
+    final tiles = cols * rows;
+
+    /// 얼룩 한 층.
+    ///
+    /// 블러는 **하나에 하나씩** 태운다. 흩어진 얼룩을 한 [Path] 에 모아 한 번에
+    /// 태우고 싶어지지만(그것이 나무 수관에서는 옳다) 여기서는 정반대다 —
+    /// 맵 전체에 흩어진 타원의 합집합은 필드 전체를 덮으므로, 블러 한 번이
+    /// 5550×2775 영역에 걸린다. 실측에서 그 "최적화"가 21fps 를 14fps 로
+    /// 떨어뜨렸다. 모아서 태우는 규칙은 **점들이 한 파츠 안에 모여 있을 때**만
+    /// 맞는다.
+    ///
+    /// 대신 [visible] 밖의 얼룩은 아예 그리지 않는다. 맵이 커져도 비용이
+    /// 화면 크기에 묶인다.
+    void layer(int count, double lo, double hi, double blurK, Color a, Color b,
+        double alpha) {
+      final paint = Paint()..isAntiAlias = true;
+      for (var i = 0; i < count; i++) {
+        final at = Offset(
+          fb.left + r.unit * fb.width,
+          fb.top + r.unit * fb.height,
+        );
+        final s = unit * r.range(lo, hi);
+        final box = Rect.fromCenter(center: at, width: s * 2.4, height: s * 1.2);
+        // 시드 소비는 컬링과 무관해야 한다 — 그래야 카메라가 움직여도
+        // 같은 자리에 같은 얼룩이 남는다. 그래서 뽑기는 끝낸 뒤 거른다.
+        if (visible != null && !visible.overlaps(box.inflate(s * blurK * 2))) {
+          continue;
+        }
+        paint
+          ..color = (r.chance(0.5) ? a : b).fade(alpha)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, s * blurK);
+        c.drawOval(box, paint);
+      }
     }
-    for (var i = 0; i < 14; i++) {
-      final p = Offset(
-        fb.left + r.unit * fb.width,
-        fb.top + r.unit * fb.height,
-      );
-      final s = span * r.range(0.02, 0.06);
-      paint
-        ..color = (r.chance(0.5) ? ground.lighten(0.14) : ground.darken(0.20))
-            .fade(0.18)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, s * 0.7);
-      c.drawOval(
-        Rect.fromCenter(center: p, width: s * 2.6, height: s * 1.3),
-        paint,
-      );
-    }
+
+    // 개수는 넓이에 비례시켜 밀도를 일정하게 유지한다. 맵이 커지면 얼룩이
+    // 커지는 것이 아니라 많아져야 한다.
+    layer((tiles * 0.035).round().clamp(6, 70), 0.85, 2.1, 0.42, dirt,
+        ground.darken(0.14), 0.17);
+    layer((tiles * 0.09).round().clamp(10, 170), 0.18, 0.46, 0.55,
+        ground.darken(0.20), ground.lighten(0.14), 0.18);
   }
   c.restore();
 
