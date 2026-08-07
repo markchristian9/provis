@@ -429,6 +429,20 @@ class HumanoidRenderer {
         seed: spec.seed);
     paintTopPlane(canvas, torso, light, iso, strength: 0.3);
 
+    // ── 재질별 매크로 텍스처 ─────────────────────────────────────────────
+    //
+    // 그라디언트 셰이딩만으로는 몸통이 "매끈한 관"이다. 재질마다 그 재질임을
+    // 알리는 반복 단위·주름·경계가 한 겹 얹혀야 옷과 갑옷이 된다. 전부
+    // 획과 채움뿐이다 — 매 프레임 도는 코드에 블러·Path.combine 을 넣으면
+    // 래스터 예산이 무너진다는 것을 실측으로 배웠다.
+    if (beast) {
+      _hide(canvas, torso, sk, light, q);
+    } else if (spec.armorHeaviness <= 0.2 && q > 0.45) {
+      _clothFolds(canvas, torso, sk, q);
+    } else if (spec.armorHeaviness <= 0.45 && q > 0.45) {
+      _leatherStrap(canvas, torso, sk, light, q);
+    }
+
     // 등가시. 짐승형의 실루엣 상단을 지배하는 파츠라 아이소에서 가장 먼저
     // 읽힌다.
     if (beast) {
@@ -461,6 +475,70 @@ class HumanoidRenderer {
       paintTopPlane(canvas, chest, light, iso, strength: 0.42);
       if (spec.trimAccent) {
         trimBand(canvas, chest, pal.accent, light, width: 1.6, alpha: 0.6);
+      }
+
+      // 판금의 패널 경계. 홈이 어둡고 그 위 모서리가 밝은 짝([panelLine])이
+      // 있어야 한 장짜리 통조림이 아니라 조각을 이어 붙인 갑옷으로 읽힌다.
+      if (q > 0.5) {
+        final up = (sk.chest - sk.waist).normalized();
+        final side = up.perp;
+        final ramp = _plate.ramp;
+        canvas.save();
+        canvas.clipPath(chest);
+        // 가슴 중앙의 세로 능선.
+        panelLine(
+          canvas,
+          smoothOpenPath([
+            lerpO(sk.waist, sk.chest, 0.30),
+            lerpO(sk.waist, sk.chest, 0.66) + side * _chestW * 0.02,
+            sk.chest + up * _h * 0.012,
+          ]),
+          ramp,
+          light,
+          width: math.max(1.0, _h * 0.0055),
+          alpha: 0.8,
+        );
+        // 흉갑과 복부판을 가르는 가로 이음선.
+        panelLine(
+          canvas,
+          smoothOpenPath([
+            lerpO(sk.waist, sk.chest, 0.42) - side * _chestW * 0.30,
+            lerpO(sk.waist, sk.chest, 0.52),
+            lerpO(sk.waist, sk.chest, 0.42) + side * _chestW * 0.30,
+          ]),
+          ramp,
+          light,
+          width: math.max(0.8, _h * 0.0045),
+          alpha: 0.6,
+        );
+        canvas.restore();
+      }
+
+      // 흉갑 아래로 드러나는 사슬 자락. 판 사이에 다른 재질이 비쳐야 갑옷이
+      // "입은 것"이 된다. 고리는 점 두 개(테두리·반짝임)로 찍는다 — 블러도
+      // saveLayer 도 없어 개수가 많아도 싸다.
+      if (q > 0.6) {
+        final up = (sk.waist - sk.pelvis).normalized();
+        final side = up.perp;
+        canvas.save();
+        canvas.clipPath(torso);
+        final rr = _waistW * 0.045;
+        final ring = Paint()
+          ..isAntiAlias = true
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(0.6, _h * 0.0016)
+          ..color = pal.metal.darken(0.30).fade(0.7);
+        final glint = Paint()..color = pal.metal.lighten(0.25).fade(0.45);
+        for (var row = 0; row < 3; row++) {
+          final base = lerpO(sk.pelvis, sk.waist, 0.60 - row * 0.21);
+          final stagger = row.isOdd ? rr * 0.95 : 0.0;
+          for (var i = -3; i <= 3; i++) {
+            final at = base + side * (rr * 1.9 * i + stagger);
+            canvas.drawCircle(at, rr, ring);
+            canvas.drawCircle(at - light.dir * rr * 0.4, rr * 0.26, glint);
+          }
+        }
+        canvas.restore();
       }
     }
 

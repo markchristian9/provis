@@ -1,3 +1,6 @@
+@Tags(['sheets'])
+library;
+
 import 'dart:io';
 import 'dart:ui' as ui;
 

@@ -55,13 +55,16 @@ flutter analyze && (cd example && flutter analyze)
 flutter test && (cd example && flutter test)
 ```
 
-세 테스트가 이 영역의 불변식을 지킨다.
+네 테스트가 이 영역의 불변식을 지킨다.
 
 | 테스트 | 무엇을 막는가 |
 |---|---|
+| `test/pc_skill_contract_test.dart` | **이 문서가 낡는 것** — 아래 규칙들의 수치·계약을 코드에 못 박는다 |
 | `test/anim_timing_test.dart` | 2배속 재생 · 프레임률 의존 · 전환 시 포즈 튐 · 발 미끄러짐 · 이벤트 중복/누락 |
 | `example/test/widget_test.dart` | 커브의 NaN(파츠가 통째로 사라진다) · 관절 역굽힘 |
 | `example/test/snapshot_test.dart` | 전 클립 × 4시점 시트 — 눈으로 대조 |
+
+**`pc_skill_contract_test.dart` 가 깨졌다면 대개 회귀가 아니라 이 문서를 갱신하라는 신호다.** 문서는 코드를 읽고 쓰지만 코드가 바뀔 때 조용히 틀린 말이 되고, **틀린 문서는 없는 문서보다 나쁘다** — 읽는 쪽이 그것을 믿고 배선하기 때문이다. 실제로 이 문서를 쓰는 도중에 애니메이션 API 가 바뀌어 "`progress` 로 판정하라"던 설명이 한 시간 만에 낡았다. 실패 메시지의 `reason` 이 어느 규칙을 고쳐야 하는지 알려 준다.
 
 ---
 

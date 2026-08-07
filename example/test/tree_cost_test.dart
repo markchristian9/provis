@@ -1,3 +1,6 @@
+@Tags(['sheets'])
+library;
+
 // 나무 한 그루의 비용 — 크기에 따라 어떻게 변하는가.
 //
 // 실측(`bench.dart`, PROVIS_PROFILE=true)에서 `TreeProp` 이 씬 빌드 시간의

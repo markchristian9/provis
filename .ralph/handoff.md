@@ -135,6 +135,59 @@ Remaining raster cost is overdraw from things still shaded live every frame:
 3. `WaterProp`, `GroundPatch`, `MoundProp`, `GrassTuft`, `FlowerBed` animate and so are
    unbaked; they are individually cheap but numerous.
 
+## 7b. Open defect found while profiling — baked props are half-resolution
+
+`PropCache.pixelRatio` defaults to `1.0` and **no caller ever sets it**. The bench
+reports `dpr 2.0`, so every baked prop — trees, walls, fences, buildings, i.e. all the
+map's static geometry — is a 1× texture magnified 2× on screen. This is a real visual
+regression introduced by the baking optimisation, and `bake_fidelity_test.dart` cannot
+catch it because the test renderer runs at dpr 1.
+
+**Raising `pixelRatio` naively will crop large props.** `_bake` does:
+
+```dart
+final w = (b.width * pixelRatio).ceil().clamp(1, 2048);   // clamped
+c.scale(pixelRatio);                                       // NOT clamped
+```
+
+The canvas is scaled by the full ratio while the image is capped, so anything larger
+than `2048/pixelRatio` loses its edges. Measured bake bounds at 1×:
+
+| prop | 1× | 2× | over 2048 cap |
+|---|---|---|---|
+| barn 9×6 | 1191×1394 | 2382×2789 | yes, both axes |
+| hall 7×8 | 1191×1394 | 2382×2789 | yes, both axes |
+| cottage 5×6 | 891×1308 | 1782×2616 | yes, height |
+
+Fix both together: derive the effective scale from the cap rather than assuming it,
+
+```dart
+final k = math.min(pixelRatio,
+    math.min(2048 / b.width, 2048 / b.height));
+final w = (b.width * k).ceil(); final h = (b.height * k).ceil();
+c.scale(k);
+```
+
+then set `pixelRatio` from `PlatformDispatcher.instance.implicitView?.devicePixelRatio`
+(dispose the previous cache when replacing it). Note texture memory grows 4× at 2×.
+
+## 7c. Test suite is now green and fast
+
+The four long-standing PNG-baker failures were not regressions — they are documentation
+and measurement tools that exceed the 10-minute per-test timeout and took the harness
+down with them. A permanently-red suite means nobody can tell a real regression from a
+slow one, which is how this repo was operating.
+
+Added `example/dart_test.yaml` and tagged every image/perf baker `sheets`, skipped by
+default:
+
+```bash
+flutter test                               # verification only — 44 pass, 11 skipped, 10 s
+flutter test --run-skipped --tags sheets   # bakers — images and measurements
+```
+
+Before: 31 pass / 4 fail / ~14 min. After: **44 pass / 0 fail / 10 s.**
+
 ## 8. Screenshots
 
 `example/build/scale/` (regenerate with `flutter test test/scale_shot_test.dart`):
