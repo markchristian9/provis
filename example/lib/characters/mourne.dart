@@ -25,25 +25,26 @@ class Mourne extends Artist {
   Sex? get sex => null;
   @override
   CharacterBuild get build => CharacterBuild(
-        archetype: Archetype.mage,
-        beast: true,
-        palette: tintedPalette(const Color(0xFF8FE4FF), Rng(0x3E11), monster: true),
-        weapon: WeaponKind.staff,
-        armorHeaviness: 0.0,
-        muscle: 0.15,
-        glowRunes: true,
-        heightScale: 1.1,
-      );
+    archetype: Archetype.mage,
+    beast: true,
+    beastForm: BeastForm.wraith,
+    palette: tintedPalette(const Color(0xFF8FE4FF), Rng(0x3E11), monster: true),
+    weapon: WeaponKind.staff,
+    armorHeaviness: 0.0,
+    muscle: 0.15,
+    glowRunes: true,
+    heightScale: 1.1,
+  );
   @override
   Color get accent => const Color(0xFF8FE4FF);
   @override
   LightRig get light => LightRig.spectral;
   @override
   List<Color> get moodSky => const [
-        Color(0xFF060A14),
-        Color(0xFF11223A),
-        Color(0xFF244A5E),
-      ];
+    Color(0xFF060A14),
+    Color(0xFF11223A),
+    Color(0xFF244A5E),
+  ];
 
   static const _ecto = Color(0xFF5FA8CC);
   static const _ectoDeep = Color(0xFF2E5E80);
@@ -58,8 +59,7 @@ class Mourne extends Artist {
   Surface get _sEctoDeep =>
       const Surface(_ectoDeep, Finish.slime, contrast: 1.15, alpha: 0.55);
   Surface get _sRag => const Surface(_rag, Finish.cloth, contrast: 1.25);
-  Surface get _sRagDeep =>
-      const Surface(_ragDeep, Finish.cloth, contrast: 1.3);
+  Surface get _sRagDeep => const Surface(_ragDeep, Finish.cloth, contrast: 1.3);
   Surface get _sBone => const Surface(_bone, Finish.bone, contrast: 1.05);
 
   Ramp get _rRag => Ramp.of(_rag, contrast: 1.25);
@@ -206,10 +206,22 @@ class Mourne extends Artist {
         flutter: 1.2,
       );
       final w = 58.0 - (u - 0.5).abs() * 40;
-      final rag = tube(spine, [w, w * 1.05, w * 0.92, w * 0.7, w * 0.4, 6],
-          samples: 24);
-      paintSurface(c, rag, i.isOdd ? _sRagDeep : _sRag, l,
-          detail: detail * 0.6, seed: 801 + i);
+      final rag = tube(spine, [
+        w,
+        w * 1.05,
+        w * 0.92,
+        w * 0.7,
+        w * 0.4,
+        6,
+      ], samples: 24);
+      paintSurface(
+        c,
+        rag,
+        i.isOdd ? _sRagDeep : _sRag,
+        l,
+        detail: detail * 0.6,
+        seed: 801 + i,
+      );
       rimBand(c, rag, l, width: 4, alpha: 0.45, color: _soul);
     }
 
@@ -355,20 +367,30 @@ class Mourne extends Artist {
   }
 
   void _armLeft(Canvas c, LightRig l, double t, double bob, double detail) =>
-      _arm(c, l, t, detail,
-          shoulder: Offset(392, 560 + bob),
-          elbow: const Offset(250, 652),
-          wrist: const Offset(168, 556),
-          mirrored: false,
-          seed: 831);
+      _arm(
+        c,
+        l,
+        t,
+        detail,
+        shoulder: Offset(392, 560 + bob),
+        elbow: const Offset(250, 652),
+        wrist: const Offset(168, 556),
+        mirrored: false,
+        seed: 831,
+      );
 
   void _armRight(Canvas c, LightRig l, double t, double bob, double detail) =>
-      _arm(c, l, t, detail,
-          shoulder: Offset(608, 556 + bob),
-          elbow: const Offset(752, 644),
-          wrist: const Offset(834, 542),
-          mirrored: true,
-          seed: 841);
+      _arm(
+        c,
+        l,
+        t,
+        detail,
+        shoulder: Offset(608, 556 + bob),
+        elbow: const Offset(752, 644),
+        wrist: const Offset(834, 542),
+        mirrored: true,
+        seed: 841,
+      );
 
   void _arm(
     Canvas c,
@@ -421,11 +443,24 @@ class Mourne extends Artist {
         const [9, 7.5, 5, 1.5],
         samples: 16,
       );
-      paintSurface(c, finger, _sEcto, l, detail: 0.3, ao: false, seed: seed + 3);
+      paintSurface(
+        c,
+        finger,
+        _sEcto,
+        l,
+        detail: 0.3,
+        ao: false,
+        seed: seed + 3,
+      );
       glowAt(c, tip, 14, _soul, intensity: 0.4);
     }
-    final palm = blob(wrist + dir * 12, 22, 18,
-        rotation: dir.angle, warp: (a, u) => 1 + math.cos(a * 2) * 0.12);
+    final palm = blob(
+      wrist + dir * 12,
+      22,
+      18,
+      rotation: dir.angle,
+      warp: (a, u) => 1 + math.cos(a * 2) * 0.12,
+    );
     paintSurface(c, palm, _sEcto, l, detail: detail, seed: seed + 4);
 
     rimBand(c, sleeve, l, width: 5, alpha: 0.6, color: _soul);

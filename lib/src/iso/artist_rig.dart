@@ -3,7 +3,6 @@ import 'dart:ui';
 import '../actor/humanoid_renderer.dart';
 import '../art/creature.dart';
 import '../core/rng.dart';
-import '../rig/body.dart';
 import 'iso_stage.dart';
 import 'iso_view.dart';
 
@@ -41,10 +40,9 @@ RiggedIsoActor riggedFromArtist(
   return RiggedIsoActor(
     renderer: HumanoidRenderer(
       spec,
-      body: beast
-          ? Body.beast(Rng(spec.seed ^ 0x5EED), height: spec.height * 1.1)
-          : null,
+      body: build.bodyFor(spec),
       beast: beast,
+      beastForm: build.beastForm,
     ),
     tile: tile,
     height: height,

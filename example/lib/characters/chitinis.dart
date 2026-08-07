@@ -29,32 +29,33 @@ class Chitinis extends Artist {
   Sex? get sex => null;
   @override
   CharacterBuild get build => CharacterBuild(
-        archetype: Archetype.assassin,
-        beast: true,
-        palette: tintedPalette(const Color(0xFF8DFF4E), Rng(0xC417), monster: true),
-        weapon: WeaponKind.daggers,
-        armorHeaviness: 0.7,
-        muscle: 0.6,
-        glowRunes: true,
-      );
+    archetype: Archetype.assassin,
+    beast: true,
+    beastForm: BeastForm.arachnid,
+    palette: tintedPalette(const Color(0xFF8DFF4E), Rng(0xC417), monster: true),
+    weapon: WeaponKind.daggers,
+    armorHeaviness: 0.7,
+    muscle: 0.6,
+    glowRunes: true,
+  );
   @override
   Color get accent => const Color(0xFF8DFF4E);
   @override
   LightRig get light => const LightRig(
-        dir: Offset(-0.56, -0.83),
-        rimDir: Offset(0.78, -0.62),
-        key: Color(0xFFD8E4FF),
-        fill: Color(0xFF2A3A5C),
-        rim: Color(0xFF9CFF6A),
-        bounce: Color(0xFF3E7A2A),
-        ambient: Color(0xFF101424),
-      );
+    dir: Offset(-0.56, -0.83),
+    rimDir: Offset(0.78, -0.62),
+    key: Color(0xFFD8E4FF),
+    fill: Color(0xFF2A3A5C),
+    rim: Color(0xFF9CFF6A),
+    bounce: Color(0xFF3E7A2A),
+    ambient: Color(0xFF101424),
+  );
   @override
   List<Color> get moodSky => const [
-        Color(0xFF080B14),
-        Color(0xFF1A1430),
-        Color(0xFF2A4A22),
-      ];
+    Color(0xFF080B14),
+    Color(0xFF1A1430),
+    Color(0xFF2A4A22),
+  ];
 
   static const _shell = Color(0xFF2E2142);
   static const _shellDark = Color(0xFF1B1329);
@@ -66,8 +67,8 @@ class Chitinis extends Artist {
   Surface get _sShell => const Surface(_shell, Finish.chitin, contrast: 1.35);
   Surface get _sShellDark =>
       const Surface(_shellDark, Finish.chitin, contrast: 1.4);
-  Surface get _sJoint => const Surface(_joint, Finish.slime,
-      contrast: 1.1, alpha: 0.95);
+  Surface get _sJoint =>
+      const Surface(_joint, Finish.slime, contrast: 1.1, alpha: 0.95);
   Surface get _sFang => const Surface(_fang, Finish.chitin, contrast: 1.45);
 
   Ramp get _rShell => Ramp.of(_shell, contrast: 1.35);
@@ -172,8 +173,12 @@ class Chitinis extends Artist {
     paintSurface(c, tibia, surf, l, detail: detail, seed: 905);
 
     // 무릎 관절구.
-    final ball = blob(knee, thick * 0.9, thick * 0.82,
-        warp: (a, u) => 1 + math.cos(a * 2) * 0.1);
+    final ball = blob(
+      knee,
+      thick * 0.9,
+      thick * 0.82,
+      warp: (a, u) => 1 + math.cos(a * 2) * 0.1,
+    );
     paintSurface(c, ball, _sJoint, l, detail: detail, seed: 907);
     rimBand(c, ball, l, width: 3, alpha: 0.6, color: _venom);
 
@@ -249,14 +254,17 @@ class Chitinis extends Artist {
       170,
       Paint()
         ..blendMode = BlendMode.plus
-        ..shader = RadialGradient(
-          colors: [
-            _venom.fade(0.42 * pulse),
-            _venom.darken(0.4).fade(0.16 * pulse),
-            _venom.fade(0.0),
-          ],
-          stops: const [0.0, 0.5, 1.0],
-        ).createShader(Rect.fromCircle(center: at + const Offset(30, 40), radius: 170)),
+        ..shader =
+            RadialGradient(
+              colors: [
+                _venom.fade(0.42 * pulse),
+                _venom.darken(0.4).fade(0.16 * pulse),
+                _venom.fade(0.0),
+              ],
+              stops: const [0.0, 0.5, 1.0],
+            ).createShader(
+              Rect.fromCircle(center: at + const Offset(30, 40), radius: 170),
+            ),
     );
     // 껍질의 판 분할과 그 사이로 새는 빛.
     for (var i = 0; i < 5; i++) {
@@ -368,34 +376,47 @@ class Chitinis extends Artist {
     for (final leg in _legs) {
       final p = leg.$1 + Offset(sway, rise);
       final socket = blob(p, leg.$4 * 1.35, leg.$4 * 1.1);
-      paintSurface(c, socket, _sJoint, l, detail: detail, rim: false, seed: 923);
+      paintSurface(
+        c,
+        socket,
+        _sJoint,
+        l,
+        detail: detail,
+        rim: false,
+        seed: 923,
+      );
     }
 
     rimBand(c, shell, l, width: 6, alpha: 0.65, color: _venom);
   }
 
   /// 낫처럼 치켜든 포획 앞다리.
-  void _scythe(Canvas c, LightRig l, double t, double detail,
-      {required bool mirror}) {
+  void _scythe(
+    Canvas c,
+    LightRig l,
+    double t,
+    double detail, {
+    required bool mirror,
+  }) {
     final k = mirror ? 1.0 : -1.0;
     final twitch = math.sin(t * 1.6 + (mirror ? 1.4 : 0)) * 9;
     final base = Offset(mirror ? 384 : 336, mirror ? 790 : 816);
-    final elbow = Offset(
-      base.dx + k * 40 - 60,
-      base.dy - 210 + twitch,
-    );
-    final tip = Offset(
-      elbow.dx + k * 150 - 40,
-      elbow.dy - 190 - twitch * 0.6,
-    );
+    final elbow = Offset(base.dx + k * 40 - 60, base.dy - 210 + twitch);
+    final tip = Offset(elbow.dx + k * 150 - 40, elbow.dy - 190 - twitch * 0.6);
 
     final upper = tube(
       [base, lerpO(base, elbow, 0.5), elbow],
       const [34, 27, 21],
       samples: 16,
     );
-    paintSurface(c, upper, mirror ? _sShell : _sShellDark, l,
-        detail: detail, seed: 931);
+    paintSurface(
+      c,
+      upper,
+      mirror ? _sShell : _sShellDark,
+      l,
+      detail: detail,
+      seed: 931,
+    );
 
     final joint = blob(elbow, 26, 23);
     paintSurface(c, joint, _sJoint, l, detail: detail, seed: 933);
@@ -447,8 +468,14 @@ class Chitinis extends Artist {
     }
   }
 
-  void _head(Canvas c, LightRig l, double t, double sway, double rise,
-      double detail) {
+  void _head(
+    Canvas c,
+    LightRig l,
+    double t,
+    double sway,
+    double rise,
+    double detail,
+  ) {
     final hc = Offset(284 + sway * 1.4, 846 + rise * 0.8);
 
     // 두흉부 앞쪽. 눈이 박히는 판.

@@ -29,24 +29,25 @@ class Vaelmorth extends Artist {
   Sex? get sex => null;
   @override
   CharacterBuild get build => CharacterBuild(
-        archetype: Archetype.berserker,
-        beast: true,
-        palette: tintedPalette(const Color(0xFFFF6A1E), Rng(0x7AE1), monster: true),
-        weapon: WeaponKind.greatsword,
-        muscle: 1.0,
-        glowRunes: true,
-        heightScale: 1.35,
-      );
+    archetype: Archetype.berserker,
+    beast: true,
+    beastForm: BeastForm.drake,
+    palette: tintedPalette(const Color(0xFFFF6A1E), Rng(0x7AE1), monster: true),
+    weapon: WeaponKind.greatsword,
+    muscle: 1.0,
+    glowRunes: true,
+    heightScale: 1.35,
+  );
   @override
   Color get accent => const Color(0xFFFF6A1E);
   @override
   LightRig get light => LightRig.infernal;
   @override
   List<Color> get moodSky => const [
-        Color(0xFF160A0C),
-        Color(0xFF3E1512),
-        Color(0xFF8A2C0E),
-      ];
+    Color(0xFF160A0C),
+    Color(0xFF3E1512),
+    Color(0xFF8A2C0E),
+  ];
 
   static const _scale = Color(0xFF4E252A);
   static const _scaleDark = Color(0xFF2E1519);
@@ -61,8 +62,13 @@ class Vaelmorth extends Artist {
       const Surface(_scaleDark, Finish.scale, contrast: 1.3);
   Surface get _sBelly => const Surface(_belly, Finish.scale, contrast: 1.0);
   Surface get _sHorn => const Surface(_horn, Finish.chitin, contrast: 1.4);
-  Surface get _sMembrane => const Surface(_membrane, Finish.membrane,
-      contrast: 1.1, sss: Color(0xFFFF9A4C), alpha: 0.94);
+  Surface get _sMembrane => const Surface(
+    _membrane,
+    Finish.membrane,
+    contrast: 1.1,
+    sss: Color(0xFFFF9A4C),
+    alpha: 0.94,
+  );
 
   Ramp get _rScale => Ramp.of(_scale, contrast: 1.25);
   Ramp get _rBelly => Ramp.of(_belly);
@@ -80,9 +86,7 @@ class Vaelmorth extends Artist {
     Offset(926, 1168),
     Offset(958, 1288),
   ];
-  static const _spineR = <double>[
-    36, 48, 72, 112, 132, 116, 82, 52, 28, 9,
-  ];
+  static const _spineR = <double>[36, 48, 72, 112, 132, 116, 82, 52, 28, 9];
 
   @override
   void paint(Canvas c, double t, {double detail = 1.0}) {
@@ -270,9 +274,11 @@ class Vaelmorth extends Artist {
       final pts = <Offset>[];
       for (var k = 0; k <= 5; k++) {
         final v = k / 5;
-        pts.add(poly[i] +
-            d.perp * (r * (0.9 - v * 1.7)) +
-            d * (n.signed1(i * 2.1 + k * 3.3) * r * 0.35));
+        pts.add(
+          poly[i] +
+              d.perp * (r * (0.9 - v * 1.7)) +
+              d * (n.signed1(i * 2.1 + k * 3.3) * r * 0.35),
+        );
       }
       final crack = smoothOpenPath(pts);
       c.drawPath(
@@ -307,8 +313,13 @@ class Vaelmorth extends Artist {
   }
 
   /// 날개. 지골 사이의 막이 안쪽으로 오목하게 처지는 것이 핵심이다.
-  void _wing(Canvas c, LightRig l, double t, double detail,
-      {required bool back}) {
+  void _wing(
+    Canvas c,
+    LightRig l,
+    double t,
+    double detail, {
+    required bool back,
+  }) {
     final flap = math.sin(t * 0.55 + (back ? 0.6 : 0)) * 16;
     final k = back ? -1.0 : 1.0;
     final shoulder = Offset(back ? 612 : 548, (back ? 716 : 690) + flap * 0.2);
@@ -335,7 +346,13 @@ class Vaelmorth extends Artist {
     final membrane = smoothClosedPath(ring, tension: 0.75);
 
     if (!back) {
-      castShadow(c, membrane, offset: const Offset(20, 26), blur: 30, alpha: 0.4);
+      castShadow(
+        c,
+        membrane,
+        offset: const Offset(20, 26),
+        blur: 30,
+        alpha: 0.4,
+      );
     }
     final surf = back ? _sMembrane.withAlpha(0.72) : _sMembrane;
     paintSurface(c, membrane, surf, l, detail: detail, seed: back ? 711 : 713);
@@ -414,34 +431,48 @@ class Vaelmorth extends Artist {
     paintSurface(c, foreArm, boneS, l, detail: detail, seed: 723);
 
     if (!back) {
-      rimBand(c, membrane, l, width: 6, alpha: 0.5, color: const Color(0xFFFF9040));
-      rimBand(c, upperArm, l, width: 5, alpha: 0.6, color: const Color(0xFFFF9040));
+      rimBand(
+        c,
+        membrane,
+        l,
+        width: 6,
+        alpha: 0.5,
+        color: const Color(0xFFFF9040),
+      );
+      rimBand(
+        c,
+        upperArm,
+        l,
+        width: 5,
+        alpha: 0.6,
+        color: const Color(0xFFFF9040),
+      );
     }
   }
 
   void _legBack(Canvas c, LightRig l, double bob, double detail) => _leg(
-        c,
-        l,
-        detail,
-        hip: Offset(688, 872 + bob * 0.3),
-        knee: const Offset(772, 1018),
-        ankle: const Offset(716, 1174),
-        toe: const Offset(792, 1288),
-        surf: _sScaleDark,
-        seed: 731,
-      );
+    c,
+    l,
+    detail,
+    hip: Offset(688, 872 + bob * 0.3),
+    knee: const Offset(772, 1018),
+    ankle: const Offset(716, 1174),
+    toe: const Offset(792, 1288),
+    surf: _sScaleDark,
+    seed: 731,
+  );
 
   void _legFront(Canvas c, LightRig l, double bob, double detail) => _leg(
-        c,
-        l,
-        detail,
-        hip: Offset(560, 858 + bob * 0.4),
-        knee: const Offset(468, 1024),
-        ankle: const Offset(536, 1176),
-        toe: const Offset(452, 1292),
-        surf: _sScale,
-        seed: 741,
-      );
+    c,
+    l,
+    detail,
+    hip: Offset(560, 858 + bob * 0.4),
+    knee: const Offset(468, 1024),
+    ankle: const Offset(536, 1176),
+    toe: const Offset(452, 1292),
+    surf: _sScale,
+    seed: 741,
+  );
 
   /// 조족형 뒷다리. 무릎이 앞, 발목이 뒤로 꺾여 Z 자를 그린다.
   void _leg(
@@ -455,16 +486,37 @@ class Vaelmorth extends Artist {
     required Surface surf,
     required int seed,
   }) {
-    final thigh = limb(hip, lerpO(hip, knee, 0.5), knee,
-        r0: 92, r1: 66, r2: 44, swell: 1.14);
+    final thigh = limb(
+      hip,
+      lerpO(hip, knee, 0.5),
+      knee,
+      r0: 92,
+      r1: 66,
+      r2: 44,
+      swell: 1.14,
+    );
     paintSurface(c, thigh, surf, l, detail: detail, seed: seed);
 
-    final shank = limb(knee, lerpO(knee, ankle, 0.5), ankle,
-        r0: 44, r1: 36, r2: 26, swell: 1.1);
+    final shank = limb(
+      knee,
+      lerpO(knee, ankle, 0.5),
+      ankle,
+      r0: 44,
+      r1: 36,
+      r2: 26,
+      swell: 1.1,
+    );
     paintSurface(c, shank, surf, l, detail: detail, seed: seed + 1);
 
-    final foot = limb(ankle, lerpO(ankle, toe, 0.5), toe,
-        r0: 26, r1: 24, r2: 20, swell: 1.05);
+    final foot = limb(
+      ankle,
+      lerpO(ankle, toe, 0.5),
+      toe,
+      r0: 26,
+      r1: 24,
+      r2: 20,
+      swell: 1.05,
+    );
     paintSurface(c, foot, surf, l, detail: detail, seed: seed + 2);
 
     // 세 발가락과 발톱.
@@ -473,8 +525,11 @@ class Vaelmorth extends Artist {
       final a = (i - 1) * 0.42;
       final dir = d.rotated(a);
       final tip = toe + dir * (52 - (i - 1).abs() * 10);
-      final digit = tube([toe, lerpO(toe, tip, 0.5), tip], const [17, 13, 7],
-          samples: 12);
+      final digit = tube(
+        [toe, lerpO(toe, tip, 0.5), tip],
+        const [17, 13, 7],
+        samples: 12,
+      );
       paintSurface(c, digit, surf, l, detail: detail, seed: seed + 3 + i);
       final claw = smoothClosedPath([
         tip - dir.perp * 8,
@@ -499,8 +554,7 @@ class Vaelmorth extends Artist {
     for (var i = 0; i < 3; i++) {
       final dir = d.rotated((i - 1) * 0.5);
       final tip = wrist + dir * 40;
-      final digit =
-          tube([wrist, tip], [11.0 - i, 4], samples: 10);
+      final digit = tube([wrist, tip], [11.0 - i, 4], samples: 10);
       paintSurface(c, digit, _sScale, l, detail: 0.4, seed: 753 + i);
       final claw = smoothClosedPath([
         tip - dir.perp * 5,
@@ -566,8 +620,7 @@ class Vaelmorth extends Artist {
           ],
         ).createShader(maw.getBounds()),
     );
-    glowAt(c, base + const Offset(-70, 66), 90, _lava,
-        intensity: 0.45 * pulse);
+    glowAt(c, base + const Offset(-70, 66), 90, _lava, intensity: 0.45 * pulse);
 
     // 이빨. 위아래가 서로 어긋나게 물려 있어야 짐승답다.
     for (var i = 0; i < 7; i++) {
@@ -606,7 +659,11 @@ class Vaelmorth extends Artist {
     // 눈두덩 융기와 콧등의 능선.
     drawMuscleLine(
       c,
-      [base + const Offset(-140, 14), base + const Offset(-70, -6), base + const Offset(-4, -18)],
+      [
+        base + const Offset(-140, 14),
+        base + const Offset(-70, -6),
+        base + const Offset(-4, -18),
+      ],
       _rScale,
       width: 16,
       alpha: 0.45,
@@ -614,7 +671,8 @@ class Vaelmorth extends Artist {
     if (detail > 0.45) {
       final n = Noise(31);
       for (var i = 0; i < 30; i++) {
-        final p = base +
+        final p =
+            base +
             Offset(-170 + n.at1(i * 3.3) * 210, -40 + n.at1(i * 7.9) * 96);
         final s = 5 + n.at1(i * 5.1) * 7;
         c.drawPath(
@@ -636,10 +694,19 @@ class Vaelmorth extends Artist {
     // 콧구멍과 콧구멍에서 새는 연기빛.
     c.drawOval(
       Rect.fromCenter(
-          center: base + const Offset(-146, 18), width: 22, height: 13),
+        center: base + const Offset(-146, 18),
+        width: 22,
+        height: 13,
+      ),
       Paint()..color = const Color(0xFF160A0A).fade(0.9),
     );
-    glowAt(c, base + const Offset(-152, 16), 26, _lava, intensity: 0.32 * pulse);
+    glowAt(
+      c,
+      base + const Offset(-152, 16),
+      26,
+      _lava,
+      intensity: 0.32 * pulse,
+    );
 
     // 뿔: 뒤로 크게 뻗은 한 쌍 + 작은 곁뿔.
     for (final rec in const [
@@ -672,11 +739,7 @@ class Vaelmorth extends Artist {
     for (var i = 0; i < 4; i++) {
       final root = base + Offset(-10 + i * 14.0, 26 + i * 12);
       final dir = Offset(0.7, 0.5).rotated(i * 0.22);
-      final spine = tube(
-        [root, root + dir * 46],
-        [9.0 - i, 2],
-        samples: 10,
-      );
+      final spine = tube([root, root + dir * 46], [9.0 - i, 2], samples: 10);
       paintSurface(c, spine, _sHorn, l, detail: 0.3, seed: 773 + i);
     }
 
@@ -719,8 +782,11 @@ class Vaelmorth extends Artist {
       Paint()..color = const Color(0xFF120602),
     );
     c.restore();
-    c.drawCircle(eye + const Offset(-9, -8), 6,
-        Paint()..color = white.fade(0.85));
+    c.drawCircle(
+      eye + const Offset(-9, -8),
+      6,
+      Paint()..color = white.fade(0.85),
+    );
     c.drawPath(
       socket,
       Paint()

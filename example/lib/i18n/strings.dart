@@ -94,6 +94,39 @@ class Strings {
 
   String get regenerateMap => _pick('맵 다시 생성', 'Regenerate map');
 
+  // ── 게임오버 ───────────────────────────────────────────────────────────
+
+  String get defeatTitle => _pick('쓰러졌다', 'YOU FELL');
+
+  String defeatLine(String name) => _pick(
+        '$name 의 경야가 여기서 끝났다.',
+        "$name's vigil ends here.",
+      );
+
+  /// 이번 판의 성적. 0 마리도 성적이므로 따로 문구를 준다.
+  String defeatScore(int slain) => slain == 0
+      ? _pick('한 마리도 쓰러뜨리지 못했다', 'No quarry felled')
+      : _pick('쓰러뜨린 몬스터  $slain', 'Monsters felled  $slain');
+
+  String get retry => _pick('다시 도전', 'Try again');
+
+  // ── 오프닝 ─────────────────────────────────────────────────────────────
+
+  String get openingTitle => _pick('경야', 'THE VIGIL');
+
+  String get openingSubtitle => _pick(
+        '이미지 한 장 없이, 전부 코드로 그린 세계',
+        'A world drawn entirely in code — not one image file',
+      );
+
+  String get openingEnter => _pick('눌러서 시작', 'PRESS TO BEGIN');
+
+  /// 오프닝이 자기가 무엇인지 한 줄로 밝힌다.
+  String get openingCredit => _pick(
+        '캐릭터 · 몬스터 · 기물 · 지면 · 소리까지 실행 중에 생성된다',
+        'Characters, monsters, props, ground and sound — all generated at run time',
+      );
+
   // ── 소리 ───────────────────────────────────────────────────────────────
 
   String get sprint => _pick('달리기', 'Sprint');

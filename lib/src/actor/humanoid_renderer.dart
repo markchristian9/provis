@@ -19,29 +19,29 @@ import 'spec.dart';
 /// "허벅지 길이" 같은 마디 길이로 되어 있다. 둘을 잇는 것은 이 함수 하나뿐이라
 /// 명세가 바뀌어도 애니메이션과 렌더러는 손대지 않는다.
 Body bodyOfSpec(HumanoidSpec s) => Body(
-      height: s.height,
-      hipHeight: s.hipY,
-      torso: s.shoulderY - s.hipY,
-      neck: s.neckY - s.shoulderY,
-      headLen: s.headHeight,
-      headWidth: s.headHeight * 0.74,
-      shoulderHalf: s.shoulderWidth * 0.5,
-      hipHalf: s.hipWidth * 0.5,
-      upperArm: s.upperArm,
-      foreArm: s.foreArm,
-      hand: s.handLen,
-      thigh: s.thigh,
-      shin: s.shin,
-      foot: s.footLen,
-      bulk: 0.78 + s.muscle * 0.62,
-      hunch: switch (s.archetype) {
-        Archetype.berserker => 0.11,
-        Archetype.knight || Archetype.paladin => 0.03,
-        Archetype.assassin => 0.07,
-        _ => 0.045,
-      },
-      depth: s.chestWidth / (s.height * 0.196),
-    );
+  height: s.height,
+  hipHeight: s.hipY,
+  torso: s.shoulderY - s.hipY,
+  neck: s.neckY - s.shoulderY,
+  headLen: s.headHeight,
+  headWidth: s.headHeight * 0.74,
+  shoulderHalf: s.shoulderWidth * 0.5,
+  hipHalf: s.hipWidth * 0.5,
+  upperArm: s.upperArm,
+  foreArm: s.foreArm,
+  hand: s.handLen,
+  thigh: s.thigh,
+  shin: s.shin,
+  foot: s.footLen,
+  bulk: 0.78 + s.muscle * 0.62,
+  hunch: switch (s.archetype) {
+    Archetype.berserker => 0.11,
+    Archetype.knight || Archetype.paladin => 0.03,
+    Archetype.assassin => 0.07,
+    _ => 0.045,
+  },
+  depth: s.chestWidth / (s.height * 0.196),
+);
 
 /// 골격 구동 휴머노이드 렌더러.
 ///
@@ -55,9 +55,10 @@ class HumanoidRenderer {
     Body? body,
     Palette? palette,
     this.beast = false,
-  })  : body = body ?? bodyOfSpec(spec),
-        pal = palette ?? spec.palette,
-        _noise = Noise(spec.seed);
+    this.beastForm = BeastForm.brute,
+  }) : body = body ?? bodyOfSpec(spec),
+       pal = palette ?? spec.palette,
+       _noise = Noise(spec.seed);
 
   final HumanoidSpec spec;
 
@@ -68,6 +69,9 @@ class HumanoidRenderer {
 
   /// 짐승형 여부. 뿔·꼬리·발톱처럼 인간형에 없는 파츠를 켠다.
   final bool beast;
+
+  /// 짐승형의 주 실루엣. 색을 지워도 종과 전투 역할이 달라 보여야 한다.
+  final BeastForm beastForm;
 
   final Noise _noise;
 
@@ -90,33 +94,73 @@ class HumanoidRenderer {
   /// 인상(무거운 판금 기사 ↔ 가벼운 암살자)을 결정한다.
   // 짐승형의 살은 몸통과 사지가 같은 재질이어야 한 마리로 읽힌다. chitin 은
   // rim 이 1.3 이라 던전 조명(청록 역광) 아래에서 사지만 형광으로 떠오른다.
+  Surface get _beastSurface => switch (beastForm) {
+    BeastForm.brute => Surface(pal.skin, Finish.skin),
+    BeastForm.drake => Surface(pal.skin, Finish.scale, contrast: 1.12),
+    BeastForm.wraith => Surface(
+      pal.clothShade.mix(pal.glow, 0.28),
+      Finish.slime,
+      contrast: 1.08,
+      alpha: 0.72,
+      glow: 0.12,
+      glowColor: pal.glow,
+    ),
+    BeastForm.arachnid => Surface(
+      pal.metal.mix(pal.skin, 0.34),
+      Finish.chitin,
+      contrast: 1.26,
+    ),
+  };
+
+  Surface get _beastHeadSurface => switch (beastForm) {
+    BeastForm.brute => Surface(pal.skin, Finish.skin),
+    BeastForm.drake => Surface(pal.skin, Finish.scale, contrast: 1.14),
+    BeastForm.wraith => Surface(
+      pal.glow.desaturate(0.58).lighten(0.18),
+      Finish.bone,
+      contrast: 1.12,
+      alpha: 0.88,
+      glow: 0.10,
+      glowColor: pal.glow,
+    ),
+    BeastForm.arachnid => _plate,
+  };
+
   Surface get _limbArmor => beast
-      ? Surface(pal.skin, Finish.skin)
+      ? _beastSurface
       : spec.armorHeaviness > 0.52
-          ? Surface(pal.metal, Finish.metal, contrast: 0.85 + 0.5 * (0.5 + 0.42 * spec.armorHeaviness))
-          : spec.armorHeaviness > 0.26
-              ? Surface(pal.leather, Finish.leather)
-              : Surface(pal.cloth, Finish.cloth);
+      ? Surface(
+          pal.metal,
+          Finish.metal,
+          contrast: 0.85 + 0.5 * (0.5 + 0.42 * spec.armorHeaviness),
+        )
+      : spec.armorHeaviness > 0.26
+      ? Surface(pal.leather, Finish.leather)
+      : Surface(pal.cloth, Finish.cloth);
 
   /// 다리의 **밑단**. 판금이어도 여기는 천이나 가죽이고, 그 위에 쿠이스와
   /// 그리브가 조각으로 얹힌다([_leg] 참고).
   Surface get _legUnder => beast
-      ? Surface(pal.skin, Finish.skin)
+      ? _beastSurface
       : spec.armorHeaviness > 0.26
-          ? Surface(pal.leather, Finish.leather)
-          : Surface(pal.cloth, Finish.cloth);
+      ? Surface(pal.leather, Finish.leather)
+      : Surface(pal.cloth, Finish.cloth);
 
   Surface get _plate => beast
-      ? Surface(pal.metal, Finish.chitin)
-      : Surface(pal.metal, Finish.metal, contrast: 0.85 + 0.5 * (0.55 + 0.4 * spec.armorHeaviness));
+      ? Surface(pal.metal, Finish.chitin, contrast: 1.22)
+      : Surface(
+          pal.metal,
+          Finish.metal,
+          contrast: 0.85 + 0.5 * (0.55 + 0.4 * spec.armorHeaviness),
+        );
 
   Surface get _torsoSurface => beast
-      ? Surface(pal.skin, Finish.skin)
+      ? _beastSurface
       : spec.armorHeaviness > 0.45
-          ? _plate
-          : spec.armorHeaviness > 0.2
-              ? Surface(pal.leather, Finish.leather)
-              : Surface(pal.cloth, Finish.cloth);
+      ? _plate
+      : spec.armorHeaviness > 0.2
+      ? Surface(pal.leather, Finish.leather)
+      : Surface(pal.cloth, Finish.cloth);
 
   /// 짐승형은 판금·망토를 걸치지 않는다. 장비 규칙을 종별로 흩어 두지 않고
   /// 여기 한 곳에서 끈다.
@@ -171,15 +215,21 @@ class HumanoidRenderer {
     if (mirror) canvas.scale(-1, 1);
     // 캔버스를 뒤집으면 광원도 따라 뒤집히므로, 리그의 x 성분을 되돌려
     // 조명이 월드에 고정되게 한다.
-    final lit = mirror
-        ? light.mirrored
-        : light;
+    final lit = mirror ? light.mirrored : light;
 
     final dz = _depthOff * facing.depthSpread;
     final front = facing.toCamera;
 
-    // ③ 뒤에서 앞으로. 후면에서는 망토가 몸을 덮는다.
-    if (beast) _tail(canvas, sk, lit, detail, time);
+    // ③ 뒤에서 앞으로. 큰 실루엣은 팔다리보다 먼저 깐다. 영웅은 직업 장비,
+    // 몬스터는 날개·망토·여분의 다리가 색보다 먼저 정체를 말한다.
+    if (beast) {
+      _monsterBackSilhouette(canvas, sk, lit, iso, detail, time);
+      if (beastForm == BeastForm.brute || beastForm == BeastForm.drake) {
+        _tail(canvas, sk, lit, iso, detail, time);
+      }
+    } else {
+      _heroBackSilhouette(canvas, sk, lit, iso, detail, time);
+    }
 
     canvas.save();
     canvas.translate(-dz, 0);
@@ -212,34 +262,34 @@ class HumanoidRenderer {
   /// 무관하므로 건드리지 않는다 — 줄이면 다리가 펴져 걸음이 무너진다.
   // ignore: unused_element
   Pose _foreshorten(Pose p, double k) => p.copyWith(
-        armNear: ArmPose(
-          shoulder: p.armNear.shoulder * k + (1 - k) * 0.12,
-          elbow: p.armNear.elbow,
-          wrist: p.armNear.wrist,
-        ),
-        armFar: ArmPose(
-          shoulder: p.armFar.shoulder * k + (1 - k) * 0.12,
-          elbow: p.armFar.elbow,
-          wrist: p.armFar.wrist,
-        ),
-        legNear: LegPose(
-          hip: p.legNear.hip * k,
-          knee: p.legNear.knee,
-          ankle: p.legNear.ankle,
-        ),
-        legFar: LegPose(
-          hip: p.legFar.hip * k,
-          knee: p.legFar.knee,
-          ankle: p.legFar.ankle,
-        ),
-      );
+    armNear: ArmPose(
+      shoulder: p.armNear.shoulder * k + (1 - k) * 0.12,
+      elbow: p.armNear.elbow,
+      wrist: p.armNear.wrist,
+    ),
+    armFar: ArmPose(
+      shoulder: p.armFar.shoulder * k + (1 - k) * 0.12,
+      elbow: p.armFar.elbow,
+      wrist: p.armFar.wrist,
+    ),
+    legNear: LegPose(
+      hip: p.legNear.hip * k,
+      knee: p.legNear.knee,
+      ankle: p.legNear.ankle,
+    ),
+    legFar: LegPose(
+      hip: p.legFar.hip * k,
+      knee: p.legFar.knee,
+      ankle: p.legFar.ankle,
+    ),
+  );
 
   double _lowestFoot(Skeleton sk) => [
-        sk.legNear.c.dy,
-        sk.legNear.d.dy,
-        sk.legFar.c.dy,
-        sk.legFar.d.dy,
-      ].reduce(math.max);
+    sk.legNear.c.dy,
+    sk.legNear.d.dy,
+    sk.legFar.c.dy,
+    sk.legFar.d.dy,
+  ].reduce(math.max);
 
   // ─────────────────────────────────────────────────────────── 파츠
 
@@ -261,9 +311,16 @@ class HumanoidRenderer {
       [r * 0.98, r * 1.02, r * 0.76, r * 0.60, r * 0.50],
       samples: 24,
     );
-    paintSurface(canvas, leg, _legUnder, light,
-        detail: q, occlusion: occ, edgeRim: true,
-        seed: spec.seed + depth.round());
+    paintSurface(
+      canvas,
+      leg,
+      _legUnder,
+      light,
+      detail: q,
+      occlusion: occ,
+      edgeRim: true,
+      seed: spec.seed + depth.round(),
+    );
     if (beast) _limbBands(canvas, leg, l.a, l.c, r, q, salt: depth.round());
 
     // 판금 다리는 **덧댄 조각**으로 그린다.
@@ -316,15 +373,21 @@ class HumanoidRenderer {
       [r * 0.62, r * 0.58, r * 0.30],
       samples: 12,
     );
-    paintSurface(canvas, boot, Surface(pal.leather, Finish.leather), light,
-        detail: q, occlusion: occ + 0.2, edgeRim: true);
+    paintSurface(
+      canvas,
+      boot,
+      Surface(pal.leather, Finish.leather),
+      light,
+      detail: q,
+      occlusion: occ + 0.2,
+      edgeRim: true,
+    );
     if (depth == 0) paintTopPlane(canvas, boot, light, iso, strength: 0.45);
 
     // 무릎 방어구. 판금 계열에서만.
     if (!beast && spec.armorHeaviness > 0.5) {
       final knee = blob(l.b, r * 0.86, r * 0.72, rotation: toeDir.angle);
-      paintSurface(canvas, knee, _plate, light,
-          detail: q, occlusion: occ);
+      paintSurface(canvas, knee, _plate, light, detail: q, occlusion: occ);
       if (depth == 0) paintTopPlane(canvas, knee, light, iso, strength: 0.5);
     }
   }
@@ -359,9 +422,16 @@ class HumanoidRenderer {
           ..color = const Color(0xFF05070B).withValues(alpha: 0.34),
       );
     }
-    paintSurface(canvas, arm, _limbArmor, light,
-        detail: q, occlusion: occ, edgeRim: true,
-        seed: spec.seed + 7 + depth.round());
+    paintSurface(
+      canvas,
+      arm,
+      _limbArmor,
+      light,
+      detail: q,
+      occlusion: occ,
+      edgeRim: true,
+      seed: spec.seed + 7 + depth.round(),
+    );
     if (beast) _limbBands(canvas, arm, l.a, l.c, r, q, salt: 5 + depth.round());
 
     // 손.
@@ -371,8 +441,15 @@ class HumanoidRenderer {
       r * 0.66,
       rotation: (l.d - l.c).angle,
     );
-    paintSurface(canvas, hand, Surface(pal.skin, Finish.skin), light,
-        detail: q, occlusion: occ + 0.1, edgeRim: true);
+    paintSurface(
+      canvas,
+      hand,
+      Surface(pal.skin, Finish.skin),
+      light,
+      detail: q,
+      occlusion: occ + 0.1,
+      edgeRim: true,
+    );
 
     // 발톱. 짐승형에게는 이것이 무기이므로 손끝에서 확실히 튀어나와야 한다.
     if (beast) {
@@ -385,8 +462,14 @@ class HumanoidRenderer {
           [r * 0.24, r * 0.02],
           samples: 8,
         );
-        paintSurface(canvas, claw, Surface(pal.metal, Finish.bone), light,
-            detail: q, occlusion: occ);
+        paintSurface(
+          canvas,
+          claw,
+          Surface(pal.metal, Finish.bone),
+          light,
+          detail: q,
+          occlusion: occ,
+        );
       }
     }
 
@@ -408,9 +491,22 @@ class HumanoidRenderer {
         rotation: -0.15,
         warp: (a, t) => 1 + 0.12 * math.sin(a * 3 + spec.seed),
       );
-      paintSurface(canvas, pauldron, _plate, light,
-          detail: q, occlusion: occ * 0.6, edgeRim: true);
-      paintTopPlane(canvas, pauldron, light, iso, strength: depth == 0 ? 0.62 : 0.3);
+      paintSurface(
+        canvas,
+        pauldron,
+        _plate,
+        light,
+        detail: q,
+        occlusion: occ * 0.6,
+        edgeRim: true,
+      );
+      paintTopPlane(
+        canvas,
+        pauldron,
+        light,
+        iso,
+        strength: depth == 0 ? 0.62 : 0.3,
+      );
       if (spec.trimAccent) {
         trimBand(canvas, pauldron, pal.accent, light, width: 1.4, alpha: 0.55);
       }
@@ -448,11 +544,16 @@ class HumanoidRenderer {
       ],
       samples: 26,
     );
-    paintSurface(canvas, torso, _torsoSurface, light,
-        detail: q,
-        occlusion: 0.14,
-        edgeRim: true,
-        seed: spec.seed);
+    paintSurface(
+      canvas,
+      torso,
+      _torsoSurface,
+      light,
+      detail: q,
+      occlusion: 0.14,
+      edgeRim: true,
+      seed: spec.seed,
+    );
     paintTopPlane(canvas, torso, light, iso, strength: 0.3);
 
     // ── 재질별 매크로 텍스처 ─────────────────────────────────────────────
@@ -471,10 +572,12 @@ class HumanoidRenderer {
 
     // 등가시. 짐승형의 실루엣 상단을 지배하는 파츠라 아이소에서 가장 먼저
     // 읽힌다.
-    if (beast) {
-      for (var i = 0; i < 5; i++) {
+    if (beast &&
+        (beastForm == BeastForm.brute || beastForm == BeastForm.drake)) {
+      final count = beastForm == BeastForm.drake ? 6 : 3;
+      for (var i = 0; i < count; i++) {
         // 등 위쪽에 몰아준다. 골반까지 깔면 다리와 겹쳐 실루엣이 뭉갠다.
-        final t = 0.30 + i * 0.16;
+        final t = 0.30 + i * (0.64 / math.max(1, count - 1));
         final at = lerpO(sk.pelvis, sk.chest, t);
         final back = (sk.pelvis - sk.chest).normalized().perp;
         final size = _chestW * (0.14 + 0.18 * math.sin(t * math.pi));
@@ -483,8 +586,15 @@ class HumanoidRenderer {
           [size * 0.30, size * 0.02],
           samples: 8,
         );
-        paintSurface(canvas, spike, Surface(pal.metal, Finish.bone), light,
-            detail: q, occlusion: 0.2, edgeRim: true);
+        paintSurface(
+          canvas,
+          spike,
+          Surface(pal.metal, Finish.bone),
+          light,
+          detail: q,
+          occlusion: 0.2,
+          edgeRim: true,
+        );
         paintTopPlane(canvas, spike, light, iso, strength: 0.45);
       }
     }
@@ -492,12 +602,15 @@ class HumanoidRenderer {
     // 흉갑. 몸통 위에 한 겹 더 얹어야 판금이 "덧대어진" 것으로 읽힌다.
     if (_wearsArmor) {
       final chest = tube(
-        [lerpO(sk.waist, sk.chest, 0.25), lerpO(sk.waist, sk.chest, 0.75), sk.chest],
+        [
+          lerpO(sk.waist, sk.chest, 0.25),
+          lerpO(sk.waist, sk.chest, 0.75),
+          sk.chest,
+        ],
         [_waistW * 0.44 * w, _chestW * 0.50 * w * breath, _chestW * 0.42 * w],
         samples: 16,
       );
-      paintSurface(canvas, chest, _plate, light,
-          detail: q, occlusion: 0.10);
+      paintSurface(canvas, chest, _plate, light, detail: q, occlusion: 0.10);
       paintTopPlane(canvas, chest, light, iso, strength: 0.42);
       if (spec.trimAccent) {
         trimBand(canvas, chest, pal.accent, light, width: 1.6, alpha: 0.6);
@@ -576,8 +689,14 @@ class HumanoidRenderer {
         [_waistW * 0.48 * w, _waistW * 0.46 * w],
         samples: 8,
       );
-      paintSurface(canvas, belt, Surface(pal.leather, Finish.leather), light,
-          detail: q, occlusion: 0.2);
+      paintSurface(
+        canvas,
+        belt,
+        Surface(pal.leather, Finish.leather),
+        light,
+        detail: q,
+        occlusion: 0.2,
+      );
     }
 
     if (spec.glowRunes || beast) {
@@ -605,8 +724,13 @@ class HumanoidRenderer {
       canvas.restore();
 
       final rune = blob(at, _h * 0.017, _h * 0.017);
-      paintSurface(canvas, rune, Surface(pal.glow, Finish.gem, glow: 0.9, glowColor: pal.glow), light,
-          detail: q);
+      paintSurface(
+        canvas,
+        rune,
+        Surface(pal.glow, Finish.gem, glow: 0.9, glowColor: pal.glow),
+        light,
+        detail: q,
+      );
       glowPath(canvas, rune, pal.glow, _h * 0.05, alpha: 0.8);
     }
   }
@@ -661,7 +785,12 @@ class HumanoidRenderer {
   /// 면에 반복 단위가 없으면 관객이 크기를 읽을 수 없다. 몸통을 가로지르는
   /// 끈 하나가 "이것은 장비다"를 만들고, 스티치 점이 스케일을 알려 준다.
   void _leatherStrap(
-      Canvas canvas, Path torso, Skeleton sk, LightRig light, double q) {
+    Canvas canvas,
+    Path torso,
+    Skeleton sk,
+    LightRig light,
+    double q,
+  ) {
     final up = (sk.chest - sk.pelvis).normalized();
     final side = up.perp;
     final a = sk.chest + side * (_chestW * 0.26) + up * (_h * 0.008);
@@ -670,14 +799,20 @@ class HumanoidRenderer {
 
     canvas.save();
     canvas.clipPath(torso);
-    final strap = tube(
-      spine,
-      [_waistW * 0.075, _waistW * 0.068, _waistW * 0.075],
-      samples: 10,
-    );
+    final strap = tube(spine, [
+      _waistW * 0.075,
+      _waistW * 0.068,
+      _waistW * 0.075,
+    ], samples: 10);
     paintSurface(
-        canvas, strap, Surface(pal.leather.darken(0.18), Finish.leather), light,
-        detail: q, rim: false, ao: false);
+      canvas,
+      strap,
+      Surface(pal.leather.darken(0.18), Finish.leather),
+      light,
+      detail: q,
+      rim: false,
+      ao: false,
+    );
     // 끈의 광원 쪽 모서리. 이 한 줄이 끈을 몸에서 떼어 놓는다.
     canvas.drawPath(
       smoothOpenPath(spine).shift(-light.dir * (_waistW * 0.045)),
@@ -703,9 +838,14 @@ class HumanoidRenderer {
 
     // 버클. 작아도 금속 하이라이트 하나가 끈에 무게를 준다.
     final buckle = blob(lerpO(a, b, 0.5), _waistW * 0.055, _waistW * 0.048);
-    paintSurface(canvas, buckle,
-        Surface(pal.metalWarm, Finish.metal, contrast: 1.0), light,
-        detail: q, rim: false);
+    paintSurface(
+      canvas,
+      buckle,
+      Surface(pal.metalWarm, Finish.metal, contrast: 1.0),
+      light,
+      detail: q,
+      rim: false,
+    );
   }
 
   /// 짐승 가죽의 얼룩과 등의 어둠.
@@ -750,10 +890,7 @@ class HumanoidRenderer {
         ..shader = Gradient.linear(
           b.center - back * (b.width * 0.52),
           b.center + back * (b.width * 0.30),
-          [
-            pal.skin.lighten(0.40).fade(0.26),
-            const Color(0x00000000),
-          ],
+          [pal.skin.lighten(0.40).fade(0.26), const Color(0x00000000)],
           const [0.0, 0.85],
         ),
     );
@@ -765,18 +902,18 @@ class HumanoidRenderer {
     final count = q > 0.7 ? 6 : 4;
     for (var i = 0; i < count; i++) {
       final u = (i + 0.5) / count;
-      final at = lerpO(sk.pelvis, sk.chest, 0.10 + 0.82 * u) +
+      final at =
+          lerpO(sk.pelvis, sk.chest, 0.10 + 0.82 * u) +
           Offset(
                 _noise.signed1(u * 7.3 + spec.seed * 0.03),
                 _noise.signed1(u * 4.1 - spec.seed * 0.02),
               ) *
               (_chestW * 0.24);
       final rx = _chestW * (0.15 + 0.14 * _noise.at1(u * 5.7 + 3));
-      patch.shader = Gradient.radial(
-        at,
-        rx,
-        [pal.skinDeep.fade(0.32), pal.skinDeep.fade(0.0)],
-      );
+      patch.shader = Gradient.radial(at, rx, [
+        pal.skinDeep.fade(0.32),
+        pal.skinDeep.fade(0.0),
+      ]);
       canvas.drawOval(
         Rect.fromCenter(center: at, width: rx * 2.2, height: rx * 1.7),
         patch,
@@ -789,8 +926,14 @@ class HumanoidRenderer {
   ///
   /// 팔다리 관에 가로 띠 몇 줄이 생기면 살이 접히는 두께가 보인다.
   void _limbBands(
-      Canvas canvas, Path limb, Offset a, Offset b, double r, double q,
-      {int salt = 0}) {
+    Canvas canvas,
+    Path limb,
+    Offset a,
+    Offset b,
+    double r,
+    double q, {
+    int salt = 0,
+  }) {
     if (q <= 0.5) return;
     final dir = (b - a).normalized();
     final across = dir.perp;
@@ -813,10 +956,414 @@ class HumanoidRenderer {
     canvas.restore();
   }
 
+  /// A class-readable secondary silhouette for heroes.
+  ///
+  /// These are intentionally large, sparse shapes. At the game camera a
+  /// quiver or a split scarf survives; buckles and embroidery do not.
+  void _heroBackSilhouette(
+    Canvas canvas,
+    Skeleton sk,
+    LightRig light,
+    IsoView iso,
+    double q,
+    double time,
+  ) {
+    final up = (sk.chest - sk.pelvis).normalized();
+    final side = up.perp;
+    switch (spec.archetype) {
+      case Archetype.knight:
+        // A dark diagonal scabbard keeps the knight's back view armed even
+        // when the sword itself is hidden by the torso.
+        final a = sk.pelvis - side * _h * 0.08;
+        final b = sk.chest + side * _h * 0.17 + up * _h * 0.10;
+        final sheath = tube([a, b], [_h * 0.017, _h * 0.013], samples: 10);
+        paintSurface(
+          canvas,
+          sheath,
+          Surface(pal.leather, Finish.leather),
+          light,
+          detail: q,
+          occlusion: 0.32,
+          edgeRim: true,
+        );
+      case Archetype.berserker:
+        final mantle = blob(
+          sk.chest + up * _h * 0.005,
+          _shoulderW * 0.60,
+          _h * 0.075,
+          points: 22,
+          warp: (a, t) =>
+              1 + 0.14 * math.sin(a * 7 + spec.seed) + 0.06 * math.sin(a * 13),
+        );
+        paintSurface(
+          canvas,
+          mantle,
+          Surface(pal.leather.lighten(0.08), Finish.fur, contrast: 1.18),
+          light,
+          detail: q,
+          occlusion: 0.22,
+          edgeRim: true,
+          seed: spec.seed + 91,
+        );
+      case Archetype.ranger:
+        final root = sk.chest - side * _shoulderW * 0.34;
+        final end = root - up * _h * 0.23 + side * _h * 0.025;
+        final quiver = tube(
+          [root + up * _h * 0.08, end],
+          [_h * 0.040, _h * 0.055],
+          samples: 12,
+        );
+        paintSurface(
+          canvas,
+          quiver,
+          Surface(pal.leather, Finish.leather),
+          light,
+          detail: q,
+          occlusion: 0.28,
+          edgeRim: true,
+        );
+        for (var i = -1; i <= 2; i++) {
+          final shaftRoot = root + side * (_h * 0.012 * i);
+          final shaftEnd = shaftRoot + up * _h * (0.22 + i.abs() * 0.012);
+          final shaft = tube(
+            [shaftRoot, shaftEnd],
+            [_h * 0.0045, _h * 0.003],
+            samples: 6,
+          );
+          paintSurface(
+            canvas,
+            shaft,
+            Surface(pal.leather, Finish.wood),
+            light,
+            detail: q,
+            occlusion: 0.24,
+          );
+          final tip = tube(
+            [shaftEnd - up * _h * 0.018, shaftEnd + up * _h * 0.014],
+            [_h * 0.012, _h * 0.001],
+            samples: 6,
+          );
+          paintSurface(
+            canvas,
+            tip,
+            Surface(pal.metal, Finish.metal),
+            light,
+            detail: q,
+            occlusion: 0.20,
+          );
+        }
+      case Archetype.mage:
+        // A pointed arcane collar creates a broad-shoulder/narrow-body read
+        // without making the lightly armored caster look physically bulky.
+        final collar = smoothClosedPath([
+          sk.chest - side * _h * 0.18,
+          sk.chest - side * _h * 0.29 + up * _h * 0.09,
+          sk.neckTop - side * _h * 0.06,
+          sk.neckTop + side * _h * 0.06,
+          sk.chest + side * _h * 0.29 + up * _h * 0.09,
+          sk.chest + side * _h * 0.18,
+          sk.chest + up * _h * 0.015,
+        ], tension: 0.42);
+        paintSurface(
+          canvas,
+          collar,
+          Surface(pal.clothShade, Finish.cloth, contrast: 1.16),
+          light,
+          detail: q,
+          occlusion: 0.24,
+          edgeRim: true,
+        );
+        trimBand(canvas, collar, pal.accent, light, width: 1.2, alpha: 0.55);
+      case Archetype.assassin:
+        final flow = math.sin(time * 2.2 + spec.seed) * _h * 0.025;
+        for (final sign in [-1.0, 1.0]) {
+          final root = sk.neckTop + side * sign * _h * 0.035;
+          final scarf = smoothClosedPath([
+            root,
+            sk.chest + side * sign * _h * 0.09,
+            sk.pelvis + side * sign * (_h * 0.14 + flow),
+            sk.pelvis + side * sign * (_h * 0.07 + flow) - up * _h * 0.22,
+            sk.chest + side * sign * _h * 0.035,
+          ], tension: 0.52);
+          paintSurface(
+            canvas,
+            scarf,
+            Surface(pal.accent.darken(0.22), Finish.cloth),
+            light,
+            detail: q,
+            occlusion: 0.30,
+            edgeRim: true,
+          );
+        }
+      case Archetype.paladin:
+        final center = sk.headCenter - up * body.headLen * 0.10;
+        final halo = Paint()
+          ..isAntiAlias = true
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1.2, _h * 0.010)
+          ..color = pal.metalWarm.lighten(0.22).fade(0.88);
+        canvas.drawCircle(center, body.headLen * 0.72, halo);
+        for (var i = 0; i < 8; i++) {
+          final a = i * math.pi / 4 + time * 0.05;
+          final d = Offset(math.cos(a), math.sin(a));
+          final ray = tube(
+            [
+              center + d * body.headLen * 0.76,
+              center + d * body.headLen * (i.isEven ? 1.02 : 0.91),
+            ],
+            [body.headLen * 0.035, body.headLen * 0.005],
+            samples: 6,
+          );
+          paintSurface(
+            canvas,
+            ray,
+            Surface(
+              pal.metalWarm,
+              Finish.metal,
+              glow: 0.12,
+              glowColor: pal.glow,
+            ),
+            light,
+            detail: q,
+            occlusion: 0.20,
+          );
+        }
+    }
+  }
+
+  void _monsterBackSilhouette(
+    Canvas canvas,
+    Skeleton sk,
+    LightRig light,
+    IsoView iso,
+    double q,
+    double time,
+  ) {
+    switch (beastForm) {
+      case BeastForm.brute:
+        _bruteTrophy(canvas, sk, light, iso, q);
+      case BeastForm.drake:
+        _drakeWings(canvas, sk, light, iso, q, time);
+      case BeastForm.wraith:
+        _wraithMantle(canvas, sk, light, q, time);
+      case BeastForm.arachnid:
+        _arachnidRear(canvas, sk, light, iso, q, time);
+    }
+  }
+
+  void _bruteTrophy(
+    Canvas canvas,
+    Skeleton sk,
+    LightRig light,
+    IsoView iso,
+    double q,
+  ) {
+    final up = (sk.chest - sk.pelvis).normalized();
+    final side = up.perp;
+    final plate = blob(
+      sk.chest - side * _shoulderW * 0.42 + up * _h * 0.025,
+      _h * 0.095,
+      _h * 0.075,
+      points: 14,
+      warp: (a, t) => 1 + 0.18 * math.sin(a * 3 + 0.7),
+    );
+    paintSurface(
+      canvas,
+      plate,
+      Surface(pal.metal, Finish.bone, contrast: 1.22),
+      light,
+      detail: q,
+      occlusion: 0.24,
+      edgeRim: true,
+    );
+    paintTopPlane(canvas, plate, light, iso, strength: 0.45);
+    for (var i = 0; i < 3; i++) {
+      final root = sk.chest - side * (_h * (0.09 + i * 0.025));
+      final spike = tube(
+        [root, root + up * _h * (0.15 + i * 0.025) - side * _h * 0.035],
+        [_h * 0.026, _h * 0.002],
+        samples: 8,
+      );
+      paintSurface(
+        canvas,
+        spike,
+        Surface(pal.metal, Finish.bone),
+        light,
+        detail: q,
+        occlusion: 0.18,
+        edgeRim: true,
+      );
+    }
+  }
+
+  void _drakeWings(
+    Canvas canvas,
+    Skeleton sk,
+    LightRig light,
+    IsoView iso,
+    double q,
+    double time,
+  ) {
+    final up = (sk.chest - sk.pelvis).normalized();
+    final side = up.perp;
+    final flex = math.sin(time * 1.4 + spec.seed) * _h * 0.018;
+    for (final sign in [-1.0, 1.0]) {
+      final root = sk.chest + side * sign * _h * 0.055;
+      final knuckle = root + side * sign * (_h * 0.32 + flex) + up * _h * 0.22;
+      final tip = root + side * sign * (_h * 0.46 + flex) + up * _h * 0.42;
+      final low = sk.pelvis + side * sign * (_h * 0.32 + flex) - up * _h * 0.10;
+      final membrane = smoothClosedPath([
+        root,
+        knuckle,
+        tip,
+        lerpO(tip, low, 0.38) - up * _h * 0.08,
+        lerpO(tip, low, 0.68) + side * sign * _h * 0.025,
+        low,
+        sk.pelvis + side * sign * _h * 0.05,
+      ], tension: 0.35);
+      paintSurface(
+        canvas,
+        membrane,
+        Surface(
+          pal.skinDeep.mix(pal.accent, 0.22),
+          Finish.membrane,
+          contrast: 1.18,
+          alpha: sign < 0 ? 0.68 : 0.82,
+        ),
+        light,
+        detail: q,
+        occlusion: sign < 0 ? 0.34 : 0.22,
+        edgeRim: true,
+      );
+      for (final end in [knuckle, tip, low]) {
+        final spar = tube([root, end], [_h * 0.016, _h * 0.006], samples: 10);
+        paintSurface(
+          canvas,
+          spar,
+          Surface(pal.metal, Finish.bone),
+          light,
+          detail: q,
+          occlusion: 0.18,
+          edgeRim: true,
+        );
+      }
+      paintTopPlane(canvas, membrane, light, iso, strength: 0.20);
+    }
+  }
+
+  void _wraithMantle(
+    Canvas canvas,
+    Skeleton sk,
+    LightRig light,
+    double q,
+    double time,
+  ) {
+    final up = (sk.chest - sk.pelvis).normalized();
+    final side = up.perp;
+    final drift = math.sin(time * 1.3 + spec.seed * 0.1) * _h * 0.025;
+    final mantle = smoothClosedPath([
+      sk.chest - side * _h * 0.15 + up * _h * 0.05,
+      sk.pelvis - side * _h * 0.19,
+      sk.groundContact - side * _h * 0.22 + Offset(drift, -_h * 0.03),
+      sk.groundContact - side * _h * 0.07 - up * _h * 0.10,
+      sk.groundContact + side * _h * 0.06 + up * _h * 0.01,
+      sk.groundContact + side * _h * 0.18 - up * _h * 0.08 + Offset(drift, 0),
+      sk.pelvis + side * _h * 0.18,
+      sk.chest + side * _h * 0.15 + up * _h * 0.05,
+    ], tension: 0.50);
+    paintSurface(
+      canvas,
+      mantle,
+      Surface(
+        pal.clothShade.mix(pal.glow, 0.16),
+        Finish.cloth,
+        contrast: 1.12,
+        alpha: 0.72,
+      ),
+      light,
+      detail: q,
+      occlusion: 0.25,
+      edgeRim: true,
+    );
+    glowPath(canvas, mantle, pal.glow, _h * 0.045, alpha: 0.28);
+  }
+
+  void _arachnidRear(
+    Canvas canvas,
+    Skeleton sk,
+    LightRig light,
+    IsoView iso,
+    double q,
+    double time,
+  ) {
+    final up = (sk.chest - sk.pelvis).normalized();
+    final side = up.perp;
+    final abdomenCenter = sk.pelvis - up * _h * 0.07;
+    final abdomen = blob(
+      abdomenCenter,
+      _h * 0.155,
+      _h * 0.125,
+      points: 20,
+      rotation: side.angle,
+      warp: (a, t) => 1 + 0.08 * math.sin(a * 4 + spec.seed),
+    );
+    paintSurface(
+      canvas,
+      abdomen,
+      _plate,
+      light,
+      detail: q,
+      occlusion: 0.28,
+      edgeRim: true,
+      seed: spec.seed + 73,
+    );
+    paintTopPlane(canvas, abdomen, light, iso, strength: 0.48);
+
+    final pulse = math.sin(time * 1.8 + spec.seed) * _h * 0.012;
+    for (final sign in [-1.0, 1.0]) {
+      for (var row = 0; row < 2; row++) {
+        final root =
+            lerpO(sk.pelvis, sk.chest, 0.20 + row * 0.22) +
+            side * sign * _h * 0.05;
+        final knee =
+            root +
+            side * sign * (_h * (0.22 + row * 0.055) + pulse) +
+            up * _h * (0.04 + row * 0.08);
+        final foot =
+            sk.groundContact +
+            side * sign * (_h * (0.30 + row * 0.09)) +
+            Offset(0, -row * _h * 0.018);
+        final leg = tube(
+          [root, knee, foot],
+          [_h * 0.025, _h * 0.018, _h * 0.004],
+          samples: 16,
+        );
+        paintSurface(
+          canvas,
+          leg,
+          _plate,
+          light,
+          detail: q,
+          occlusion: row == 0 ? 0.34 : 0.24,
+          edgeRim: true,
+          seed: spec.seed + 80 + row,
+        );
+      }
+    }
+  }
+
   /// 꼬리. 몸통 뒤에서 나와 관성으로 늦게 따라온다 — 포즈의 흔들림을
   /// 그대로 쓰지 않고 시간 지연을 주어야 살아 있는 부속으로 읽힌다.
-  void _tail(Canvas canvas, Skeleton sk, LightRig light, double q, double time) {
-    final len = _h * 0.52;
+  void _tail(
+    Canvas canvas,
+    Skeleton sk,
+    LightRig light,
+    IsoView iso,
+    double q,
+    double time,
+  ) {
+    final drake = beastForm == BeastForm.drake;
+    final len = _h * (drake ? 0.82 : 0.42);
     final back = (sk.pelvis - sk.chest).normalized().perp;
     final root = sk.pelvis + back * _hipW * 0.30;
     final drift = wobble(time * 2.1, spec.seed * 0.31);
@@ -826,14 +1373,52 @@ class HumanoidRenderer {
       [
         root,
         root + back * len * 0.36 + Offset(0, len * (0.10 - lift * 0.18)),
-        root + back * len * 0.72 + Offset(0, len * (0.22 - lift * 0.34) + drift * len * 0.10),
-        root + back * len * 1.02 + Offset(0, len * (0.30 - lift * 0.50) + drift * len * 0.20),
+        root +
+            back * len * 0.72 +
+            Offset(0, len * (0.22 - lift * 0.34) + drift * len * 0.10),
+        root +
+            back * len * 1.02 +
+            Offset(0, len * (0.30 - lift * 0.50) + drift * len * 0.20),
       ],
-      [_hipW * 0.30, _hipW * 0.22, _hipW * 0.13, _hipW * 0.03],
+      [
+        _hipW * (drake ? 0.34 : 0.30),
+        _hipW * (drake ? 0.25 : 0.22),
+        _hipW * (drake ? 0.14 : 0.13),
+        _hipW * 0.03,
+      ],
       samples: 24,
     );
-    paintSurface(canvas, tail, Surface(pal.skin, Finish.skin), light,
-        detail: q, occlusion: 0.34, edgeRim: true, seed: spec.seed + 21);
+    paintSurface(
+      canvas,
+      tail,
+      _beastSurface,
+      light,
+      detail: q,
+      occlusion: 0.34,
+      edgeRim: true,
+      seed: spec.seed + 21,
+    );
+    if (drake) {
+      final tip =
+          root +
+          back * len * 1.02 +
+          Offset(0, len * (0.30 - lift * 0.50) + drift * len * 0.20);
+      final blade = tube(
+        [tip - back * _h * 0.045, tip + back * _h * 0.075],
+        [_h * 0.032, _h * 0.002],
+        samples: 8,
+      );
+      paintSurface(
+        canvas,
+        blade,
+        Surface(pal.metal, Finish.bone),
+        light,
+        detail: q,
+        occlusion: 0.22,
+        edgeRim: true,
+      );
+      paintTopPlane(canvas, blade, light, iso, strength: 0.35);
+    }
   }
 
   void _head(
@@ -852,9 +1437,14 @@ class HumanoidRenderer {
       [_neckW * 0.52, _neckW * 0.46],
       samples: 8,
     );
-    paintSurface(canvas, neck, beast ? Surface(pal.skin, Finish.skin) : Surface(pal.skin, Finish.skin),
-        light,
-        detail: q, occlusion: 0.45);
+    paintSurface(
+      canvas,
+      neck,
+      beast ? _beastHeadSurface : Surface(pal.skin, Finish.skin),
+      light,
+      detail: q,
+      occlusion: 0.45,
+    );
 
     // 머리부터는 머리 로컬 좌표에서 그린다. 원점이 머리 중심, +x 가 전방,
     // -y 가 정수리 방향이므로 이목구비를 정면 기준으로 배치할 수 있다.
@@ -888,9 +1478,16 @@ class HumanoidRenderer {
             0.05 * _noise.signed1(a * 2 + spec.seed * 0.01);
       },
     );
-    paintSurface(canvas, skull, beast ? Surface(pal.skin, Finish.skin) : Surface(pal.skin, Finish.skin),
-        hLight,
-        detail: q, occlusion: 0.12, edgeRim: true, seed: spec.seed + 3);
+    paintSurface(
+      canvas,
+      skull,
+      beast ? _beastHeadSurface : Surface(pal.skin, Finish.skin),
+      hLight,
+      detail: q,
+      occlusion: 0.12,
+      edgeRim: true,
+      seed: spec.seed + 3,
+    );
     paintTopPlane(canvas, skull, hLight, iso, strength: 0.34);
 
     // 얼굴을 화면에서 가장 대비가 센 곳으로 만든다.
@@ -906,6 +1503,7 @@ class HumanoidRenderer {
     canvas.save();
     canvas.clipPath(skull);
     final keyAt = Offset(hLight.dir.dx, hLight.dir.dy) * (hl * 0.30);
+    final faceBase = beast ? _beastHeadSurface.base : pal.skin;
     canvas.drawCircle(
       keyAt,
       hl * 0.46,
@@ -916,8 +1514,8 @@ class HumanoidRenderer {
           keyAt,
           hl * 0.46,
           [
-            pal.skin.lighten(0.34).fade(0.30),
-            pal.skin.lighten(0.20).fade(0.10),
+            faceBase.lighten(0.34).fade(0.30),
+            faceBase.lighten(0.20).fade(0.10),
             const Color(0x00000000),
           ],
           const [0.0, 0.45, 1.0],
@@ -944,7 +1542,9 @@ class HumanoidRenderer {
     canvas.restore();
 
     // 짐승형의 아래턱. 벌린 입이 실루엣 밖으로 나가야 포효가 읽힌다.
-    if (beast) {
+    if (beast &&
+        beastForm != BeastForm.wraith &&
+        beastForm != BeastForm.arachnid) {
       final open = sk.pose.mouth.clamp(0.0, 1.0);
       final jaw = tube(
         [
@@ -955,8 +1555,14 @@ class HumanoidRenderer {
         [hl * 0.22, hl * 0.17, hl * 0.07],
         samples: 14,
       );
-      paintSurface(canvas, jaw, Surface(pal.skinDeep, Finish.skin), hLight,
-          detail: q, occlusion: 0.3);
+      paintSurface(
+        canvas,
+        jaw,
+        Surface(pal.skinDeep, Finish.skin),
+        hLight,
+        detail: q,
+        occlusion: 0.3,
+      );
       // 이빨.
       for (var i = 0; i < 4; i++) {
         final t = 0.24 + i * 0.16;
@@ -966,8 +1572,13 @@ class HumanoidRenderer {
           [hl * 0.030, hl * 0.004],
           samples: 6,
         );
-        paintSurface(canvas, fang, Surface(pal.metal, Finish.bone), hLight,
-            detail: q);
+        paintSurface(
+          canvas,
+          fang,
+          Surface(pal.metal, Finish.bone),
+          hLight,
+          detail: q,
+        );
       }
     }
 
@@ -982,7 +1593,7 @@ class HumanoidRenderer {
     }
 
     if (beast) {
-      _horns(canvas, hLight, iso, hl, q);
+      _beastCrown(canvas, hLight, iso, hl, q);
     } else {
       _hairAndHelm(canvas, hLight, iso, hl, q, f);
     }
@@ -990,30 +1601,156 @@ class HumanoidRenderer {
     canvas.restore();
   }
 
-  /// 뿔. 아이소에서는 머리 위가 실루엣의 왕좌이므로, 종을 알리는 정보를
-  /// 여기에 몰아준다.
-  void _horns(Canvas canvas, LightRig light, IsoView iso, double hl, double q) {
-    final curl = 0.6 + _noise.at1(spec.seed * 0.11) * 1.2;
-    for (final side in [1.0, 0.55]) {
-      final horn = tube(
-        [
-          Offset(-hl * 0.14, -hl * 0.34),
-          Offset(-hl * 0.34 * side, -hl * 0.70),
-          Offset(-hl * 0.16 * side, -hl * 0.98),
-          Offset(hl * (0.16 * curl) * side, -hl * 1.02),
-        ],
-        [hl * 0.19, hl * 0.13, hl * 0.08, hl * 0.015],
-        samples: 20,
-      );
-      paintSurface(canvas, horn, Surface(pal.metal, Finish.bone), light,
-          detail: q, occlusion: 0.12, edgeRim: true, seed: spec.seed + 31);
-      paintTopPlane(canvas, horn, light, iso, strength: 0.55);
+  /// The head carries each monster's secondary read: horns for the brute,
+  /// swept antlers for the drake, a broken crown for the wraith, and a low
+  /// eye/mandible cluster for the brood creature.
+  void _beastCrown(
+    Canvas canvas,
+    LightRig light,
+    IsoView iso,
+    double hl,
+    double q,
+  ) {
+    switch (beastForm) {
+      case BeastForm.brute:
+        final curl = 0.6 + _noise.at1(spec.seed * 0.11) * 1.2;
+        for (final side in [1.0, 0.55]) {
+          final horn = tube(
+            [
+              Offset(-hl * 0.14, -hl * 0.34),
+              Offset(-hl * 0.34 * side, -hl * 0.70),
+              Offset(-hl * 0.16 * side, -hl * 0.98),
+              Offset(hl * (0.16 * curl) * side, -hl * 1.02),
+            ],
+            [hl * 0.19, hl * 0.13, hl * 0.08, hl * 0.015],
+            samples: 20,
+          );
+          paintSurface(
+            canvas,
+            horn,
+            Surface(pal.metal, Finish.bone),
+            light,
+            detail: q,
+            occlusion: 0.12,
+            edgeRim: true,
+            seed: spec.seed + 31,
+          );
+          paintTopPlane(canvas, horn, light, iso, strength: 0.55);
+        }
+      case BeastForm.drake:
+        for (final sign in [-1.0, 1.0]) {
+          final horn = tube(
+            [
+              Offset(-hl * 0.18, -hl * 0.28 + sign * hl * 0.10),
+              Offset(-hl * 0.50, -hl * 0.50 + sign * hl * 0.18),
+              Offset(-hl * 0.88, -hl * 0.46 + sign * hl * 0.24),
+              Offset(-hl * 1.18, -hl * 0.28 + sign * hl * 0.28),
+            ],
+            [hl * 0.14, hl * 0.10, hl * 0.055, hl * 0.008],
+            samples: 18,
+          );
+          paintSurface(
+            canvas,
+            horn,
+            Surface(pal.metal, Finish.bone),
+            light,
+            detail: q,
+            occlusion: sign < 0 ? 0.20 : 0.08,
+            edgeRim: true,
+            seed: spec.seed + 41 + sign.round(),
+          );
+          paintTopPlane(canvas, horn, light, iso, strength: 0.48);
+        }
+      case BeastForm.wraith:
+        final halo = Paint()
+          ..isAntiAlias = true
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1.0, hl * 0.075)
+          ..color = pal.glow.fade(0.72);
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset(-hl * 0.18, -hl * 0.30),
+            width: hl * 1.55,
+            height: hl * 0.72,
+          ),
+          halo,
+        );
+        for (var i = 0; i < 5; i++) {
+          final x = (i - 2) * hl * 0.18;
+          final root = Offset(x - hl * 0.18, -hl * 0.42);
+          final shard = tube(
+            [
+              root,
+              root + Offset(x * 0.18, -hl * (0.34 + (i.isEven ? 0.07 : 0.0))),
+            ],
+            [hl * 0.055, hl * 0.006],
+            samples: 7,
+          );
+          paintSurface(
+            canvas,
+            shard,
+            Surface(pal.metal, Finish.bone, glow: 0.22, glowColor: pal.glow),
+            light,
+            detail: q,
+            occlusion: 0.12,
+            edgeRim: true,
+          );
+        }
+      case BeastForm.arachnid:
+        // Eight eyes form one bright, low cluster instead of a human face.
+        for (var row = 0; row < 2; row++) {
+          for (var i = 0; i < 4; i++) {
+            final eye = Offset(
+              hl * (0.06 + i * 0.13),
+              hl * (-0.14 + row * 0.13 + (i.isOdd ? 0.025 : 0)),
+            );
+            final r = hl * (row == 0 ? 0.052 : 0.043);
+            canvas.drawCircle(
+              eye,
+              r * 1.9,
+              Paint()..color = pal.glow.fade(0.16),
+            );
+            canvas.drawCircle(eye, r, Paint()..color = pal.eye.lighten(0.22));
+            canvas.drawCircle(
+              eye + Offset(r * 0.20, -r * 0.22),
+              r * 0.28,
+              Paint()..color = const Color(0xFFFFFFFF).fade(0.80),
+            );
+          }
+        }
+        for (final sign in [-1.0, 1.0]) {
+          final mandible = tube(
+            [
+              Offset(hl * 0.22, hl * (0.12 + sign * 0.10)),
+              Offset(hl * 0.52, hl * (0.26 + sign * 0.22)),
+              Offset(hl * 0.66, hl * (0.12 + sign * 0.15)),
+            ],
+            [hl * 0.10, hl * 0.07, hl * 0.008],
+            samples: 12,
+          );
+          paintSurface(
+            canvas,
+            mandible,
+            _plate,
+            light,
+            detail: q,
+            occlusion: 0.10,
+            edgeRim: true,
+          );
+        }
     }
   }
 
   /// 이목구비. 아이소에서 머리는 작으므로 눈만 확실히 읽히면 된다 —
   /// 눈 사이 간격을 페이싱으로 좁혀 3/4 각도를 만든다.
-  void _face(Canvas canvas, LightRig light, double hl, Pose pose, Facing f, double q) {
+  void _face(
+    Canvas canvas,
+    LightRig light,
+    double hl,
+    Pose pose,
+    Facing f,
+    double q,
+  ) {
     final open = pose.eyeOpen.clamp(0.0, 1.0);
     if (open < 0.06) {
       // 감긴 눈은 선 하나로. 죽음·피격에서 이 한 줄이 표정을 만든다.
@@ -1037,25 +1774,24 @@ class HumanoidRenderer {
     final vis = f.faceVisible;
     final gap = hl * 0.30 * (1 - f.profile);
     final eyes = <(double, double)>[
-      (hl * 0.30, 1.0),                     // 가까운 눈 — 항상 보인다
-      (hl * 0.30 - gap, f.bothEyes),        // 먼 눈 — 3/4 를 지나면 가린다
+      (hl * 0.30, 1.0), // 가까운 눈 — 항상 보인다
+      (hl * 0.30 - gap, f.bothEyes), // 먼 눈 — 3/4 를 지나면 가린다
     ];
     for (final (ex, weight) in eyes) {
       final a = (weight * vis).clamp(0.0, 1.0);
       if (a < 0.04) continue;
       final eye = blob(Offset(ex, -hl * 0.05), hl * 0.075, hl * 0.055 * open);
       paintSurface(
-          canvas,
-          eye,
-          Surface(pal.eye, Finish.gem,
-              glow: 0.9, glowColor: pal.glow, alpha: a),
-          light,
-          detail: q);
+        canvas,
+        eye,
+        Surface(pal.eye, Finish.gem, glow: 0.9, glowColor: pal.glow, alpha: a),
+        light,
+        detail: q,
+      );
       canvas.drawCircle(
         Offset(ex + hl * 0.012, -hl * 0.05),
         hl * 0.026 * open,
-        Paint()
-          ..color = const Color(0xFF120E14).withValues(alpha: 0.85 * a),
+        Paint()..color = const Color(0xFF120E14).withValues(alpha: 0.85 * a),
       );
     }
 
@@ -1082,8 +1818,11 @@ class HumanoidRenderer {
     canvas.drawOval(
       mouth,
       Paint()
-        ..color = mix(pal.skinDeep, const Color(0xFF1A0C10), 0.55 + 0.3 * m)
-            .withValues(alpha: vis),
+        ..color = mix(
+          pal.skinDeep,
+          const Color(0xFF1A0C10),
+          0.55 + 0.3 * m,
+        ).withValues(alpha: vis),
     );
   }
 
@@ -1092,7 +1831,12 @@ class HumanoidRenderer {
   /// 측면에서 얼굴이 밋밋한 타원으로 남으면 사람 머리로 안 보인다. 실루엣
   /// 밖으로 나온 코 하나가 방향을 확정한다 — 정면에서는 0, 완전 측면에서 최대.
   void _profileFeatures(
-      Canvas canvas, LightRig light, double hl, Facing f, double q) {
+    Canvas canvas,
+    LightRig light,
+    double hl,
+    Facing f,
+    double q,
+  ) {
     final jut = f.profileJut;
     final back = f.showBack;
     // 후면에서는 코가 반대쪽(화면 뒤)이므로 그리지 않는다.
@@ -1104,8 +1848,14 @@ class HumanoidRenderer {
       Offset(hl * (0.40 + 0.13 * jut), hl * 0.04),
       Offset(hl * 0.40, hl * 0.08),
     ], tension: 0.8);
-    paintSurface(canvas, nose, Surface(pal.skin, Finish.skin), light,
-        detail: q, rim: false);
+    paintSurface(
+      canvas,
+      nose,
+      Surface(pal.skin, Finish.skin),
+      light,
+      detail: q,
+      rim: false,
+    );
 
     // 턱 — 코보다 덜 나오되 같은 방향으로. 둘이 함께 옆얼굴을 만든다.
     final chin = smoothClosedPath([
@@ -1114,8 +1864,14 @@ class HumanoidRenderer {
       Offset(hl * 0.30, hl * 0.38),
       Offset(hl * 0.24, hl * 0.30),
     ], tension: 0.8);
-    paintSurface(canvas, chin, Surface(pal.skin, Finish.skin), light,
-        detail: q, rim: false);
+    paintSurface(
+      canvas,
+      chin,
+      Surface(pal.skin, Finish.skin),
+      light,
+      detail: q,
+      rim: false,
+    );
   }
 
   /// 뒷머리 — 얼굴보다 **먼저** 그린다.
@@ -1124,7 +1880,12 @@ class HumanoidRenderer {
   /// 아무리 두꺼워도 이목구비를 가리지 않는다. 실루엣에서 머리 부피를 만드는
   /// 것이 이쪽이고, 앞머리([_hairFront])는 이마 위만 덮는 얇은 층이다.
   void _hairBack(
-      Canvas canvas, LightRig light, IsoView iso, double hl, double q) {
+    Canvas canvas,
+    LightRig light,
+    IsoView iso,
+    double hl,
+    double q,
+  ) {
     final s = spec;
 
     // 후드의 **뒤통수 부분**도 여기서 그린다. 얼굴보다 먼저 깔아야 두건이
@@ -1139,8 +1900,15 @@ class HumanoidRenderer {
         warp: (a, t) =>
             1 + 0.18 * math.max(0.0, -math.cos(a)) + 0.08 * math.sin(a * 2),
       );
-      paintSurface(canvas, cowl, Surface(pal.clothShade, Finish.cloth), light,
-          detail: q, occlusion: 0.12, edgeRim: true);
+      paintSurface(
+        canvas,
+        cowl,
+        Surface(pal.clothShade, Finish.cloth),
+        light,
+        detail: q,
+        occlusion: 0.12,
+        edgeRim: true,
+      );
       paintTopPlane(canvas, cowl, light, iso, strength: 0.5);
     }
 
@@ -1172,8 +1940,16 @@ class HumanoidRenderer {
       ],
       samples: 24,
     );
-    paintSurface(canvas, hair, Surface(pal.hair, Finish.hair), light,
-        detail: q, occlusion: 0.18, edgeRim: true, seed: s.seed + 5);
+    paintSurface(
+      canvas,
+      hair,
+      Surface(pal.hair, Finish.hair),
+      light,
+      detail: q,
+      occlusion: 0.18,
+      edgeRim: true,
+      seed: s.seed + 5,
+    );
     paintTopPlane(canvas, hair, light, iso, strength: 0.4);
   }
 
@@ -1183,7 +1959,12 @@ class HumanoidRenderer {
   /// 아래로 내려오는 끝점도 -0.10hl 을 넘지 않는다. 이 한 층이 있어야 머리가
   /// 두개골에 가발을 씌운 것처럼 보이지 않는다.
   void _hairFront(
-      Canvas canvas, LightRig light, IsoView iso, double hl, double q) {
+    Canvas canvas,
+    LightRig light,
+    IsoView iso,
+    double hl,
+    double q,
+  ) {
     final s = spec;
     if (s.headGear != HeadGear.none && s.headGear != HeadGear.circlet) return;
 
@@ -1196,8 +1977,15 @@ class HumanoidRenderer {
       [hl * 0.10, hl * 0.20, hl * 0.26],
       samples: 16,
     );
-    paintSurface(canvas, fringe, Surface(pal.hair, Finish.hair), light,
-        detail: q, occlusion: 0.10, seed: s.seed + 6);
+    paintSurface(
+      canvas,
+      fringe,
+      Surface(pal.hair, Finish.hair),
+      light,
+      detail: q,
+      occlusion: 0.10,
+      seed: s.seed + 6,
+    );
     paintTopPlane(canvas, fringe, light, iso, strength: 0.46);
   }
 
@@ -1218,12 +2006,21 @@ class HumanoidRenderer {
         break;
       case HeadGear.circlet:
         final band = tube(
-          [Offset(hl * 0.36, -hl * 0.20), Offset(0, -hl * 0.40), Offset(-hl * 0.40, -hl * 0.18)],
+          [
+            Offset(hl * 0.36, -hl * 0.20),
+            Offset(0, -hl * 0.40),
+            Offset(-hl * 0.40, -hl * 0.18),
+          ],
           [hl * 0.05, hl * 0.06, hl * 0.05],
           samples: 14,
         );
-        paintSurface(canvas, band, Surface(pal.metalWarm, Finish.metal, contrast: 0.85 + 0.5 * (0.9)), light,
-            detail: q);
+        paintSurface(
+          canvas,
+          band,
+          Surface(pal.metalWarm, Finish.metal, contrast: 0.85 + 0.5 * (0.9)),
+          light,
+          detail: q,
+        );
       case HeadGear.hood:
         // 두건의 **앞테두리**만. 뒤통수는 이미 [_hairBack] 이 깔아 두었고,
         // 여기서는 이마를 가로지르는 천만 얹어 얼굴을 남긴다. 후드의 인상은
@@ -1237,8 +2034,14 @@ class HumanoidRenderer {
           [hl * 0.12, hl * 0.15, hl * 0.20],
           samples: 16,
         );
-        paintSurface(canvas, brim, Surface(pal.cloth, Finish.cloth), light,
-            detail: q, occlusion: 0.08);
+        paintSurface(
+          canvas,
+          brim,
+          Surface(pal.cloth, Finish.cloth),
+          light,
+          detail: q,
+          occlusion: 0.08,
+        );
         paintTopPlane(canvas, brim, light, iso, strength: 0.5);
 
         // 두건 안쪽 그늘. 이목구비 위에 얹어 얼굴이 어둠 속에 있게 한다.
@@ -1259,8 +2062,15 @@ class HumanoidRenderer {
           points: 16,
           warp: (a, t) => 1 + 0.07 * math.sin(a * 2 + 0.6),
         );
-        paintSurface(canvas, helm, _plate, light,
-            detail: q, occlusion: 0.08, edgeRim: true);
+        paintSurface(
+          canvas,
+          helm,
+          _plate,
+          light,
+          detail: q,
+          occlusion: 0.08,
+          edgeRim: true,
+        );
         paintTopPlane(canvas, helm, light, iso, strength: 0.66);
         if (s.trimAccent) {
           trimBand(canvas, helm, pal.accent, light, width: 1.5, alpha: 0.5);
@@ -1278,16 +2088,27 @@ class HumanoidRenderer {
           );
           canvas.drawPath(
             slit,
-            Paint()..color = const Color(0xFF0A0910).withValues(alpha: 0.88 * vis),
+            Paint()
+              ..color = const Color(0xFF0A0910).withValues(alpha: 0.88 * vis),
           );
-          final spark = blob(Offset(hl * 0.26, -hl * 0.055), hl * 0.075, hl * 0.030);
+          final spark = blob(
+            Offset(hl * 0.26, -hl * 0.055),
+            hl * 0.075,
+            hl * 0.030,
+          );
           paintSurface(
-              canvas,
-              spark,
-              Surface(pal.eye, Finish.energy,
-                  glow: 1.0, glowColor: pal.glow, alpha: vis),
-              light,
-              detail: q);
+            canvas,
+            spark,
+            Surface(
+              pal.eye,
+              Finish.energy,
+              glow: 1.0,
+              glowColor: pal.glow,
+              alpha: vis,
+            ),
+            light,
+            detail: q,
+          );
           glowPath(canvas, spark, pal.glow, hl * 0.16, alpha: 0.7 * vis);
         }
         if (s.headGear == HeadGear.hornedHelm) {
@@ -1301,8 +2122,13 @@ class HumanoidRenderer {
               [hl * 0.13, hl * 0.09, hl * 0.02],
               samples: 14,
             );
-            paintSurface(canvas, horn, Surface(pal.metal, Finish.bone), light,
-                detail: q);
+            paintSurface(
+              canvas,
+              horn,
+              Surface(pal.metal, Finish.bone),
+              light,
+              detail: q,
+            );
             paintTopPlane(canvas, horn, light, iso, strength: 0.5);
           }
         }
@@ -1331,22 +2157,19 @@ class HumanoidRenderer {
 
     final sway = wobble(time * 1.6, spec.seed * 0.7) * _h * 0.010;
     // 정지 상태에서는 중력으로 곧게 늘어지고, 흐름이 강할수록 뒤로 들린다.
-    final tail = top +
+    final tail =
+        top +
         backDir * len * (0.22 + 0.86 * flow) +
         Offset(0, len * (0.88 - 0.74 * flow) + sway);
-    final mid = top +
+    final mid =
+        top +
         backDir * len * (0.10 + 0.45 * flow) +
         Offset(0, len * (0.46 - 0.34 * flow) + sway * 0.5);
 
     // 폭은 어깨를 넘지 않는다. 망토가 어깨보다 넓어지면 실루엣에서 몸이
     // 사라지고 보라색 덩어리만 남는다.
     final cape = tube(
-      [
-        top,
-        lerpO(top, mid, 0.45),
-        mid,
-        tail,
-      ],
+      [top, lerpO(top, mid, 0.45), mid, tail],
       [
         _shoulderW * 0.28,
         _shoulderW * 0.36,
@@ -1356,8 +2179,16 @@ class HumanoidRenderer {
       samples: 26,
       capEnd: false,
     );
-    paintSurface(canvas, cape, Surface(pal.cloth, Finish.cloth), light,
-        detail: q, occlusion: 0.26, edgeRim: true, seed: spec.seed + 11);
+    paintSurface(
+      canvas,
+      cape,
+      Surface(pal.cloth, Finish.cloth),
+      light,
+      detail: q,
+      occlusion: 0.26,
+      edgeRim: true,
+      seed: spec.seed + 11,
+    );
     paintTopPlane(canvas, cape, light, iso, strength: 0.22);
     if (spec.trimAccent) {
       trimBand(canvas, cape, pal.accent, light, width: 1.2, alpha: 0.4);
@@ -1392,8 +2223,11 @@ class HumanoidRenderer {
     // 수직축에 가깝게 세워 쥐고, 휘두르는 순간에만 손을 따라간다.
     final up = (sk.chest - sk.pelvis).normalized();
     final swing = sk.pose.weaponSwing.clamp(0.0, 1.0);
-    final pole = lerpO(up, Offset(math.cos(dir), math.sin(dir)), 0.20 + 0.62 * swing)
-        .normalized();
+    final pole = lerpO(
+      up,
+      Offset(math.cos(dir), math.sin(dir)),
+      0.20 + 0.62 * swing,
+    ).normalized();
 
     // 도검류는 장병기만큼 세우지는 않는다 — 늘어뜨린 검이 자연스럽다. 다만
     // 손목 방향을 그대로 쓰면 신장의 절반짜리 칼날이 지면을 뚫으므로, 쉴
@@ -1416,33 +2250,58 @@ class HumanoidRenderer {
         final a = grip - pole * len * 0.34;
         final b = grip + pole * len * 0.66;
         final shaft = tube([a, b], [_h * 0.010, _h * 0.008], samples: 10);
-        paintSurface(canvas, shaft, Surface(pal.leather, Finish.leather), light,
-            detail: q);
+        paintSurface(
+          canvas,
+          shaft,
+          Surface(pal.leather, Finish.leather),
+          light,
+          detail: q,
+        );
         final orb = blob(b, _h * 0.030, _h * 0.030);
-        paintSurface(canvas, orb, Surface(pal.glow, Finish.gem, glow: 0.9, glowColor: pal.glow), light,
-            detail: q);
+        paintSurface(
+          canvas,
+          orb,
+          Surface(pal.glow, Finish.gem, glow: 0.9, glowColor: pal.glow),
+          light,
+          detail: q,
+        );
         glowPath(canvas, orb, pal.glow, _h * 0.09, alpha: 1.0);
       case WeaponKind.spear:
         final len = _h * 0.86;
         final a = grip - pole * len * 0.36;
         final b = grip + pole * len * 0.64;
         final shaft = tube([a, b], [_h * 0.009, _h * 0.008], samples: 10);
-        paintSurface(canvas, shaft, Surface(pal.leather, Finish.leather), light,
-            detail: q);
+        paintSurface(
+          canvas,
+          shaft,
+          Surface(pal.leather, Finish.leather),
+          light,
+          detail: q,
+        );
         final tip = tube(
           [b - pole * _h * 0.06, b],
           [_h * 0.020, _h * 0.002],
           samples: 8,
         );
-        paintSurface(canvas, tip, Surface(pal.metal, Finish.metal, contrast: 0.85 + 0.5 * (0.95)), light,
-            detail: q);
+        paintSurface(
+          canvas,
+          tip,
+          Surface(pal.metal, Finish.metal, contrast: 0.85 + 0.5 * (0.95)),
+          light,
+          detail: q,
+        );
       case WeaponKind.axe:
         final len = _h * 0.42;
         final a = grip - edge * len * 0.28;
         final b = grip + edge * len * 0.72;
         final shaft = tube([a, b], [_h * 0.011, _h * 0.009], samples: 8);
-        paintSurface(canvas, shaft, Surface(pal.leather, Finish.leather), light,
-            detail: q);
+        paintSurface(
+          canvas,
+          shaft,
+          Surface(pal.leather, Finish.leather),
+          light,
+          detail: q,
+        );
         final n = edge.perp;
         final head = smoothClosedPath([
           b + n * _h * 0.012,
@@ -1450,8 +2309,13 @@ class HumanoidRenderer {
           b + n * _h * 0.10 + edge * _h * 0.03,
           b - n * _h * 0.012,
         ]);
-        paintSurface(canvas, head, Surface(pal.metal, Finish.metal, contrast: 0.85 + 0.5 * (0.9)), light,
-            detail: q);
+        paintSurface(
+          canvas,
+          head,
+          Surface(pal.metal, Finish.metal, contrast: 0.85 + 0.5 * (0.9)),
+          light,
+          detail: q,
+        );
         paintTopPlane(canvas, head, light, iso, strength: 0.5);
       case WeaponKind.daggers:
         _blade(canvas, grip, edgeDir, _h * 0.20, _h * 0.014, light, q);
@@ -1471,7 +2335,12 @@ class HumanoidRenderer {
   /// 각도를 따르지 않고 몸의 수직축에 세운다 — 팔을 흔들어도 방패면이
   /// 팔랑거리지 않아야 무게가 실린다.
   void _shield(
-      Canvas canvas, Skeleton sk, LightRig light, IsoView iso, double q) {
+    Canvas canvas,
+    Skeleton sk,
+    LightRig light,
+    IsoView iso,
+    double q,
+  ) {
     final arm = sk.armFar;
     final up = (sk.chest - sk.pelvis).normalized();
     final grip = lerpO(arm.c, arm.d, 0.4);
@@ -1491,16 +2360,27 @@ class HumanoidRenderer {
       // 아래로 살짝 뾰족한 연 방패. 완전한 원보다 방향이 읽힌다.
       warp: (a, t) => 1 + 0.10 * math.sin(a) - 0.06 * math.cos(a * 2),
     );
-    paintSurface(canvas, face, _plate, light,
-        detail: q, occlusion: 0.16, edgeRim: true);
+    paintSurface(
+      canvas,
+      face,
+      _plate,
+      light,
+      detail: q,
+      occlusion: 0.16,
+      edgeRim: true,
+    );
     paintTopPlane(canvas, face, light, iso, strength: 0.42);
     trimBand(canvas, face, pal.accent, light, width: 2.0, alpha: 0.6);
 
     // 보스(중앙 돌기). 평평한 판에 하이라이트 하나가 더 생겨 금속으로 읽힌다.
     final boss = blob(center, r * 0.24, r * 0.26);
     paintSurface(
-        canvas, boss, Surface(pal.metalWarm, Finish.metal, contrast: 1.15), light,
-        detail: q);
+      canvas,
+      boss,
+      Surface(pal.metalWarm, Finish.metal, contrast: 1.15),
+      light,
+      detail: q,
+    );
   }
 
   void _blade(
@@ -1519,16 +2399,30 @@ class HumanoidRenderer {
     final tip = grip + f * len;
 
     // 자루와 폼멜.
-    final hilt = tube([grip - f * len * 0.20, base], [halfWidth * 0.55, halfWidth * 0.5], samples: 8);
-    paintSurface(canvas, hilt, Surface(pal.leather, Finish.leather), light,
-        detail: q);
+    final hilt = tube(
+      [grip - f * len * 0.20, base],
+      [halfWidth * 0.55, halfWidth * 0.5],
+      samples: 8,
+    );
+    paintSurface(
+      canvas,
+      hilt,
+      Surface(pal.leather, Finish.leather),
+      light,
+      detail: q,
+    );
     final guard = tube(
       [base - n * halfWidth * 2.6, base + n * halfWidth * 2.6],
       [halfWidth * 0.45, halfWidth * 0.45],
       samples: 8,
     );
-    paintSurface(canvas, guard, Surface(pal.metalWarm, Finish.metal, contrast: 0.85 + 0.5 * (0.85)), light,
-        detail: q);
+    paintSurface(
+      canvas,
+      guard,
+      Surface(pal.metalWarm, Finish.metal, contrast: 0.85 + 0.5 * (0.85)),
+      light,
+      detail: q,
+    );
 
     // 검신. 끝으로 갈수록 좁아지는 각진 실루엣이 금속의 밴딩을 살린다.
     final blade = smoothClosedPath([
@@ -1539,8 +2433,14 @@ class HumanoidRenderer {
       lerpO(base, tip, 0.55) - n * halfWidth * 0.9,
       base - n * halfWidth,
     ], tension: 0.4);
-    paintSurface(canvas, blade, Surface(pal.metal, Finish.metal, contrast: 0.85 + 0.5 * (0.97)), light,
-        detail: q, occlusion: 0.02);
+    paintSurface(
+      canvas,
+      blade,
+      Surface(pal.metal, Finish.metal, contrast: 0.85 + 0.5 * (0.97)),
+      light,
+      detail: q,
+      occlusion: 0.02,
+    );
     if (s.glowRunes) {
       glowPath(canvas, blade, pal.glow, halfWidth * 3, alpha: 0.5);
     }
@@ -1561,8 +2461,13 @@ class HumanoidRenderer {
       [_h * 0.004, _h * 0.010, _h * 0.004],
       samples: 20,
     );
-    paintSurface(canvas, bow, Surface(pal.leather, Finish.leather), light,
-        detail: q);
+    paintSurface(
+      canvas,
+      bow,
+      Surface(pal.leather, Finish.leather),
+      light,
+      detail: q,
+    );
 
     // 시위. 당긴 손까지 삼각형으로 이어져 장력이 보인다.
     canvas.drawPath(
@@ -1573,7 +2478,11 @@ class HumanoidRenderer {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = math.max(1.0, _h * 0.004)
-        ..color = mix(pal.leather, const Color(0xFFFFFFFF), 0.5).withValues(alpha: 0.85),
+        ..color = mix(
+          pal.leather,
+          const Color(0xFFFFFFFF),
+          0.5,
+        ).withValues(alpha: 0.85),
     );
 
     // 화살.
@@ -1620,8 +2529,11 @@ class HumanoidRenderer {
           ..strokeWidth = _h * 0.030 * p.weaponSwing
           ..strokeCap = StrokeCap.round
           ..blendMode = BlendMode.plus
-          ..color = mix(pal.glow, const Color(0xFFFFFFFF), 0.55)
-              .withValues(alpha: (0.5 * p.weaponSwing).clamp(0.0, 1.0))
+          ..color = mix(
+            pal.glow,
+            const Color(0xFFFFFFFF),
+            0.55,
+          ).withValues(alpha: (0.5 * p.weaponSwing).clamp(0.0, 1.0))
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, _h * 0.02),
       );
     }
@@ -1635,7 +2547,9 @@ class HumanoidRenderer {
           ..blendMode = BlendMode.plus
           ..shader = RadialGradient(
             colors: [
-              const Color(0xFFFF6A4A).withValues(alpha: (0.34 * p.impact).clamp(0.0, 1.0)),
+              const Color(
+                0xFFFF6A4A,
+              ).withValues(alpha: (0.34 * p.impact).clamp(0.0, 1.0)),
               const Color(0x00000000),
             ],
           ).createShader(b),

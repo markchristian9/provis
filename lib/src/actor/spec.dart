@@ -9,18 +9,25 @@ enum Archetype { knight, berserker, ranger, mage, assassin, paladin }
 
 extension ArchetypeLabel on Archetype {
   String get label => switch (this) {
-        Archetype.knight => 'Knight',
-        Archetype.berserker => 'Berserker',
-        Archetype.ranger => 'Ranger',
-        Archetype.mage => 'Mage',
-        Archetype.assassin => 'Assassin',
-        Archetype.paladin => 'Paladin',
-      };
+    Archetype.knight => 'Knight',
+    Archetype.berserker => 'Berserker',
+    Archetype.ranger => 'Ranger',
+    Archetype.mage => 'Mage',
+    Archetype.assassin => 'Assassin',
+    Archetype.paladin => 'Paladin',
+  };
 }
 
 enum WeaponKind { sword, greatsword, axe, staff, spear, daggers, bow, none }
 
 enum HeadGear { none, circlet, hood, halfHelm, fullHelm, hornedHelm }
+
+/// The large-form silhouette used by a monster in the isometric renderer.
+///
+/// This is deliberately a small, gameplay-facing vocabulary rather than an
+/// anatomical taxonomy. Each value owns a different primary read at game
+/// scale: mass, wings, a dissolving mantle, or many legs.
+enum BeastForm { brute, drake, wraith, arachnid }
 
 /// 휴머노이드 한 명분의 완전한 명세. 렌더러는 이것만 보고 그린다.
 class HumanoidSpec {
@@ -111,7 +118,8 @@ class HumanoidSpec {
 
   static HumanoidSpec generate(int seed, {Archetype? forceArchetype}) {
     final r = Rng(seed);
-    final Archetype arch = forceArchetype ?? r.pick<Archetype>(Archetype.values);
+    final Archetype arch =
+        forceArchetype ?? r.pick<Archetype>(Archetype.values);
 
     // 원형별 체형 다이얼.
     late double heads, broad, bulk, poise;
@@ -193,40 +201,57 @@ class HumanoidSpec {
       depthOffset: h * r.bell(0.030, 0.048),
       weapon: switch (arch) {
         Archetype.knight => r.weighted(
-            [WeaponKind.sword, WeaponKind.spear, WeaponKind.axe],
-            [5, 2, 2],
-          ),
+          [WeaponKind.sword, WeaponKind.spear, WeaponKind.axe],
+          [5, 2, 2],
+        ),
         Archetype.berserker => r.weighted(
-            [WeaponKind.axe, WeaponKind.greatsword],
-            [3, 3],
-          ),
+          [WeaponKind.axe, WeaponKind.greatsword],
+          [3, 3],
+        ),
         Archetype.ranger => r.weighted(
-            [WeaponKind.bow, WeaponKind.daggers, WeaponKind.spear],
-            [4, 2, 1],
-          ),
+          [WeaponKind.bow, WeaponKind.daggers, WeaponKind.spear],
+          [4, 2, 1],
+        ),
         Archetype.mage => WeaponKind.staff,
         Archetype.assassin => r.weighted(
-            [WeaponKind.daggers, WeaponKind.sword],
-            [5, 1],
-          ),
+          [WeaponKind.daggers, WeaponKind.sword],
+          [5, 1],
+        ),
         Archetype.paladin => r.weighted(
-            [WeaponKind.sword, WeaponKind.greatsword],
-            [4, 2],
-          ),
+          [WeaponKind.sword, WeaponKind.greatsword],
+          [4, 2],
+        ),
       },
       headGear: switch (arch) {
         Archetype.knight => r.weighted(
-            [HeadGear.halfHelm, HeadGear.fullHelm, HeadGear.hornedHelm, HeadGear.none],
-            [3, 3, 2, 1],
-          ),
+          [
+            HeadGear.halfHelm,
+            HeadGear.fullHelm,
+            HeadGear.hornedHelm,
+            HeadGear.none,
+          ],
+          [3, 3, 2, 1],
+        ),
         Archetype.berserker => r.weighted(
-            [HeadGear.hornedHelm, HeadGear.none, HeadGear.halfHelm],
-            [4, 3, 2],
-          ),
-        Archetype.ranger => r.weighted([HeadGear.hood, HeadGear.none, HeadGear.circlet], [4, 3, 1]),
-        Archetype.mage => r.weighted([HeadGear.hood, HeadGear.circlet, HeadGear.none], [5, 2, 1]),
-        Archetype.assassin => r.weighted([HeadGear.hood, HeadGear.none], [6, 1]),
-        Archetype.paladin => r.weighted([HeadGear.fullHelm, HeadGear.halfHelm, HeadGear.circlet], [3, 3, 2]),
+          [HeadGear.hornedHelm, HeadGear.none, HeadGear.halfHelm],
+          [4, 3, 2],
+        ),
+        Archetype.ranger => r.weighted(
+          [HeadGear.hood, HeadGear.none, HeadGear.circlet],
+          [4, 3, 1],
+        ),
+        Archetype.mage => r.weighted(
+          [HeadGear.hood, HeadGear.circlet, HeadGear.none],
+          [5, 2, 1],
+        ),
+        Archetype.assassin => r.weighted(
+          [HeadGear.hood, HeadGear.none],
+          [6, 1],
+        ),
+        Archetype.paladin => r.weighted(
+          [HeadGear.fullHelm, HeadGear.halfHelm, HeadGear.circlet],
+          [3, 3, 2],
+        ),
       },
       hasCape: switch (arch) {
         Archetype.knight => r.chance(0.75),
@@ -243,7 +268,9 @@ class HumanoidSpec {
         _ => r.chance(0.9),
       },
       pauldronScale: r.bell(0.9, 1.5),
-      hasShield: arch == Archetype.knight || arch == Archetype.paladin ? r.chance(0.45) : false,
+      hasShield: arch == Archetype.knight || arch == Archetype.paladin
+          ? r.chance(0.45)
+          : false,
       armorHeaviness: switch (arch) {
         Archetype.knight => r.bell(0.7, 0.95),
         Archetype.paladin => r.bell(0.75, 1.0),

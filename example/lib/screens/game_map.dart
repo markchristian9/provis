@@ -12,10 +12,12 @@ import '../audio/game_audio.dart';
 import '../characters/roster.dart';
 import '../combat/attack_combo.dart';
 import '../combat/attack_mode.dart';
+import '../combat/damage_popup.dart';
 import '../combat/projectile.dart';
 import '../world/camera.dart';
 import '../world/village.dart';
 import '../i18n/lang.dart';
+import 'game_over.dart';
 
 /// 게임 맵 — 선택한 캐릭터로 입장하고, 명부의 모든 몬스터가 한 마리씩 나온다.
 ///
@@ -33,9 +35,16 @@ class GameMapScreen extends StatefulWidget {
 
 class _GameMapScreenState extends State<GameMapScreen> {
   late final FieldGame _game = FieldGame(hero: widget.hero)
-    ..audio.onReady = _onAudioReady;
+    ..audio.onReady = _onAudioReady
+    ..onGameOver = _onGameOver;
 
   void _onAudioReady() {
+    if (mounted) setState(() {});
+  }
+
+  /// 게임 루프가 죽음 모션이 끝났다고 알려 온다. Flame 은 위젯 트리 밖에서
+  /// 도므로 상태 갱신은 여기서만 한다.
+  void _onGameOver() {
     if (mounted) setState(() {});
   }
 
@@ -169,6 +178,19 @@ class _GameMapScreenState extends State<GameMapScreen> {
               ),
             ),
           ),
+
+          // ── 패배 ───────────────────────────────────────────────────────
+          //
+          // 게임 위에 얹는다. 뒤에서 쓰러진 주인공이 그대로 보이고, 다시
+          // 도전할 때 마을과 소리 창고를 다시 굽지 않는다.
+          if (_game.gameOver)
+            GameOverOverlay(
+              heroName: widget.hero.name,
+              accent: widget.hero.accent,
+              slain: _game.slain,
+              onRetry: () => setState(_game.retry),
+              onQuit: () => Navigator.of(context).pop(),
+            ),
         ],
       ),
     );
@@ -295,6 +317,28 @@ class FieldGame extends FlameGame with TapCallbacks {
   final AttackCombo _combo = AttackCombo();
   final List<CombatProjectile> _projectiles = [];
 
+  /// 떠오르는 피해 숫자. 히트스톱·타격음이 "맞았다"를 말한다면 이쪽은
+  /// **얼마나** 맞았는지를 말한다.
+  final DamagePopupField _popups = DamagePopupField();
+
+  /// 영웅이 쓰러진 뒤 게임오버 화면이 뜨기까지 남은 시간(초).
+  ///
+  /// 즉시 덮으면 플레이어는 자기가 쓰러지는 것을 보지 못한다. 죽음 모션과
+  /// 마지막 비명이 끝날 틈을 준 뒤에 화면을 넘긴다.
+  static const double _gameOverDelay = 1.35;
+  double _gameOverIn = 0;
+
+  /// 게임오버 화면을 지금 띄워야 하는가. 위젯 층이 이 값을 읽는다.
+  bool get gameOver => !_heroAlive && _gameOverIn <= 0;
+
+  bool get heroAlive => _heroAlive;
+
+  /// 쓰러졌음을 위젯 층에 알린다. 게임 루프는 setState 를 부를 수 없다.
+  VoidCallback? onGameOver;
+
+  /// 이번 판에 쓰러뜨린 몬스터 수. 게임오버 화면이 성적으로 보여 준다.
+  int slain = 0;
+
   double _heroCooldown = 0;
 
   /// 흔들리기 전의 카메라 원점. 흔들림은 **여기로 정확히 돌아와야** 한다.
@@ -330,6 +374,8 @@ class FieldGame extends FlameGame with TapCallbacks {
     await add(_CombatProjectileLayer(this));
     // 이름표는 세계 위에 그려야 나무나 건물에 가려지지 않는다.
     await add(_CombatNameplateLayer(this));
+    // 피해 숫자는 그 이름표보다도 위에 온다.
+    await add(_DamagePopupLayer(this));
   }
 
   @override
@@ -411,6 +457,12 @@ class FieldGame extends FlameGame with TapCallbacks {
     _buildMap();
   }
 
+  /// 쓰러진 자리에서 같은 맵을 다시 시작한다.
+  ///
+  /// 맵 시드를 건드리지 않으므로 마을은 그대로다 — 진 판을 복기하려면 같은
+  /// 지형이어야 한다. 맵까지 바뀌면 그것은 재시작이 아니라 새 게임이다.
+  void retry() => _buildMap();
+
   void _buildMap() {
     _scene.props.clear();
     _scene.grid?.clear();
@@ -423,6 +475,9 @@ class FieldGame extends FlameGame with TapCallbacks {
     _heroCooldown = 0;
     _combo.reset();
     _projectiles.clear();
+    _popups.clear();
+    _gameOverIn = 0;
+    slain = 0;
     guarding = false;
     _scene.groundSeed = mapSeed;
     // 구워 둔 기물 텍스처를 놓아 준다. 이걸 빠뜨리면 맵을 다시 생성할 때마다
@@ -680,6 +735,17 @@ class FieldGame extends FlameGame with TapCallbacks {
     _updateProjectiles(dt);
     _updateMobs(dt);
     _updateCamera(dt);
+    _popups.update(dt);
+
+    // 죽음 모션이 끝나기를 기다렸다가 한 번만 알린다. 위젯 층은 Flame 의
+    // 프레임 안에 있지 않으므로 여기서 밀어 줘야 화면이 바뀐다.
+    if (_gameOverIn > 0) {
+      _gameOverIn -= dt;
+      if (_gameOverIn <= 0) {
+        _gameOverIn = 0;
+        onGameOver?.call();
+      }
+    }
   }
 
   void _updateHero(double dt) {
@@ -811,6 +877,19 @@ class FieldGame extends FlameGame with TapCallbacks {
     mob.hp = math.max(0, mob.hp - damage);
     final pan = _panOf(mob.actor.tile);
     final vol = _volumeAt(mob.actor.tile);
+
+    // 숫자는 체력을 깎은 **직후**에 띄운다. 죽는 타격에서도 마지막 한 대의
+    // 피해량은 보여야 한다 — 아래 분기에서 몬스터가 죽더라도 이 숫자는
+    // 자기 수명을 따로 산다.
+    _popups.add(
+      DamagePopup(
+        tile: mob.actor.tile,
+        amount: damage,
+        crit: damage > 1,
+        color: hero.accent,
+        airborne: mob.actor.airborne,
+      ),
+    );
     final armored = mob.actor.renderer.spec.armorHeaviness > 0.55;
     audio.play(
       armored ? SfxKeys.impactArmor : SfxKeys.impactFlesh,
@@ -824,6 +903,7 @@ class FieldGame extends FlameGame with TapCallbacks {
 
     if (mob.hp <= 0) {
       mob.alive = false;
+      slain++;
       mob.ctrl.stop();
       // death 는 원샷 목록에 없으므로 follow 가 덮어쓴다. 죽은 몬스터는
       // 아래 갱신 루프에서 통째로 건너뛰므로 마지막 포즈가 유지된다.
@@ -1007,6 +1087,16 @@ class FieldGame extends FlameGame with TapCallbacks {
       _heroHp = math.max(0, _heroHp - 1);
       _heroActor.animator.hitstop(0.06);
       _shake = math.max(_shake, 4.2);
+      // 내가 맞은 피해도 숫자로 뜬다. 적의 색으로 띄워야 "내가 준 것"과
+      // "내가 받은 것"이 곁눈으로 구분된다.
+      _popups.add(
+        DamagePopup(
+          tile: _heroActor.tile,
+          amount: 1,
+          color: const Color(0xFFFF5A5A),
+          airborne: _heroActor.airborne,
+        ),
+      );
       if (_heroHp == 0) {
         _heroAlive = false;
         guarding = false;
@@ -1014,6 +1104,8 @@ class FieldGame extends FlameGame with TapCallbacks {
         _heroCtrl.stop();
         _heroActor.play('death');
         audio.play(VoiceKeys.die(hero.id), volume: 0.9, pan: pan);
+        // 쓰러지는 모습을 보여 준 뒤에 화면을 넘긴다.
+        _gameOverIn = _gameOverDelay;
       } else {
         _heroActor.play('hit');
       }
@@ -1159,6 +1251,22 @@ class _CombatProjectileLayer extends Component {
     for (final projectile in game._projectiles) {
       projectile.paint(canvas, FieldGame.iso, game._scene.cameraOffset);
     }
+  }
+}
+
+/// 떠오르는 피해 숫자.
+///
+/// 이름표(1000)보다 위에 둔다. 둘이 겹치는 순간은 정확히 타격의 순간이고,
+/// 그때 읽혀야 하는 것은 이름이 아니라 숫자다.
+class _DamagePopupLayer extends Component {
+  _DamagePopupLayer(this.game) : super(priority: 1200);
+
+  final FieldGame game;
+
+  @override
+  void render(Canvas canvas) {
+    if (!game._spawned) return;
+    game._popups.paint(canvas, FieldGame.iso, game._scene.cameraOffset);
   }
 }
 

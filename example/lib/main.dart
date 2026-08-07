@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'i18n/lang.dart';
-import 'screens/start_screen.dart';
+import 'screens/opening_screen.dart';
 
 /// provis 데모.
 ///
 ///   flutter run -t lib/main.dart
 ///
-/// 흐름: 명부(캐릭터 | 몬스터 탭) → 캐릭터 선택 → 게임 맵 입장 → 클릭 이동.
+/// 흐름: 오프닝 → 명부(캐릭터 | 몬스터 탭) → 캐릭터 선택 → 게임 맵 입장 →
+/// 클릭 이동 → (쓰러지면) 게임오버.
 ///
 /// 보여 주는 것:
 /// - 절차적 맵 기물 (나무·바위·건물·담장·물웅덩이·길·풀)
@@ -31,7 +32,7 @@ class ProvisDemoApp extends StatelessWidget {
         title: 'provis',
         debugShowCheckedModeBanner: false,
         theme: ThemeData.dark(useMaterial3: true),
-        home: const StartScreen(),
+        home: const OpeningScreen(),
       ),
     );
   }

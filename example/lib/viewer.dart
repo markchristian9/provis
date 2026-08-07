@@ -17,20 +17,20 @@ class VisApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LangScope(
-        child: MaterialApp(
-          title: 'Procedural Actor Viewer',
-          debugShowCheckedModeBanner: false,
-          theme: ThemeData(
-            brightness: Brightness.dark,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF7AA2FF),
-              brightness: Brightness.dark,
-            ),
-            fontFamily: 'monospace',
-          ),
-          home: const ViewerPage(),
+    child: MaterialApp(
+      title: 'Procedural Actor Viewer',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF7AA2FF),
+          brightness: Brightness.dark,
         ),
-      );
+        fontFamily: 'monospace',
+      ),
+      home: const ViewerPage(),
+    ),
+  );
 }
 
 /// 뷰어의 모든 가변 상태.
@@ -59,18 +59,26 @@ class ViewerModel extends ChangeNotifier {
 
   /// 활을 든 상태로 그릴지. 사격 동작에서만 원거리 무기로 갈아 쥔다.
   bool get ranged =>
-      animator.current.name.startsWith('shoot') || spec.weapon == WeaponKind.bow;
+      animator.current.name.startsWith('shoot') ||
+      spec.weapon == WeaponKind.bow;
 
   HumanoidRenderer _buildRenderer() {
     if (!beast) return HumanoidRenderer(spec);
-    // 짐승형은 같은 골격 코드에 비율과 색만 바꿔 얹는다. 다리가 짧고 팔이
-    // 길며 구부정하므로, 같은 걷기 클립이 전혀 다른 걸음걸이로 읽힌다.
-    final r = Rng(seed ^ 0x5EED);
+    // 시드를 넘기면 네 가지 큰 실루엣이 순환한다. 색만 바뀌는 몬스터 대신
+    // 거구·비룡·망령·절지종이 실제로 다른 몸과 부속을 갖는다.
+    final form = BeastForm.values[seed.abs() % BeastForm.values.length];
+    final build = CharacterBuild(
+      archetype: spec.archetype,
+      beast: true,
+      beastForm: form,
+      seed: seed,
+    );
     return HumanoidRenderer(
       spec,
-      body: Body.beast(r, height: spec.height * 1.12),
+      body: build.bodyFor(spec),
       palette: Palette.monster(Rng(seed ^ 0xB0A5)),
       beast: true,
+      beastForm: form,
     );
   }
 
@@ -196,11 +204,10 @@ class IsoFloor extends Component {
           tile,
           Paint()
             ..color = mix(
-                  light.ambient,
-                  checker ? light.bounce : const Color(0xFF000000),
-                  checker ? 0.16 : 0.35,
-                )
-                .withValues(alpha: 0.85 * fade),
+              light.ambient,
+              checker ? light.bounce : const Color(0xFF000000),
+              checker ? 0.16 : 0.35,
+            ).withValues(alpha: 0.85 * fade),
         );
         canvas.drawPath(
           tile,
@@ -537,7 +544,9 @@ class _AutoChip extends StatelessWidget {
   Widget build(BuildContext context) {
     const on = Color(0xFF4ADE9B);
     return Material(
-      color: active ? on.withValues(alpha: 0.30) : Colors.white.withValues(alpha: 0.06),
+      color: active
+          ? on.withValues(alpha: 0.30)
+          : Colors.white.withValues(alpha: 0.06),
       borderRadius: BorderRadius.circular(7),
       child: InkWell(
         borderRadius: BorderRadius.circular(7),
@@ -566,7 +575,9 @@ class _AutoChip extends StatelessWidget {
                   fontSize: 12,
                   letterSpacing: 1.6,
                   fontWeight: FontWeight.w700,
-                  color: active ? Colors.white : Colors.white.withValues(alpha: 0.68),
+                  color: active
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.68),
                 ),
               ),
             ],
@@ -604,7 +615,11 @@ class _IconChip extends StatelessWidget {
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: Icon(icon, size: 17, color: Colors.white.withValues(alpha: 0.85)),
+            child: Icon(
+              icon,
+              size: 17,
+              color: Colors.white.withValues(alpha: 0.85),
+            ),
           ),
         ),
       ),

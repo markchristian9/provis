@@ -4,6 +4,7 @@ import '../art/creature.dart';
 import '../core/palette.dart';
 import '../core/rng.dart';
 import '../core/scheme.dart';
+import '../rig/body.dart';
 import 'spec.dart';
 
 /// 캐릭터의 **정체성**을 선언한다.
@@ -51,6 +52,7 @@ class CharacterBuild {
     this.glowRunes,
     this.heightScale = 1.0,
     this.beast = false,
+    this.beastForm = BeastForm.brute,
     this.seed,
   });
 
@@ -89,6 +91,9 @@ class CharacterBuild {
   /// 짐승형 골격을 쓴다.
   final bool beast;
 
+  /// 짐승형의 큰 실루엣. 세부 색보다 먼저 전투 역할을 읽히게 한다.
+  final BeastForm beastForm;
+
   /// 명시하지 않으면 [Artist.id] 에서 뽑는다.
   final int? seed;
 
@@ -114,6 +119,19 @@ class CharacterBuild {
     );
   }
 
+  /// 이 선언에 맞는 몬스터 골격. 인간형이면 `null` 이다.
+  Body? bodyFor(HumanoidSpec spec) {
+    if (!beast) return null;
+    final r = Rng(spec.seed ^ 0x5EED);
+    final height = spec.height * 1.1;
+    return switch (beastForm) {
+      BeastForm.brute => Body.beast(r, height: height),
+      BeastForm.drake => Body.drake(r, height: height),
+      BeastForm.wraith => Body.wraith(r, height: height),
+      BeastForm.arachnid => Body.arachnid(r, height: height),
+    };
+  }
+
   CharacterBuild copyWith({
     Archetype? archetype,
     Sex? sex,
@@ -123,25 +141,26 @@ class CharacterBuild {
     bool? hasCape,
     double? heightScale,
     bool? beast,
+    BeastForm? beastForm,
     int? seed,
-  }) =>
-      CharacterBuild(
-        archetype: archetype ?? this.archetype,
-        sex: sex ?? this.sex,
-        palette: palette ?? this.palette,
-        headGear: headGear ?? this.headGear,
-        weapon: weapon ?? this.weapon,
-        hasCape: hasCape ?? this.hasCape,
-        hasPauldrons: hasPauldrons,
-        hasShield: hasShield,
-        armorHeaviness: armorHeaviness,
-        muscle: muscle,
-        hairLength: hairLength,
-        glowRunes: glowRunes,
-        heightScale: heightScale ?? this.heightScale,
-        beast: beast ?? this.beast,
-        seed: seed ?? this.seed,
-      );
+  }) => CharacterBuild(
+    archetype: archetype ?? this.archetype,
+    sex: sex ?? this.sex,
+    palette: palette ?? this.palette,
+    headGear: headGear ?? this.headGear,
+    weapon: weapon ?? this.weapon,
+    hasCape: hasCape ?? this.hasCape,
+    hasPauldrons: hasPauldrons,
+    hasShield: hasShield,
+    armorHeaviness: armorHeaviness,
+    muscle: muscle,
+    hairLength: hairLength,
+    glowRunes: glowRunes,
+    heightScale: heightScale ?? this.heightScale,
+    beast: beast ?? this.beast,
+    beastForm: beastForm ?? this.beastForm,
+    seed: seed ?? this.seed,
+  );
 
   /// 선언이 없는 [Artist] 를 위한 추정.
   ///
@@ -156,6 +175,7 @@ class CharacterBuild {
       sex: a.sex,
       palette: tintedPalette(a.accent, Rng(seed ^ 0xC0107), monster: monster),
       beast: monster,
+      beastForm: BeastForm.values[seed % BeastForm.values.length],
       seed: seed,
     );
   }

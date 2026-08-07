@@ -66,24 +66,24 @@ class Body {
   /// 줄어드는 것을 반영할 때 쓴다 — 치수 자체를 건드리지 않으므로 IK 와
   /// 사지 길이는 그대로 유지된다.
   Body scaledWidth(double k) => Body(
-        height: height,
-        hipHeight: hipHeight,
-        torso: torso,
-        neck: neck,
-        headLen: headLen,
-        headWidth: headWidth,
-        shoulderHalf: shoulderHalf * k,
-        hipHalf: hipHalf * k,
-        upperArm: upperArm,
-        foreArm: foreArm,
-        hand: hand,
-        thigh: thigh,
-        shin: shin,
-        foot: foot,
-        bulk: bulk,
-        hunch: hunch,
-        depth: depth,
-      );
+    height: height,
+    hipHeight: hipHeight,
+    torso: torso,
+    neck: neck,
+    headLen: headLen,
+    headWidth: headWidth,
+    shoulderHalf: shoulderHalf * k,
+    hipHalf: hipHalf * k,
+    upperArm: upperArm,
+    foreArm: foreArm,
+    hand: hand,
+    thigh: thigh,
+    shin: shin,
+    foot: foot,
+    bulk: bulk,
+    hunch: hunch,
+    depth: depth,
+  );
 
   double get shoulderY => -(hipHeight + torso);
 
@@ -140,6 +140,81 @@ class Body {
       bulk: bulk,
       hunch: r.range(0.12, 0.34),
       depth: r.range(1.0, 1.35),
+    );
+  }
+
+  /// Winged predator: broad chest, compact legs, and a forward-leaning neck.
+  factory Body.drake(Rng r, {double height = 320}) {
+    final legRatio = r.range(0.40, 0.44);
+    final bulk = r.bell(1.12, 1.42);
+    return Body(
+      height: height,
+      hipHeight: height * legRatio,
+      torso: height * r.range(0.31, 0.34),
+      neck: height * r.range(0.045, 0.065),
+      headLen: height * r.range(0.115, 0.140),
+      headWidth: height * r.range(0.086, 0.105),
+      shoulderHalf: height * r.range(0.085, 0.108) * bulk * 0.82,
+      hipHalf: height * r.range(0.050, 0.062),
+      upperArm: height * r.range(0.175, 0.205),
+      foreArm: height * r.range(0.160, 0.190),
+      hand: height * r.range(0.055, 0.070),
+      thigh: height * legRatio * r.range(0.50, 0.56),
+      shin: height * legRatio * r.range(0.46, 0.51),
+      foot: height * r.range(0.075, 0.095),
+      bulk: bulk,
+      hunch: r.range(0.16, 0.25),
+      depth: r.range(1.05, 1.28),
+    );
+  }
+
+  /// Spectral caster: a narrow core, long arms, and a high floating posture.
+  factory Body.wraith(Rng r, {double height = 320}) {
+    final legRatio = r.range(0.48, 0.52);
+    final bulk = r.bell(0.72, 0.90);
+    return Body(
+      height: height,
+      hipHeight: height * legRatio,
+      torso: height * r.range(0.30, 0.33),
+      neck: height * r.range(0.040, 0.060),
+      headLen: height * r.range(0.135, 0.155),
+      headWidth: height * r.range(0.082, 0.098),
+      shoulderHalf: height * r.range(0.054, 0.068),
+      hipHalf: height * r.range(0.036, 0.046),
+      upperArm: height * r.range(0.215, 0.245),
+      foreArm: height * r.range(0.195, 0.225),
+      hand: height * r.range(0.055, 0.070),
+      thigh: height * legRatio * r.range(0.48, 0.53),
+      shin: height * legRatio * r.range(0.47, 0.52),
+      foot: height * r.range(0.045, 0.058),
+      bulk: bulk,
+      hunch: r.range(0.03, 0.10),
+      depth: r.range(0.78, 0.94),
+    );
+  }
+
+  /// Brood creature: low center of gravity with a dense thorax for extra legs.
+  factory Body.arachnid(Rng r, {double height = 320}) {
+    final legRatio = r.range(0.33, 0.38);
+    final bulk = r.bell(1.02, 1.28);
+    return Body(
+      height: height,
+      hipHeight: height * legRatio,
+      torso: height * r.range(0.27, 0.31),
+      neck: height * r.range(0.018, 0.030),
+      headLen: height * r.range(0.105, 0.125),
+      headWidth: height * r.range(0.105, 0.130),
+      shoulderHalf: height * r.range(0.082, 0.102) * bulk * 0.82,
+      hipHalf: height * r.range(0.070, 0.088),
+      upperArm: height * r.range(0.185, 0.215),
+      foreArm: height * r.range(0.175, 0.205),
+      hand: height * r.range(0.055, 0.072),
+      thigh: height * legRatio * r.range(0.50, 0.56),
+      shin: height * legRatio * r.range(0.46, 0.52),
+      foot: height * r.range(0.072, 0.092),
+      bulk: bulk,
+      hunch: r.range(0.25, 0.36),
+      depth: r.range(1.15, 1.38),
     );
   }
 }

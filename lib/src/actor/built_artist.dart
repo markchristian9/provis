@@ -57,10 +57,10 @@ class BuiltArtist extends Artist {
     List<Color>? moodSky,
     this.portraitClip = 'wait',
     this.portraitYaw = 0.62,
-  })  : _build = build,
-        _accent = accent,
-        _light = light,
-        _moodSky = moodSky;
+  }) : _build = build,
+       _accent = accent,
+       _light = light,
+       _moodSky = moodSky;
 
   // 아래 넷은 게터가 기본값 대체 로직을 갖고 있어 initializing formal 로
   // 바꿀 수 없다. private 필드로 받아 두고 게터에서 채운다.
@@ -95,7 +95,8 @@ class BuiltArtist extends Artist {
   Sex? get sex => _build.sex;
 
   @override
-  Color get accent => _accent ?? _build.palette?.accent ?? const Color(0xFF9AC7FF);
+  Color get accent =>
+      _accent ?? _build.palette?.accent ?? const Color(0xFF9AC7FF);
 
   /// 조명을 지정하지 않으면 **강조색을 역광에 실어** 준다.
   ///
@@ -124,7 +125,9 @@ class BuiltArtist extends Artist {
 
   late final HumanoidRenderer _renderer = HumanoidRenderer(
     _spec,
+    body: _build.bodyFor(_spec),
     beast: _build.beast,
+    beastForm: _build.beastForm,
   );
 
   /// 초상용 애니메이터. 시간의 순수 함수여야 하므로 상태를 갖지 않는다.
@@ -137,14 +140,14 @@ class BuiltArtist extends Artist {
   void paint(Canvas c, double t, {double detail = 1.0}) {
     // 초상은 게임 액터와 **같은 렌더러**로 그린다. 이 한 줄 때문에 명부에서
     // 본 인물과 맵에서 걷는 인물이 같아진다.
-    final pose = Anims.byName(portraitClip).sample(
-      Anims.byName(portraitClip).loop ? (t * 0.35) % 1.0 : 0.35,
-    );
+    final pose = Anims.byName(
+      portraitClip,
+    ).sample(Anims.byName(portraitClip).loop ? (t * 0.35) % 1.0 : 0.35);
 
     c.save();
     // kStage 좌표계의 발밑으로 옮기고, 초상에 맞게 키운다.
     c.translate(kStage.width * 0.5, kGround);
-    final k = kGround * 0.86 / _spec.height;
+    final k = kGround * 0.86 / _renderer.body.height;
     c.scale(k);
     _renderer.paint(
       c,

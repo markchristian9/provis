@@ -27,31 +27,32 @@ class Gorehide extends Artist {
   Sex? get sex => null;
   @override
   CharacterBuild get build => CharacterBuild(
-        archetype: Archetype.berserker,
-        beast: true,
-        palette: tintedPalette(const Color(0xFF8FA36B), Rng(0x60E), monster: true),
-        weapon: WeaponKind.axe,
-        muscle: 1.0,
-        heightScale: 1.22,
-      );
+    archetype: Archetype.berserker,
+    beast: true,
+    beastForm: BeastForm.brute,
+    palette: tintedPalette(const Color(0xFF8FA36B), Rng(0x60E), monster: true),
+    weapon: WeaponKind.axe,
+    muscle: 1.0,
+    heightScale: 1.22,
+  );
   @override
   Color get accent => const Color(0xFF8FA36B);
   @override
   LightRig get light => const LightRig(
-        dir: Offset(-0.62, -0.78),
-        rimDir: Offset(0.84, -0.44),
-        key: Color(0xFFFFE9C0),
-        fill: Color(0xFF4A5C48),
-        rim: Color(0xFFFFB871),
-        bounce: Color(0xFF7A5A3A),
-        ambient: Color(0xFF221E18),
-      );
+    dir: Offset(-0.62, -0.78),
+    rimDir: Offset(0.84, -0.44),
+    key: Color(0xFFFFE9C0),
+    fill: Color(0xFF4A5C48),
+    rim: Color(0xFFFFB871),
+    bounce: Color(0xFF7A5A3A),
+    ambient: Color(0xFF221E18),
+  );
   @override
   List<Color> get moodSky => const [
-        Color(0xFF181510),
-        Color(0xFF3A2E20),
-        Color(0xFF6B4A26),
-      ];
+    Color(0xFF181510),
+    Color(0xFF3A2E20),
+    Color(0xFF6B4A26),
+  ];
 
   static const _hide = Color(0xFF6E7C54);
   static const _hideDark = Color(0xFF485238);
@@ -62,12 +63,20 @@ class Gorehide extends Artist {
   static const _wood = Color(0xFF5A4230);
   static const _wound = Color(0xFF9A3A32);
 
-  Surface get _sHide => const Surface(_hide, Finish.skin,
-      contrast: 1.32, sss: Color(0xFF8A5E38));
-  Surface get _sHideDark => const Surface(_hideDark, Finish.skin,
-      contrast: 1.38, sss: Color(0xFF63452A));
-  Surface get _sBelly => const Surface(_belly, Finish.skin,
-      contrast: 1.15, sss: Color(0xFFA07A52));
+  Surface get _sHide =>
+      const Surface(_hide, Finish.skin, contrast: 1.32, sss: Color(0xFF8A5E38));
+  Surface get _sHideDark => const Surface(
+    _hideDark,
+    Finish.skin,
+    contrast: 1.38,
+    sss: Color(0xFF63452A),
+  );
+  Surface get _sBelly => const Surface(
+    _belly,
+    Finish.skin,
+    contrast: 1.15,
+    sss: Color(0xFFA07A52),
+  );
   Surface get _sBone => const Surface(_bone, Finish.bone, contrast: 1.1);
   Surface get _sIron => const Surface(_iron, Finish.metal, contrast: 1.25);
   Surface get _sRawhide => const Surface(_rawhide, Finish.leather);
@@ -116,26 +125,26 @@ class Gorehide extends Artist {
   }
 
   void _legBack(Canvas c, LightRig l, double detail) => _leg(
-        c,
-        l,
-        detail,
-        hip: const Offset(618, 962),
-        knee: const Offset(700, 1130),
-        ankle: const Offset(676, 1262),
-        toe: 1,
-        surf: _sHideDark,
-      );
+    c,
+    l,
+    detail,
+    hip: const Offset(618, 962),
+    knee: const Offset(700, 1130),
+    ankle: const Offset(676, 1262),
+    toe: 1,
+    surf: _sHideDark,
+  );
 
   void _legFront(Canvas c, LightRig l, double detail) => _leg(
-        c,
-        l,
-        detail,
-        hip: const Offset(402, 968),
-        knee: const Offset(330, 1132),
-        ankle: const Offset(360, 1258),
-        toe: -1,
-        surf: _sHide,
-      );
+    c,
+    l,
+    detail,
+    hip: const Offset(402, 968),
+    knee: const Offset(330, 1132),
+    ankle: const Offset(360, 1258),
+    toe: -1,
+    surf: _sHide,
+  );
 
   void _leg(
     Canvas c,
@@ -148,12 +157,26 @@ class Gorehide extends Artist {
     required Surface surf,
   }) {
     // 짧고 굵은 다리. 무릎이 낮아 웅크린 인상을 준다.
-    final thigh = limb(hip, lerpO(hip, knee, 0.5), knee,
-        r0: 96, r1: 78, r2: 62, swell: 1.1);
+    final thigh = limb(
+      hip,
+      lerpO(hip, knee, 0.5),
+      knee,
+      r0: 96,
+      r1: 78,
+      r2: 62,
+      swell: 1.1,
+    );
     paintSurface(c, thigh, surf, l, detail: detail, seed: 601);
 
-    final shin = limb(knee, lerpO(knee, ankle, 0.5), ankle,
-        r0: 62, r1: 56, r2: 52, swell: 1.06);
+    final shin = limb(
+      knee,
+      lerpO(knee, ankle, 0.5),
+      ankle,
+      r0: 62,
+      r1: 56,
+      r2: 52,
+      swell: 1.06,
+    );
     paintSurface(c, shin, surf, l, detail: detail, seed: 603);
 
     // 발: 세 개의 굵은 발가락과 누런 발톱.
@@ -185,7 +208,10 @@ class Gorehide extends Artist {
       final x = ankle.dx + toe * (34 + i * 34);
       panelLine(
         c,
-        smoothOpenPath([Offset(x, ankle.dy + 6), Offset(x + toe * 8, ankle.dy + 62)]),
+        smoothOpenPath([
+          Offset(x, ankle.dy + 6),
+          Offset(x + toe * 8, ankle.dy + 62),
+        ]),
         _rHide,
         l,
         width: 9,
@@ -212,8 +238,13 @@ class Gorehide extends Artist {
     paintSurface(c, body, _sHide, l, detail: detail, seed: 611);
 
     // 등의 혹. 실루엣 위쪽을 부풀려 굽은 등을 만든다.
-    final hump = blob(const Offset(596, 636), 140, 104,
-        rotation: -0.3, warp: (a, u) => 1 + math.cos(a * 2) * 0.10);
+    final hump = blob(
+      const Offset(596, 636),
+      140,
+      104,
+      rotation: -0.3,
+      warp: (a, u) => 1 + math.cos(a * 2) * 0.10,
+    );
     paintSurface(c, hump, _sHideDark, l, detail: detail, seed: 613);
     occlude(c, hump, const Offset(-0.6, 0.8), depth: 0.5, alpha: 0.55);
 
@@ -248,14 +279,22 @@ class Gorehide extends Artist {
     // 가슴 근육.
     drawMuscleLine(
       c,
-      [chest + const Offset(-150, -6), chest + const Offset(-70, 74), chest + const Offset(4, 86)],
+      [
+        chest + const Offset(-150, -6),
+        chest + const Offset(-70, 74),
+        chest + const Offset(4, 86),
+      ],
       _rHide,
       width: 24,
       alpha: 0.45,
     );
     drawMuscleLine(
       c,
-      [chest + const Offset(152, 2), chest + const Offset(76, 78), chest + const Offset(6, 88)],
+      [
+        chest + const Offset(152, 2),
+        chest + const Offset(76, 78),
+        chest + const Offset(6, 88),
+      ],
       _rHide,
       width: 24,
       alpha: 0.4,
@@ -296,8 +335,11 @@ class Gorehide extends Artist {
         );
         final r = 4 + n.at1(i * 5.1) * 9;
         c.drawCircle(p, r, Paint()..color = _rHide.deep.fade(0.35));
-        c.drawCircle(p + Offset(-r * 0.3, -r * 0.35), r * 0.6,
-            Paint()..color = _rHide.light.fade(0.3));
+        c.drawCircle(
+          p + Offset(-r * 0.3, -r * 0.35),
+          r * 0.6,
+          Paint()..color = _rHide.light.fade(0.3),
+        );
       }
     }
     c.restore();
@@ -333,7 +375,11 @@ class Gorehide extends Artist {
     c.restore();
 
     // 허리에 두른 쇠사슬과 매달린 전리품 뼈.
-    _chain(c, l, const [Offset(360, 942), Offset(500, 984), Offset(670, 934)], 15);
+    _chain(c, l, const [
+      Offset(360, 942),
+      Offset(500, 984),
+      Offset(670, 934),
+    ], 15);
     for (var i = 0; i < 3; i++) {
       final x = 420 + i * 82.0;
       final bonePath = tube(
@@ -342,10 +388,16 @@ class Gorehide extends Artist {
         samples: 8,
       );
       paintSurface(c, bonePath, _sBone, l, detail: detail, seed: 619 + i);
-      c.drawCircle(Offset(x + 8, 1038 + i * 8), 13,
-          Paint()..color = _rBone.mid);
-      c.drawCircle(Offset(x + 4, 1034 + i * 8), 6,
-          Paint()..color = _rBone.deep.fade(0.7));
+      c.drawCircle(
+        Offset(x + 8, 1038 + i * 8),
+        13,
+        Paint()..color = _rBone.mid,
+      );
+      c.drawCircle(
+        Offset(x + 4, 1034 + i * 8),
+        6,
+        Paint()..color = _rBone.deep.fade(0.7),
+      );
     }
 
     rimBand(c, body, l, width: 9, alpha: 0.6, color: const Color(0xFFFFC48A));
@@ -358,11 +410,23 @@ class Gorehide extends Artist {
     const elbow = Offset(806, 900);
     const wrist = Offset(768, 1092);
 
-    final arm = limb(shoulder, elbow, wrist, r0: 92, r1: 68, r2: 54, swell: 1.22);
+    final arm = limb(
+      shoulder,
+      elbow,
+      wrist,
+      r0: 92,
+      r1: 68,
+      r2: 54,
+      swell: 1.22,
+    );
     paintSurface(c, arm, _sHideDark, l, detail: detail, seed: 621);
 
-    final fist = blob(const Offset(772, 1152), 66, 60,
-        warp: (a, u) => 1 + math.cos(a * 3) * 0.12);
+    final fist = blob(
+      const Offset(772, 1152),
+      66,
+      60,
+      warp: (a, u) => 1 + math.cos(a * 3) * 0.12,
+    );
     paintSurface(c, fist, _sHideDark, l, detail: detail, seed: 623);
     c.save();
     c.clipPath(fist);
@@ -379,7 +443,11 @@ class Gorehide extends Artist {
       );
     }
     c.restore();
-    _chain(c, l, const [Offset(742, 880), Offset(812, 930), Offset(798, 1010)], 13);
+    _chain(c, l, const [
+      Offset(742, 880),
+      Offset(812, 930),
+      Offset(798, 1010),
+    ], 13);
     rimBand(c, arm, l, width: 8, alpha: 0.55, color: const Color(0xFFFFB871));
   }
 
@@ -392,23 +460,41 @@ class Gorehide extends Artist {
     // 곤봉을 먼저 그려 팔이 그 위에 얹히게 한다.
     _club(c, l, t, detail);
 
-    final upper = limb(shoulder, lerpO(shoulder, elbow, 0.5), elbow,
-        r0: 98, r1: 84, r2: 66, swell: 1.24);
+    final upper = limb(
+      shoulder,
+      lerpO(shoulder, elbow, 0.5),
+      elbow,
+      r0: 98,
+      r1: 84,
+      r2: 66,
+      swell: 1.24,
+    );
     paintSurface(c, upper, _sHide, l, detail: detail, seed: 631);
     c.save();
     c.clipPath(upper);
     // 이두박근의 갈라짐.
     drawMuscleLine(
       c,
-      [shoulder + const Offset(-10, 60), const Offset(238, 830), const Offset(226, 900)],
+      [
+        shoulder + const Offset(-10, 60),
+        const Offset(238, 830),
+        const Offset(226, 900),
+      ],
       _rHide,
       width: 20,
       alpha: 0.4,
     );
     c.restore();
 
-    final fore = limb(elbow, lerpO(elbow, wrist, 0.5), wrist,
-        r0: 70, r1: 62, r2: 52, swell: 1.1);
+    final fore = limb(
+      elbow,
+      lerpO(elbow, wrist, 0.5),
+      wrist,
+      r0: 70,
+      r1: 62,
+      r2: 52,
+      swell: 1.1,
+    );
     paintSurface(c, fore, _sHide, l, detail: detail, seed: 633);
 
     // 팔뚝을 감은 사슬.
@@ -420,8 +506,12 @@ class Gorehide extends Artist {
     ], 16);
 
     // 곤봉 자루를 쥔 주먹.
-    final fist = blob(const Offset(272, 1136), 70, 64,
-        warp: (a, u) => 1 + math.cos(a * 3 + 0.6) * 0.13);
+    final fist = blob(
+      const Offset(272, 1136),
+      70,
+      64,
+      warp: (a, u) => 1 + math.cos(a * 3 + 0.6) * 0.13,
+    );
     paintSurface(c, fist, _sHide, l, detail: detail, seed: 635);
     c.save();
     c.clipPath(fist);
@@ -459,7 +549,12 @@ class Gorehide extends Artist {
     c.translate(-272, -1140);
 
     final shaft = tube(
-      const [Offset(272, 1200), Offset(252, 900), Offset(234, 620), Offset(214, 402)],
+      const [
+        Offset(272, 1200),
+        Offset(252, 900),
+        Offset(234, 620),
+        Offset(214, 402),
+      ],
       const [34, 44, 66, 78],
       samples: 26,
     );
@@ -467,8 +562,13 @@ class Gorehide extends Artist {
     paintSurface(c, shaft, _sWood, l, detail: detail, seed: 641);
 
     // 머리 쪽이 뭉툭하게 벌어진 옹이.
-    final head = blob(const Offset(206, 352), 96, 108,
-        rotation: -0.1, warp: (a, u) => 1 + math.cos(a * 3 + 1.2) * 0.14);
+    final head = blob(
+      const Offset(206, 352),
+      96,
+      108,
+      rotation: -0.1,
+      warp: (a, u) => 1 + math.cos(a * 3 + 1.2) * 0.14,
+    );
     paintSurface(c, head, _sWood, l, detail: detail, seed: 643);
 
     c.save();
@@ -527,8 +627,11 @@ class Gorehide extends Artist {
         castShadow(c, spike, offset: const Offset(5, 7), blur: 6, alpha: 0.5);
         paintSurface(c, spike, _sIron, l, detail: 0.3, seed: 645);
         c.drawCircle(base, 13, Paint()..color = _rIron.shadow);
-        c.drawCircle(base + const Offset(-4, -4), 6,
-            Paint()..color = _rIron.light.fade(0.8));
+        c.drawCircle(
+          base + const Offset(-4, -4),
+          6,
+          Paint()..color = _rIron.light.fade(0.8),
+        );
       }
     }
     rimBand(c, head, l, width: 6, alpha: 0.5, color: const Color(0xFFFFB871));
@@ -691,7 +794,8 @@ class Gorehide extends Artist {
       c.clipPath(horn);
       for (var i = 0; i < 5; i++) {
         final u = 0.15 + i * 0.17;
-        final p = root + Offset(s * (40 * u + 20 * u * u), -58 * u - 64 * u * u);
+        final p =
+            root + Offset(s * (40 * u + 20 * u * u), -58 * u - 64 * u * u);
         c.drawPath(
           smoothOpenPath([p + Offset(-s * 22, -4), p + Offset(s * 22, 6)]),
           Paint()
@@ -723,22 +827,26 @@ class Gorehide extends Artist {
     for (final s in const [-1.0, 1.0]) {
       final e = hc + Offset(s * 40, -12);
       glowAt(c, e, 26, const Color(0xFFFF5A2A), intensity: 0.5);
-      drawEye(c, e, 17, 9,
-          iris: const Color(0xFFFF6A2E),
-          light: l,
-          open: 0.85,
-          look: -0.2 * s,
-          mirrored: s > 0,
-          glow: const Color(0xFFFF5A2A),
-          scleraTint: const Color(0xFFB8A184),
-          lash: 0.3);
+      drawEye(
+        c,
+        e,
+        17,
+        9,
+        iris: const Color(0xFFFF6A2E),
+        light: l,
+        open: 0.85,
+        look: -0.2 * s,
+        mirrored: s > 0,
+        glow: const Color(0xFFFF5A2A),
+        scleraTint: const Color(0xFFB8A184),
+        lash: 0.3,
+      );
     }
 
     // 콧구멍.
     for (final s in const [-1.0, 1.0]) {
       c.drawOval(
-        Rect.fromCenter(
-            center: hc + Offset(s * 20, 14), width: 20, height: 14),
+        Rect.fromCenter(center: hc + Offset(s * 20, 14), width: 20, height: 14),
         Paint()..color = _rHide.deep.darken(0.4).fade(0.85),
       );
     }
@@ -757,8 +865,11 @@ class Gorehide extends Artist {
           ..color = const Color(0xFFD8E4D0).fade(0.55)
           ..blendMode = BlendMode.plus,
       );
-      c.drawCircle(hc + Offset(-10, 112 + drip * 46), 5,
-          Paint()..color = const Color(0xFFE0ECD8).fade(0.6));
+      c.drawCircle(
+        hc + Offset(-10, 112 + drip * 46),
+        5,
+        Paint()..color = const Color(0xFFE0ECD8).fade(0.6),
+      );
     }
 
     rimBand(c, head, l, width: 7, alpha: 0.6, color: const Color(0xFFFFB871));

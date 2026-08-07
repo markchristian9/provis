@@ -40,36 +40,80 @@ Future<void> dump(String name, int w, int h, void Function(Canvas) body) async {
   print('wrote ${f.path} (${w}x$h)');
 }
 
-List<(String, HumanoidRenderer)> cast() => [
-      ('knight', HumanoidRenderer(
-          HumanoidSpec.generate(7, forceArchetype: Archetype.knight))),
-      ('mage', HumanoidRenderer(
-          HumanoidSpec.generate(11, forceArchetype: Archetype.mage))),
-      ('ranger', HumanoidRenderer(
-          HumanoidSpec.generate(23, forceArchetype: Archetype.ranger))),
-      ('berserker', HumanoidRenderer(
-          HumanoidSpec.generate(31, forceArchetype: Archetype.berserker))),
-      ('beast-a', HumanoidRenderer(
-          HumanoidSpec.generate(5),
-          body: Body.beast(Rng(5), height: 190),
-          palette: Palette.monster(Rng(9)),
-          beast: true)),
-      ('beast-b', HumanoidRenderer(
-          HumanoidSpec.generate(17),
-          body: Body.beast(Rng(17), height: 210),
-          palette: Palette.monster(Rng(3)),
-          beast: true)),
-    ];
+HumanoidRenderer beast(BeastForm form, int seed) {
+  final spec = HumanoidSpec.generate(seed);
+  final build = CharacterBuild(
+    archetype: spec.archetype,
+    beast: true,
+    beastForm: form,
+    seed: seed,
+  );
+  return HumanoidRenderer(
+    spec,
+    body: build.bodyFor(spec),
+    palette: Palette.monster(Rng(seed ^ 0xB0A5)),
+    beast: true,
+    beastForm: form,
+  );
+}
 
-void drawActor(Canvas c, HumanoidRenderer r, LightRig light, {double yaw = 0.85}) {
+List<(String, HumanoidRenderer)> cast() => [
+  (
+    'knight',
+    HumanoidRenderer(
+      HumanoidSpec.generate(7, forceArchetype: Archetype.knight),
+    ),
+  ),
+  (
+    'mage',
+    HumanoidRenderer(HumanoidSpec.generate(11, forceArchetype: Archetype.mage)),
+  ),
+  (
+    'ranger',
+    HumanoidRenderer(
+      HumanoidSpec.generate(23, forceArchetype: Archetype.ranger),
+    ),
+  ),
+  (
+    'berserker',
+    HumanoidRenderer(
+      HumanoidSpec.generate(31, forceArchetype: Archetype.berserker),
+    ),
+  ),
+  (
+    'assassin',
+    HumanoidRenderer(
+      HumanoidSpec.generate(41, forceArchetype: Archetype.assassin),
+    ),
+  ),
+  (
+    'paladin',
+    HumanoidRenderer(
+      HumanoidSpec.generate(47, forceArchetype: Archetype.paladin),
+    ),
+  ),
+  ('brute', beast(BeastForm.brute, 5)),
+  ('drake', beast(BeastForm.drake, 9)),
+  ('wraith', beast(BeastForm.wraith, 13)),
+  ('arachnid', beast(BeastForm.arachnid, 17)),
+];
+
+void drawActor(
+  Canvas c,
+  HumanoidRenderer r,
+  LightRig light, {
+  double yaw = 0.85,
+}) {
   c.save();
   c.scale(kGameHeight / r.body.height);
-  r.paint(c,
-      pose: const Pose(),
-      light: light,
-      facing: Facing(yaw),
-      iso: iso,
-      detail: 1.0);
+  r.paint(
+    c,
+    pose: const Pose(),
+    light: light,
+    facing: Facing(yaw),
+    iso: iso,
+    detail: 1.0,
+  );
   c.restore();
 }
 
@@ -80,10 +124,13 @@ void main() {
   testWidgets('① 실루엣 — 검게 칠했을 때 구분되는가', (tester) async {
     await tester.runAsync(() async {
       final actors = cast();
-      await dump('audit_silhouette', (cw * actors.length).toInt(), ch.toInt(),
-          (c) {
-        c.drawRect(Rect.fromLTWH(0, 0, cw * actors.length, ch),
-            Paint()..color = const Color(0xFFEDEDED));
+      await dump('audit_silhouette', (cw * actors.length).toInt(), ch.toInt(), (
+        c,
+      ) {
+        c.drawRect(
+          Rect.fromLTWH(0, 0, cw * actors.length, ch),
+          Paint()..color = const Color(0xFFEDEDED),
+        );
         for (var i = 0; i < actors.length; i++) {
           final cell = Rect.fromLTWH(cw * i, 0, cw, ch);
           // saveLayer + srcIn 으로 그려진 픽셀을 통째로 검게 덮는다.
@@ -91,9 +138,12 @@ void main() {
           c.translate(cell.center.dx, ch * 0.92);
           drawActor(c, actors[i].$2, light);
           c.translate(-cell.center.dx, -ch * 0.92);
-          c.drawRect(cell, Paint()
-            ..blendMode = BlendMode.srcIn
-            ..color = const Color(0xFF101014));
+          c.drawRect(
+            cell,
+            Paint()
+              ..blendMode = BlendMode.srcIn
+              ..color = const Color(0xFF101014),
+          );
           c.restore();
         }
       });
@@ -105,18 +155,38 @@ void main() {
       final actors = cast();
       // 채도를 0 으로 미는 색행렬. 색을 빼면 남는 것이 명도 설계다.
       const desat = ColorFilter.matrix(<double>[
-        0.2126, 0.7152, 0.0722, 0, 0,
-        0.2126, 0.7152, 0.0722, 0, 0,
-        0.2126, 0.7152, 0.0722, 0, 0,
-        0, 0, 0, 1, 0,
+        0.2126,
+        0.7152,
+        0.0722,
+        0,
+        0,
+        0.2126,
+        0.7152,
+        0.0722,
+        0,
+        0,
+        0.2126,
+        0.7152,
+        0.0722,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
       ]);
-      await dump('audit_grayscale', (cw * actors.length).toInt(), ch.toInt(),
-          (c) {
-        c.drawRect(Rect.fromLTWH(0, 0, cw * actors.length, ch),
-            Paint()..color = const Color(0xFF3A4152));
+      await dump('audit_grayscale', (cw * actors.length).toInt(), ch.toInt(), (
+        c,
+      ) {
+        c.drawRect(
+          Rect.fromLTWH(0, 0, cw * actors.length, ch),
+          Paint()..color = const Color(0xFF3A4152),
+        );
         c.saveLayer(
-            Rect.fromLTWH(0, 0, cw * actors.length, ch),
-            Paint()..colorFilter = desat);
+          Rect.fromLTWH(0, 0, cw * actors.length, ch),
+          Paint()..colorFilter = desat,
+        );
         for (var i = 0; i < actors.length; i++) {
           c.save();
           c.translate(cw * i + cw / 2, ch * 0.92);
@@ -133,19 +203,23 @@ void main() {
       final actors = cast();
       for (final preset in [0, 1, 2, 3]) {
         final l = LightRig.preset(preset);
-        await dump('audit_onground_$preset',
-            (cw * actors.length).toInt(), ch.toInt(), (c) {
-          c.save();
-          c.translate(cw * actors.length / 2, ch * 0.55);
-          paintIsoGround(c, iso, 14, 14, l, lineAlpha: 0.0, skirt: 0.0);
-          c.restore();
-          for (var i = 0; i < actors.length; i++) {
+        await dump(
+          'audit_onground_$preset',
+          (cw * actors.length).toInt(),
+          ch.toInt(),
+          (c) {
             c.save();
-            c.translate(cw * i + cw / 2, ch * 0.92);
-            drawActor(c, actors[i].$2, l);
+            c.translate(cw * actors.length / 2, ch * 0.55);
+            paintIsoGround(c, iso, 14, 14, l, lineAlpha: 0.0, skirt: 0.0);
             c.restore();
-          }
-        });
+            for (var i = 0; i < actors.length; i++) {
+              c.save();
+              c.translate(cw * i + cw / 2, ch * 0.92);
+              drawActor(c, actors[i].$2, l);
+              c.restore();
+            }
+          },
+        );
       }
     });
   }, timeout: const Timeout(Duration(minutes: 4)));
