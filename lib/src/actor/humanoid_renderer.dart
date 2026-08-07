@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/painting.dart' show RadialGradient;
 
 import '../core/noise.dart';
+import '../core/palette.dart';
 import '../core/spline.dart';
 import '../iso/iso_view.dart';
 import '../core/scheme.dart';
@@ -262,6 +263,7 @@ class HumanoidRenderer {
     );
     paintSurface(canvas, leg, _legUnder, light,
         detail: q, occlusion: occ, seed: spec.seed + depth.round());
+    if (beast) _limbBands(canvas, leg, l.a, l.c, r, q, salt: depth.round());
 
     // 판금 다리는 **덧댄 조각**으로 그린다.
     //
@@ -277,6 +279,26 @@ class HumanoidRenderer {
       );
       paintSurface(canvas, cuisse, _plate, light, detail: q, occlusion: occ);
       if (depth == 0) paintTopPlane(canvas, cuisse, light, iso, strength: 0.34);
+      // 쿠이스의 판 경계. 허벅지 금속이 한 장짜리 관으로 보이지 않게 한다.
+      if (q > 0.55) {
+        final across = (l.b - l.a).normalized().perp;
+        final mid = lerpO(l.a, l.b, 0.40);
+        canvas.save();
+        canvas.clipPath(cuisse);
+        panelLine(
+          canvas,
+          smoothOpenPath([
+            mid - across * (r * 1.2),
+            lerpO(l.a, l.b, 0.45),
+            mid + across * (r * 1.2),
+          ]),
+          _plate.ramp,
+          light,
+          width: math.max(0.8, r * 0.09),
+          alpha: 0.55,
+        );
+        canvas.restore();
+      }
 
       final greave = tube(
         [lerpO(l.b, l.c, 0.22), lerpO(l.b, l.c, 0.92)],
@@ -338,6 +360,7 @@ class HumanoidRenderer {
     }
     paintSurface(canvas, arm, _limbArmor, light,
         detail: q, occlusion: occ, seed: spec.seed + 7 + depth.round());
+    if (beast) _limbBands(canvas, arm, l.a, l.c, r, q, salt: 5 + depth.round());
 
     // 손.
     final hand = blob(
@@ -560,6 +583,188 @@ class HumanoidRenderer {
           detail: q);
       glowPath(canvas, rune, pal.glow, _h * 0.05, alpha: 0.8);
     }
+  }
+
+  /// 천 몸통의 주름과 밑단.
+  ///
+  /// 단색 관은 튜브지 옷이 아니다. 중력 방향으로 흐르는 주름 세 줄과 밑단의
+  /// 어두운 띠 — 이 두 신호가 있어야 천이 몸에 **걸쳐진** 것으로 읽힌다.
+  void _clothFolds(Canvas canvas, Path torso, Skeleton sk, double q) {
+    final up = (sk.chest - sk.pelvis).normalized();
+    final side = up.perp;
+    canvas.save();
+    canvas.clipPath(torso);
+
+    final fold = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      // 천 마감의 _fiber 결이 이미 가는 세로선을 깔아 준다. 주름까지 진하면
+      // 골판지가 되므로, 이쪽은 넓고 옅게 두 신호를 겹치지 않게 한다.
+      ..strokeWidth = math.max(1.4, _waistW * 0.060)
+      ..color = pal.clothShade.fade(0.20);
+    for (final k in const [-0.32, 0.06, 0.36]) {
+      // 주름은 곧은 선이 아니다 — 허리에서 한 번 꺾여야 천이 접힌 것이 된다.
+      final swayK = _noise.signed1(k * 11 + spec.seed * 0.1) * _waistW * 0.07;
+      canvas.drawPath(
+        smoothOpenPath([
+          lerpO(sk.waist, sk.chest, 0.70) + side * (_waistW * k * 0.75),
+          sk.waist + side * (_waistW * k + swayK),
+          lerpO(sk.pelvis, sk.waist, 0.10) + side * (_waistW * k * 1.15),
+        ]),
+        fold,
+      );
+    }
+
+    // 밑단 그늘. 옷자락 끝은 몸에서 떨어져 그늘에 잠긴다.
+    canvas.drawRect(
+      torso.getBounds(),
+      Paint()
+        ..blendMode = BlendMode.multiply
+        ..shader = Gradient.linear(
+          sk.pelvis + up * (_h * 0.02),
+          lerpO(sk.pelvis, sk.waist, 0.75),
+          [pal.clothShade.fade(0.40), const Color(0x00FFFFFF)],
+        ),
+    );
+    canvas.restore();
+  }
+
+  /// 가죽 갑주의 어깨끈·버클·스티치.
+  ///
+  /// 면에 반복 단위가 없으면 관객이 크기를 읽을 수 없다. 몸통을 가로지르는
+  /// 끈 하나가 "이것은 장비다"를 만들고, 스티치 점이 스케일을 알려 준다.
+  void _leatherStrap(
+      Canvas canvas, Path torso, Skeleton sk, LightRig light, double q) {
+    final up = (sk.chest - sk.pelvis).normalized();
+    final side = up.perp;
+    final a = sk.chest + side * (_chestW * 0.26) + up * (_h * 0.008);
+    final b = lerpO(sk.pelvis, sk.waist, 0.42) - side * (_waistW * 0.34);
+    final spine = [a, lerpO(a, b, 0.5), b];
+
+    canvas.save();
+    canvas.clipPath(torso);
+    final strap = tube(
+      spine,
+      [_waistW * 0.075, _waistW * 0.068, _waistW * 0.075],
+      samples: 10,
+    );
+    paintSurface(
+        canvas, strap, Surface(pal.leather.darken(0.18), Finish.leather), light,
+        detail: q, rim: false, ao: false);
+    // 끈의 광원 쪽 모서리. 이 한 줄이 끈을 몸에서 떼어 놓는다.
+    canvas.drawPath(
+      smoothOpenPath(spine).shift(-light.dir * (_waistW * 0.045)),
+      Paint()
+        ..isAntiAlias = true
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeWidth = math.max(0.8, _waistW * 0.018)
+        ..color = pal.leather.lighten(0.30).fade(0.5),
+    );
+    // 스티치 점. 멀리서는 사라지고 초상 거리에서만 보인다.
+    if (q > 0.65) {
+      final dot = Paint()..color = pal.leather.lighten(0.38).fade(0.55);
+      for (var i = 0; i < 5; i++) {
+        canvas.drawCircle(
+          lerpO(a, b, 0.14 + i * 0.18) + side * (_waistW * 0.055),
+          math.max(0.6, _waistW * 0.009),
+          dot,
+        );
+      }
+    }
+    canvas.restore();
+
+    // 버클. 작아도 금속 하이라이트 하나가 끈에 무게를 준다.
+    final buckle = blob(lerpO(a, b, 0.5), _waistW * 0.055, _waistW * 0.048);
+    paintSurface(canvas, buckle,
+        Surface(pal.metalWarm, Finish.metal, contrast: 1.0), light,
+        detail: q, rim: false);
+  }
+
+  /// 짐승 가죽의 얼룩과 등의 어둠.
+  ///
+  /// 매끈한 살덩이는 풍선이다. 등줄기가 배보다 어둡고(원통의 신호), 가죽에
+  /// 얼룩이 번져 있어야(재질의 신호) 생물로 읽힌다. 가장자리는 블러 대신
+  /// 방사 그라디언트로 풀어 준다 — 결과는 비슷하고 비용은 수십 분의 일이다.
+  void _hide(Canvas canvas, Path torso, Skeleton sk, LightRig light, double q) {
+    if (q <= 0.4) return;
+    final b = torso.getBounds();
+    if (b.isEmpty) return;
+    final back = (sk.pelvis - sk.chest).normalized().perp;
+
+    canvas.save();
+    canvas.clipPath(torso);
+
+    // ① 등줄기의 어둠.
+    canvas.drawRect(
+      b,
+      Paint()
+        ..blendMode = BlendMode.multiply
+        ..shader = Gradient.linear(
+          b.center + back * (b.width * 0.5),
+          b.center - back * (b.width * 0.5),
+          [
+            pal.skinDeep.mix(light.ambient, 0.30).fade(0.50),
+            const Color(0x00FFFFFF),
+          ],
+          const [0.0, 0.62],
+        ),
+    );
+
+    // ② 가죽 얼룩. 크기와 자리를 노이즈로 흩뜨려야 물방울무늬가 안 된다.
+    final patch = Paint()
+      ..isAntiAlias = true
+      ..blendMode = BlendMode.multiply;
+    final count = q > 0.7 ? 6 : 4;
+    for (var i = 0; i < count; i++) {
+      final u = (i + 0.5) / count;
+      final at = lerpO(sk.pelvis, sk.chest, 0.10 + 0.82 * u) +
+          Offset(
+                _noise.signed1(u * 7.3 + spec.seed * 0.03),
+                _noise.signed1(u * 4.1 - spec.seed * 0.02),
+              ) *
+              (_chestW * 0.24);
+      final rx = _chestW * (0.15 + 0.14 * _noise.at1(u * 5.7 + 3));
+      patch.shader = Gradient.radial(
+        at,
+        rx,
+        [pal.skinDeep.fade(0.32), pal.skinDeep.fade(0.0)],
+      );
+      canvas.drawOval(
+        Rect.fromCenter(center: at, width: rx * 2.2, height: rx * 1.7),
+        patch,
+      );
+    }
+    canvas.restore();
+  }
+
+  /// 사지를 두르는 가죽 주름 띠. 짐승 전용.
+  ///
+  /// 팔다리 관에 가로 띠 몇 줄이 생기면 살이 접히는 두께가 보인다.
+  void _limbBands(
+      Canvas canvas, Path limb, Offset a, Offset b, double r, double q,
+      {int salt = 0}) {
+    if (q <= 0.5) return;
+    final dir = (b - a).normalized();
+    final across = dir.perp;
+    final stroke = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = math.max(1.0, r * 0.30)
+      ..color = pal.skinDeep.fade(0.18);
+    canvas.save();
+    canvas.clipPath(limb);
+    for (final t in const [0.34, 0.62, 0.84]) {
+      final at = lerpO(a, b, t + 0.05 * _noise.signed1(t * 9.0 + salt));
+      canvas.drawLine(
+        at - across * (r * 1.3),
+        at + across * (r * 1.3) + dir * (r * 0.22),
+        stroke,
+      );
+    }
+    canvas.restore();
   }
 
   /// 꼬리. 몸통 뒤에서 나와 관성으로 늦게 따라온다 — 포즈의 흔들림을

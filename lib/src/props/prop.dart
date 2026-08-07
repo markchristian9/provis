@@ -207,6 +207,14 @@ class PropInstance {
 
   /// 깊이 정렬 키. 화면 y 가 아니라 월드 좌표라야 높은 기물이 뒤로 밀리지 않는다.
   double get depth => tile.dx + tile.dy;
+
+  /// 지금 그려질 불투명도(0..1). **씬이 관리한다** — 직접 건드리지 않는다.
+  ///
+  /// 주인공이 이 기물 뒤로 들어가면 씬이 목표값을 낮추고, 여기 담긴 값이 그
+  /// 목표를 향해 매 프레임 다가간다. 즉시 갈아 끼우지 않는 이유는 하나다 —
+  /// 알파가 한 프레임에 튀면 건물이 **깜빡이는 것처럼** 보이고, 주인공이
+  /// 모서리를 스칠 때마다 화면이 번쩍인다.
+  double opacity = 1.0;
 }
 
 /// 기물 하나를 아이소 맵에 그린다.
@@ -221,9 +229,15 @@ void paintProp(
   double time, {
   double detail = 1.0,
   PropCache? cache,
+  double opacity = 1.0,
 }) {
   final anchor = iso.project(it.tile.dx, it.tile.dy);
   final s = it.scale;
+
+  // 가림 페이드. 완전히 투명하면 그릴 이유가 없다.
+  final a = opacity.clamp(0.0, 1.0);
+  if (a <= 0.01) return;
+  final faded = a < 0.999;
 
   c.save();
   c.translate(anchor.dx, anchor.dy);
@@ -246,14 +260,32 @@ void paintProp(
       img,
       Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
       baked.bounds,
-      _bakedPaint,
+      // 구운 기물은 **레이어가 필요 없다.** 텍스처 한 장이므로 알파를 그리기
+      // 페인트에 그대로 실으면 되고, 그러면 saveLayer 한 번(가림이 걸린 동안
+      // 매 프레임, 건물 한 채가 화면의 큰 사각형)을 통째로 아낀다.
+      faded ? (Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: a)) : _bakedPaint,
     );
+    c.restore();
+  } else if (faded) {
+    // 굽지 않은 기물은 파츠가 여러 겹이다. 파츠마다 알파를 곱하면 겹친
+    // 부분이 두 번 어두워져 속이 비쳐 보이므로, 한 겹으로 묶어야 한다.
+    // 경계를 주어 레이어를 기물 크기로 좁힌다 — null 이면 클립 전체가 된다.
+    c.saveLayer(it.prop.bakeBounds,
+        Paint()..color = const Color(0xFF000000).withValues(alpha: a));
+    it.prop.paint(c, tt, light, detail: detail);
     c.restore();
   } else {
     it.prop.paint(c, tt, light, detail: detail);
   }
   // 살아 있는 한 겹은 구웠든 아니든 언제나 지금 그린다.
-  it.prop.live(c, tt, light, detail: detail);
+  if (faded) {
+    c.saveLayer(it.prop.bakeBounds,
+        Paint()..color = const Color(0xFF000000).withValues(alpha: a));
+    it.prop.live(c, tt, light, detail: detail);
+    c.restore();
+  } else {
+    it.prop.live(c, tt, light, detail: detail);
+  }
   c.restore();
 }
 

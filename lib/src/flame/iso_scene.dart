@@ -173,6 +173,97 @@ class IsoSceneComponent extends Component {
         a.dy - pad <= v.bottom;
   }
 
+  // ── 가림 처리 ──────────────────────────────────────────────────────────
+  //
+  // ## 왜 필요한가
+  //
+  // 기물이 제 크기를 찾으면서 건물은 8 m 가 되었다. 아이소 뷰에서 주인공이
+  // 건물 **뒤**로 한 걸음만 들어가면 화면에서 완전히 사라진다 — 1.8 m 짜리
+  // 사람을 8 m 짜리 벽이 통째로 덮기 때문이다. 어디 있는지 모르는 캐릭터를
+  // 조작할 수는 없으므로, 이건 취향이 아니라 **조작 가능성**의 문제다.
+  //
+  // ## 무엇을 흐리는가
+  //
+  // 주인공을 가리는 기물만이다. 판정은 둘 다 만족해야 한다.
+  //
+  // 1. **주인공보다 앞에 그려진다** — `depth` 가 더 크다. 뒤에 있는 것은
+  //    애초에 가리지 못하므로 건드리면 안 된다.
+  // 2. **화면에서 실제로 겹친다** — 같은 줄에 있어도 멀리 떨어져 있으면
+  //    가리지 않는다. 화면 사각형이 겹칠 때만 흐린다.
+  //
+  // 눕는 기물(길·물)과 발치의 작은 것들은 가릴 수 없으므로 제외한다. 그것까지
+  // 흐리면 주인공이 지날 때마다 땅이 깜빡인다.
+
+  /// 이 액터가 가려지면 가린 기물을 흐린다. `null` 이면 아무것도 흐리지 않는다.
+  RiggedIsoActor? occlusionFocus;
+
+  /// 가린 기물이 내려가는 불투명도. 0 이면 완전히 사라진다.
+  ///
+  /// 0 으로 두지 않는 이유는, 벽이 통째로 사라지면 주인공이 **실내에 있는지
+  /// 실외에 있는지** 알 수 없어지기 때문이다. 윤곽이 남아야 공간이 읽힌다.
+  double occlusionFade = 0.28;
+
+  /// 페이드가 오가는 데 걸리는 시간(초).
+  double occlusionLag = 0.12;
+
+  /// 액터가 화면에서 차지하는 사각형.
+  Rect _actorRect(RiggedIsoActor a) {
+    final p = iso.project(a.tile.dx, a.tile.dy, a.airborne);
+    final h = a.height * iso.squash;
+    final w = a.height * 0.44;
+    // 발밑을 조금 넘겨 잡는다 — 접지 그림자까지 보여야 위치가 읽힌다.
+    return Rect.fromLTRB(p.dx - w * 0.5, p.dy - h, p.dx + w * 0.5, p.dy + h * 0.08);
+  }
+
+  /// 기물이 화면에서 차지하는 사각형.
+  ///
+  /// [Prop.bakeBounds] 를 그대로 쓴다 — 굽기용으로 이미 "이 기물이 국소
+  /// 좌표에서 차지하는 상자"를 정확히 알고 있으므로, 같은 값을 두 번 정의할
+  /// 이유가 없다.
+  Rect _propRect(PropInstance it) {
+    final b = it.prop.bakeBounds;
+    final p = iso.project(it.tile.dx, it.tile.dy);
+    final sx = it.scale;
+    final sy = it.scale * (it.prop.grounded ? iso.shadowRatio : iso.squash);
+    return Rect.fromLTRB(
+      p.dx + b.left * sx,
+      p.dy + b.top * sy,
+      p.dx + b.right * sx,
+      p.dy + b.bottom * sy,
+    );
+  }
+
+  /// 이 기물이 주인공을 가릴 수 있는 종류인가.
+  bool _canOcclude(PropInstance it, RiggedIsoActor focus) {
+    if (it.prop.grounded) return false;
+    // 발목까지 오는 것은 가리지 못한다. 그것까지 흐리면 땅이 깜빡인다.
+    return it.prop.height * it.scale > focus.height * 0.45;
+  }
+
+  /// 가림 페이드를 한 프레임 진행시킨다.
+  void _updateOcclusion(double dt) {
+    final focus = occlusionFocus;
+    // 초점이 없으면 흐렸던 것을 되돌려 놓는다 — 켰다 끈 뒤에도 반투명한
+    // 건물이 남아 있으면 안 된다.
+    final rect = focus == null ? null : _actorRect(focus);
+    final k = occlusionLag <= 0 ? 1.0 : 1 - math.exp(-dt / occlusionLag);
+
+    for (final it in props) {
+      var want = 1.0;
+      if (focus != null &&
+          rect != null &&
+          it.depth > focus.depth &&
+          _canOcclude(it, focus) &&
+          _propRect(it).overlaps(rect)) {
+        want = occlusionFade;
+      }
+      it.opacity += (want - it.opacity) * k;
+      // 목표에 충분히 가까우면 붙인다. 안 그러면 영원히 0.999 에 머물러
+      // saveLayer 가 계속 켜진다.
+      if ((it.opacity - want).abs() < 0.01) it.opacity = want;
+    }
+  }
+
   /// 지금 화면에 걸리는 기물 수. 컬링이 실제로 걸러내는지 확인하는 데 쓴다.
   int visiblePropCount() {
     if (!cullToViewport || viewport == null) return props.length;
@@ -238,6 +329,9 @@ class IsoSceneComponent extends Component {
 
     _clock += dt;
     marker?.update(dt);
+    // 가림 페이드. 액터가 움직인 뒤에 재야 하지만, 한 프레임 늦어도 눈에
+    // 띄지 않으므로 여기서 함께 진행시킨다.
+    _updateOcclusion(dt);
 
     // 시간의 주인은 씬이다. 게임 코드가 같은 프레임에 `follow` 를 불러도
     // 여기서 이미 진행시켰다는 사실을 알고 시간은 건드리지 않는다.
@@ -324,7 +418,8 @@ class IsoSceneComponent extends Component {
           // 액터는 거르지 않는다. 수가 적어 이득이 없고, 화면 밖에 있어도
           // 애니메이션 상태는 계속 흘러야 하기 때문이다.
           if (cull && !_onScreen(it.tile, it.prop.height * it.scale)) continue;
-          paintProp(canvas, it, iso, light, _clock, cache: propCache);
+          paintProp(canvas, it, iso, light, _clock,
+              cache: propCache, opacity: it.opacity);
           if (sw != null) key = it.prop.runtimeType.toString();
         case 1:
           paintIsoActor(canvas, actors[i], iso, _clock);

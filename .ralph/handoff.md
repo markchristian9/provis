@@ -188,6 +188,39 @@ flutter test --run-skipped --tags sheets   # bakers — images and measurements
 
 Before: 31 pass / 4 fail / ~14 min. After: **44 pass / 0 fail / 10 s.**
 
+## 7d. Occlusion fade — the PC stays visible behind structures
+
+A playability consequence of the corrected scale, reported after the fix landed: an
+8 m building completely swallows a 1.8 m character standing behind it. You cannot
+control what you cannot see, so this is a controllability bug, not a preference.
+
+`IsoSceneComponent` now fades whatever hides the focused actor:
+
+```dart
+scene.occlusionFocus = heroActor;   // null disables it entirely
+scene.occlusionFade = 0.28;         // not 0 — the silhouette must survive
+scene.occlusionLag = 0.12;          // seconds; instant alpha reads as flicker
+```
+
+A prop fades only when **both** hold: its `depth` exceeds the actor's (so it is drawn
+in front), and its screen rect actually overlaps the actor's. Depth alone is wrong —
+props on the same diagonal but far away would dim for no reason. Grounded props and
+anything shorter than 45 % of the actor are excluded, or the ground flickers underfoot.
+
+Screen rects reuse `Prop.bakeBounds` rather than defining a second notion of "how big
+is this prop"; the bake path already had to know exactly that.
+
+Two deliberate choices worth keeping:
+- **`occlusionFade` is 0.28, not 0.** A wall that vanishes entirely loses the
+  information that the character is *indoors*. The silhouette has to stay.
+- **Only the hero is a focus.** Doing this per-mob would leave the map permanently
+  flickering as six wanderers brush past buildings.
+
+Verified by `example/test/occlusion_test.dart` (7 tests: fades in front, ignores
+behind, ignores non-overlapping, restores on exit, interpolates rather than popping,
+restores when focus is cleared, ignores grass). Visual proof:
+`build/scale/occlusion.png` — same scene, fade off vs on.
+
 ## 8. Screenshots
 
 `example/build/scale/` (regenerate with `flutter test test/scale_shot_test.dart`):

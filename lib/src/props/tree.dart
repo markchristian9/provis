@@ -502,6 +502,35 @@ class TreeProp extends Prop {
       c.restore();
     }
 
+    // 잎 단위의 결. 덩어리 안에 잎 하나하나가 보여야 관객이 수관의 크기를
+    // 읽는다 — 실측 화면에서 이 층이 없는 수관은 게임 줌에서 풍선 덩어리로
+    // 남았다. 광원 쪽 절반에는 밝은 잎, 반대쪽에는 그늘 잎을 심는다.
+    // 나무는 구워지므로 이 수백 장의 비용은 굽는 순간 한 번뿐이다.
+    if (detail > 0.5) {
+      c.save();
+      c.clipPath(shape);
+      final n = Noise(massSeed * 61 + 7);
+      final count = (rad * 0.85).round().clamp(14, 72);
+      final paint = Paint()..isAntiAlias = true;
+      for (var i = 0; i < count; i++) {
+        final u = (i + 0.5) / count;
+        final a = u * math.pi * 2 * 3.7 + n.signed1(u * 9.1) * 2.0;
+        final d = rad * (0.12 + 0.88 * n.at1(u * 7.3 + 2));
+        final leafAt = at + Offset(math.cos(a) * d, math.sin(a) * d * 0.88);
+        final off = leafAt - at;
+        final litLeaf = off.dx * l.dir.dx + off.dy * l.dir.dy > 0;
+        final len = rad * (0.11 + 0.09 * n.at1(u * 5.1));
+        paint.color = litLeaf
+            ? tone.lighten(0.16 + 0.12 * n.at1(u * 4.7)).fade(0.55)
+            : tone.darken(0.28).mix(l.ambient, 0.22).fade(0.50);
+        c.drawPath(
+          leafBlade(leafAt, len, a + 0.6 * n.signed1(u * 3.3), width: 0.34),
+          paint,
+        );
+      }
+      c.restore();
+    }
+
     // 투과와 림은 **앞쪽 덩어리에만** 얹는다. Path.combine 은 복합 형상에서
     // 비싸므로 덩어리마다 두 번씩 부르면 수관 하나에 열 번이 넘게 걸린다.
     // 뒤쪽 덩어리에서는 어차피 보이지도 않는다.

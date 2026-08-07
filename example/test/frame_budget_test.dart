@@ -132,6 +132,13 @@ void main() {
     // 여유가 필요하므로 12ms 를 상한으로 둔다 — 게임 로직·오디오·위젯이
     // 같은 스레드를 나눠 쓰기 때문이다.
     expect(record, lessThan(12.0), reason: 'UI 스레드가 프레임 예산을 넘는다');
-    expect(raster, lessThan(12.0), reason: '래스터가 프레임 예산을 넘는다');
+
+    // 래스터에는 예산을 걸지 않는다. `flutter test` 는 GPU 가 없어 CPU
+    // 소프트웨어 래스터로 그리고, 그 수치는 기기와 크게 다르다 — 텍스처
+    // 쿼드 62장은 GPU 에서 거의 공짜지만 소프트웨어에서는 실제 일이다.
+    // 기기 래스터는 `flutter run --profile -t lib/bench.dart` 로 잰다.
+    // 여기서는 **카나리아**만 세운다: 지면 블러 합집합 사고(21→14fps)급
+    // 회귀는 소프트웨어 수치도 수십 ms 단위로 튀므로 이 상한이 잡아낸다.
+    expect(raster, lessThan(160.0), reason: '소프트웨어 래스터가 회귀했다');
   }, timeout: const Timeout(Duration(minutes: 5)));
 }

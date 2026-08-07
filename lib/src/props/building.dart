@@ -1133,19 +1133,47 @@ class BuildingProp extends Prop {
       ..lineTo(p0.dx + up.dx, p0.dy + up.dy)
       ..close();
 
-    final tone = _plinth.darken(0.10);
+    // 굴뚝 면은 [paintSurface] 로 칠하지 않는다. `_diffuse` 의 방사 그라디언트는
+    // 반지름이 **짧은 변**에 비례하므로, 폭이 좁고 키가 큰 이 면에서는 원이
+    // 윗부분만 덮고 아래 전체가 `deep`(거의 검정)으로 떨어진다 — 실측 화면에서
+    // 굴뚝이 까만 비석으로 서 있던 원인이다. 원통·기둥과 같은 이유로 명암을
+    // **세로 선형 띠**로 직접 깐다.
+    final tone = _plinth.darken(0.05);
     for (final (i, face) in [quad(lf, f), quad(f, rr)].indexed) {
       final lit = (i == 0) == leftLit;
-      paintSurface(
-        c,
+      final faceTone = lit
+          ? tone.lighten(0.14)
+          : tone.darken(0.26).mix(l.ambient, 0.28);
+      final fb = face.getBounds();
+      c.drawPath(
         face,
-        Surface(lit ? tone.lighten(0.06) : tone.darken(0.24).mix(l.ambient, 0.3),
-            Finish.stone, contrast: 1.2),
-        l,
-        detail: detail * 0.6,
-        seed: seed + 50 + i,
-        rim: false,
+        Paint()
+          ..isAntiAlias = true
+          ..shader = Gradient.linear(
+            fb.topCenter,
+            fb.bottomCenter,
+            [
+              faceTone.lighten(0.14),
+              faceTone,
+              faceTone.darken(0.16).mix(l.ambient, 0.12),
+            ],
+            const [0.0, 0.45, 1.0],
+          ),
       );
+      // 조적 줄눈. 단위가 보여야 굴뚝의 크기를 읽는다.
+      if (detail > 0.5) {
+        final mortar = Paint()
+          ..isAntiAlias = true
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(0.8, h * 0.022)
+          ..color = faceTone.darken(0.35).fade(0.38);
+        final base = i == 0 ? lf : f;
+        final run = (i == 0 ? f - lf : rr - f);
+        for (var row = 1; row < 4; row++) {
+          final y = up * (row / 4);
+          c.drawLine(base + y, base + run + y, mortar);
+        }
+      }
     }
     // 갓돌 — 굴뚝 꼭대기가 조금 넓어야 굴뚝으로 읽힌다.
     final capTop = Path()

@@ -470,6 +470,9 @@ class FieldGame extends FlameGame with TapCallbacks {
       iso: iso,
     );
     _scene.rigged.add(_heroActor);
+    // 주인공이 건물 뒤로 들어가면 그 건물이 흐려진다. 8 m 짜리 벽이 1.8 m
+    // 짜리 사람을 통째로 덮으므로, 이게 없으면 주인공을 잃어버린다.
+    _scene.occlusionFocus = _heroActor;
 
     // 몬스터는 마을 곳곳에 흩어 놓고 각자 배회시킨다.
     final r = Rng(mapSeed ^ 0x5A17);

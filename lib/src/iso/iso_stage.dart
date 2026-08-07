@@ -282,9 +282,55 @@ void paintIsoGround(
     // 개수는 넓이에 비례시켜 밀도를 일정하게 유지한다. 맵이 커지면 얼룩이
     // 커지는 것이 아니라 많아져야 한다.
     layer((tiles * 0.035).round().clamp(6, 70), 0.85, 2.1, 0.42, dirt,
-        ground.darken(0.14), 0.17);
+        ground.darken(0.14), 0.20);
     layer((tiles * 0.09).round().clamp(10, 170), 0.18, 0.46, 0.55,
-        ground.darken(0.20), ground.lighten(0.14), 0.18);
+        ground.darken(0.20), ground.lighten(0.14), 0.21);
+
+    // ── 낟알 층. 얼룩이 명도의 **대역**을 만들었으면, 이쪽은 손에 잡히는
+    // **결**을 만든다 — 풀 이삭은 짧게 기운 획으로, 흙 알갱이는 납작한
+    // 점으로. 블러가 전혀 없어서 얼룩보다 개수가 몇 배라도 싸다. 시드
+    // 소비를 컬링보다 먼저 끝내는 규칙은 위와 같다.
+    if (detail > 0.45) {
+      final grain = Paint()..isAntiAlias = true;
+      final blade = Paint()
+        ..isAntiAlias = true
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+      // 타일당 너덧 개는 있어야 결로 읽힌다. 얼룩과 달리 개수를 크게 잡는
+      // 이유는 하나 — 블러가 없으면 점 하나의 비용이 수백 분의 일이다.
+      final count = (tiles * 6.0).round().clamp(320, 8000);
+      for (var i = 0; i < count; i++) {
+        final at = Offset(
+          fb.left + r.unit * fb.width,
+          fb.top + r.unit * fb.height,
+        );
+        final grass = r.chance(0.62);
+        final s = unit * r.range(0.026, 0.070);
+        final lean = r.signed(0.55);
+        final tone = r.unit;
+        if (visible != null &&
+            !visible.overlaps(Rect.fromCircle(center: at, radius: s * 3))) {
+          continue;
+        }
+        if (grass) {
+          blade
+            ..strokeWidth = math.max(1.0, s * 0.28)
+            ..color = ground.lighten(0.12 + 0.20 * tone).fade(0.45);
+          c.drawLine(
+            at,
+            at + Offset(s * lean, -s * (0.9 + 0.5 * tone)),
+            blade,
+          );
+        } else {
+          grain.color =
+              (tone > 0.5 ? dirt.darken(0.18) : ground.darken(0.30)).fade(0.34);
+          c.drawOval(
+            Rect.fromCenter(center: at, width: s * 1.7, height: s * 0.8),
+            grain,
+          );
+        }
+      }
+    }
   }
   c.restore();
 
