@@ -377,13 +377,19 @@ class _Stage extends StatelessWidget {
               left: 34,
               right: 34,
               bottom: 30,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: _Identity(
-                  artist: artist,
-                  spec: spec,
-                  compact: false,
-                  onEnter: onEnter,
+              // Align 이 느슨한 제약을 물려준다. 이것 없이 ConstrainedBox 만
+              // 두면 left+right 가 만든 꽉 찬 폭이 이겨서, 막대와 글이 인물
+              // 밑까지 늘어난다.
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  child: _Identity(
+                    artist: artist,
+                    spec: spec,
+                    compact: false,
+                    onEnter: onEnter,
+                  ),
                 ),
               ),
             ),
