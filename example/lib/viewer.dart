@@ -59,7 +59,7 @@ class ViewerModel extends ChangeNotifier {
 
   /// 활을 든 상태로 그릴지. 사격 동작에서만 원거리 무기로 갈아 쥔다.
   bool get ranged =>
-      animator.current.name == Anims.shoot.name || spec.weapon == WeaponKind.bow;
+      animator.current.name.startsWith('shoot') || spec.weapon == WeaponKind.bow;
 
   HumanoidRenderer _buildRenderer() {
     if (!beast) return HumanoidRenderer(spec);

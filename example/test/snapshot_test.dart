@@ -63,7 +63,7 @@ void main() {
           facing: const Facing(0.9),
           time: phases[c] * clip.duration,
           detail: 1.0,
-          ranged: clip.name == 'shoot',
+          ranged: clip.name.startsWith('shoot'),
         );
         canvas.restore();
       }

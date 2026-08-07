@@ -581,8 +581,9 @@ class RiggedIsoActor {
     if (!_sceneDriven) update(dt);
   }
 
-  /// 클립을 이름으로 재생한다. `idle`·`wait`·`walk`·`run`·`dash`·`attack`·
-  /// `shoot`·`hit`·`death`.
+  /// 클립을 이름으로 재생한다. 기본 이동·상태 클립과 `attack1..3`,
+  /// `shoot1..3`, `cast1..3` 콤보를 쓴다. 1타의 이름은 호환을 위해
+  /// 각각 `attack`·`shoot`·`cast`다.
   void play(String name) {
     _state = name;
     animator.playByName(name);
@@ -621,7 +622,11 @@ class RiggedIsoActor {
   }
 
   bool _isOneShot(String name) =>
-      name == 'attack' || name == 'hit' || name == 'shoot' || name == 'dash';
+      name.startsWith('attack') ||
+      name.startsWith('shoot') ||
+      name.startsWith('cast') ||
+      name == 'hit' ||
+      name == 'dash';
 }
 
 /// [RiggedIsoActor] 하나를 그린다.

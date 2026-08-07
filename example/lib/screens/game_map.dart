@@ -747,7 +747,9 @@ class FieldGame extends FlameGame with TapCallbacks {
   }
 
   bool get _heroBusy =>
-      _heroActor.state == 'attack' || _heroActor.state == 'shoot';
+      _heroActor.state.startsWith('attack') ||
+      _heroActor.state.startsWith('shoot') ||
+      _heroActor.state.startsWith('cast');
 
   void _beginHeroAttack() {
     if (!_heroAlive) return;
@@ -765,15 +767,21 @@ class FieldGame extends FlameGame with TapCallbacks {
     _heroCooldown = 0.42;
     _combo.begin(chained: chained);
 
+    final clip = switch (_heroAttackMode) {
+      HeroAttackMode.melee => Anims.meleeCombo[_combo.step - 1],
+      HeroAttackMode.bow => Anims.bowCombo[_combo.step - 1],
+      HeroAttackMode.spell => Anims.spellCombo[_combo.step - 1],
+    };
     _heroActor.ranged = _heroUsesBow;
-    _heroActor.play(_heroUsesRanged ? 'shoot' : 'attack');
+    _heroActor.play(clip.name);
     _heroActor.animator.rate = _combo.attackRate;
     if (_heroUsesRanged) return; // release 이벤트가 발사체를 낸다
 
     // 스윙 소리의 봉우리는 파형의 60% 지점에 있다. 그 봉우리가 클립의 strike
     // 이벤트(t=0.5)에 떨어지도록 앞당겨 예약한다 — 소리와 그림이 어긋나는
     // 순간 두 배로 싸구려가 된다.
-    final lead = Anims.attack.duration * 0.5 / _combo.attackRate - 0.21;
+    final strike = clip.events.singleWhere((event) => event.name == 'strike');
+    final lead = clip.duration * strike.at / _combo.attackRate - 0.21;
     _after(math.max(0, lead), () {
       audio.play(
         SfxKeys.swing(_heroWeapon),
