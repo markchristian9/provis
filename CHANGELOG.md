@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### 소리 — 파일 없이 합성한다
+스프라이트를 쓰지 않는 것과 같은 규칙을 소리에 적용했다. 패키지에 오디오
+파일이 한 장도 늘지 않고, 재생 패키지에 대한 의존도 생기지 않는다 —
+라이브러리는 WAV 바이트까지만 만든다.
+
+- **`Sfx`** — 발소리(바닥 5종 × 걷기/달리기), 무기 8종의 휘두르기, 타격,
+  방어(`block`)와 흘리기(`parry`), 사격, 쓰러짐, UI. 모든 레시피가 몸통(저역)·
+  표면(중역 잡음)·끝단(고역 순간) 세 층으로 되어 있다.
+- **`CreatureVoice`** — 음원-필터 모형의 몬스터 목소리. `VoiceKind` 7종
+  (growl·roar·wail·chitter·hiss·screech·moan) × 발화 5종(idle·alert·attack·
+  hurt·die). 몸집(`size`)이 포먼트를 통째로 옮기므로 같은 레시피가 사람에서
+  거인까지 이어지고, `id` 가 시드이므로 같은 캐릭터는 언제나 같은 목소리다.
+- **`Bgm`** — 무드 4종(`LightRig.preset` 과 같은 순서)의 이음매 없는 스테레오
+  루프. 드론·화성·선율·공기 네 층이며, `Wave.foldTail` 이 꼬리를 머리에 접어
+  반복 지점의 딱 소리를 없앤다.
+- **`SoundBank`** — 이름 하나에 변주 여럿. 늦게 굽고 캐시한다. 등록되지 않은
+  이름은 조용히 무음을 내지 않고 던진다.
+- **DSP** — `Osc`(PolyBLEP) · `Env` · `Svf` · `FormantBank` · `OnePole` ·
+  `DcBlock` · `DelayLine` · `reverb` · `pluck` · `encodeWav`.
+- **`example`** — `audioplayers` 로 붙인 재생 계층(`example/lib/audio/`). 창고를
+  격리 스레드에서 굽고, 거리로 음량을·화면 가로 위치로 좌우 균형을 정한다.
+  게임 맵에 공격·방어·달리기·음소거가 붙었고, 소리는 `Clip.events` 의
+  `footfall`·`strike`·`release`·`collapse` 에 걸려 그림과 어긋나지 않는다.
+
 ### 애니메이션 — 부드러움 점검
 프레임률이 흔들려도, 이동 속도가 달라져도 같은 그림이 나오도록 재생 경로 전체를
 손봤다.

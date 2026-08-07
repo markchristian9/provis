@@ -62,9 +62,21 @@ export 'src/actor/humanoid_renderer.dart';
 
 // ── 아이소메트릭: 카메라·배치·조작 ───────────────────────────────────────
 export 'src/iso/iso_view.dart';
+// 크기의 유일한 기준. 기물과 캐릭터가 같은 자를 쓰게 한다.
+export 'src/iso/world_scale.dart';
 export 'src/iso/iso_stage.dart';
 export 'src/iso/iso_input.dart';
 export 'src/iso/artist_rig.dart';
+
+// ── 소리 ─────────────────────────────────────────────────────────────────
+// 그림과 같은 규칙이다 — 파일을 쓰지 않고 코드로 만든다. 합성만 하고 재생은
+// 하지 않으므로 오디오 백엔드에 의존하지 않는다. 결과는 WAV 바이트다.
+export 'src/audio/dsp.dart';
+export 'src/audio/wave.dart';
+export 'src/audio/sfx.dart';
+export 'src/audio/voice.dart';
+export 'src/audio/bgm.dart';
+export 'src/audio/bank.dart';
 
 // ── Flame 통합 (선택) ────────────────────────────────────────────────────
 // 핵심 렌더는 dart:ui 만으로 동작한다. 이 파일만 Flame 에 의존한다.

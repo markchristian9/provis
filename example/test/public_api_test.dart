@@ -380,6 +380,54 @@ void main() {
       final tinted = tintedPalette(const Color(0xFFFF6A1E), Rng(3));
       expect(tinted.accent, const Color(0xFFFF6A1E));
     });
+
+    test('소리 — 파일 한 장 없이 효과음·목소리·배경음이 나온다', () {
+      // 그림과 같은 규칙이다. 소비자는 barrel 하나로 소리까지 만든다.
+      final bank = SoundBank.field(seed: 11);
+      final wav = bank.pick(
+        SfxKeys.step(StepGround.grass, running: true),
+        Rng(2),
+      );
+      // WAV 헤더가 붙은 재생 가능한 바이트여야 한다 — 재생 계층은 이것만 안다.
+      expect(String.fromCharCodes(wav.sublist(0, 4)), 'RIFF');
+      expect(wav.length, greaterThan(44));
+
+      expect(bank.bytes(SfxKeys.swing(WeaponKind.greatsword)), isNotEmpty);
+      expect(bank.bytes(SfxKeys.blockMetal), isNotEmpty);
+      expect(bank.bytes(SfxKeys.impactArmor), isNotEmpty);
+
+      // 몬스터의 목소리는 그 캐릭터에서 나온다 — 같은 인물이면 같은 목소리다.
+      final beast = BuiltArtist(
+        id: 'consumer_beast',
+        name: 'Beast',
+        title: 'The Consumer Beast',
+        blurb: '소비자가 만든 몬스터.',
+        build: CharacterBuild(
+          archetype: Archetype.berserker,
+          beast: true,
+          heightScale: 1.3,
+          palette: tintedPalette(const Color(0xFF8FA36B), Rng(7), monster: true),
+        ),
+      );
+      final voice = CreatureVoice.of(beast, kind: VoiceKind.roar);
+      expect(voice.kind, VoiceKind.roar);
+      expect(CreatureVoice.of(beast).seed, voice.seed, reason: '시드가 흔들린다');
+      bank.addVoice(beast.id, voice);
+      expect(bank.bytes(VoiceKeys.attack(beast.id)).length, greaterThan(44));
+
+      // 직접 합성해서 손보는 길도 열려 있어야 한다.
+      final custom = Sfx.footstep(seed: 3, ground: StepGround.stone)
+        ..drive(1.2)
+        ..normalize(0.8);
+      expect(custom.peak, closeTo(0.8, 1e-6));
+      expect(encodeWav(custom).length, 44 + custom.length * 2);
+
+      // 배경음은 스테레오 루프다.
+      final bgm = Bgm.bake(mood: Mood.moonlight, seed: 5, seconds: 5.0);
+      expect(bgm.left.length, bgm.right.length);
+      expect(encodeWav(bgm.left, right: bgm.right).length,
+          44 + bgm.left.length * 4);
+    });
   });
 }
 

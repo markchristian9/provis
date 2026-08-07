@@ -11,6 +11,8 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   flame: ^1.38.0
+  # 재생만 맡는다. 소리 자체는 provis 가 코드로 합성하므로 에셋이 없다.
+  audioplayers: ^6.8.1
   provis:
     path: ../
 

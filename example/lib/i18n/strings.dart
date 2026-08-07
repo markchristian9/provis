@@ -88,11 +88,26 @@ class Strings {
   String get backToRoster => _pick('← 명부', '← Roster');
 
   String mapHint(int kinds) => _pick(
-        '맵을 클릭해 이동  ·  몬스터 $kinds종 출현',
-        'Click the map to move  ·  $kinds monster kinds afield',
+        '맵을 클릭해 이동  ·  몬스터를 클릭해 공격  ·  몬스터 $kinds종 출현',
+        'Click to move  ·  click a monster to strike  ·  $kinds kinds afield',
       );
 
   String get regenerateMap => _pick('맵 다시 생성', 'Regenerate map');
+
+  // ── 소리 ───────────────────────────────────────────────────────────────
+
+  String get sprint => _pick('달리기', 'Sprint');
+
+  String get guard => _pick('방어', 'Guard');
+
+  String get attack => _pick('공격', 'Attack');
+
+  String get mute => _pick('음소거', 'Mute');
+
+  String get soundOn => _pick('소리 켬', 'Sound on');
+
+  /// 소리는 실행 중에 합성한다. 그동안 조용한 것이 고장이 아님을 알린다.
+  String get bakingSound => _pick('소리 합성 중…', 'Synthesizing sound…');
 
   String get hideGrid => _pick('격자 끄기', 'Hide grid');
 

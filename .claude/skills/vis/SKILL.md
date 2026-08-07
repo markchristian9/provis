@@ -22,6 +22,8 @@ provis/                      ← pub.dev 배포 패키지 (루트)
 │   ├── iso/                 iso_view · iso_stage · iso_input
 │   ├── props/               prop · prop_kit · tree · rock · building
 │   │                        water · ground · flora · terrain
+│   ├── audio/               dsp · wave · sfx · voice · bgm · bank
+│   │                        (합성만 한다 — 재생은 앱의 몫)
 │   └── flame/               iso_scene (선택적 Flame 통합)
 └── example/                 실행 앱 (별도 패키지)
     ├── lib/main.dart        아이소 필드 — 기물 + 클릭 이동

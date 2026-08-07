@@ -20,6 +20,9 @@ import 'package:provis/provis.dart';
 | **살아 있는 조명** | 시각을 정오에서 황혼으로 바꾸면 캐릭터·건물·물·그림자가 **한꺼번에** 반응합니다. 다시 구울 것이 없습니다. |
 | **해상도 무제한** | 벡터라 4K 에서도, 48px 썸네일에서도 같은 코드가 선명합니다. |
 
+같은 규칙을 소리에도 적용합니다 — 발소리·검격·몬스터의 목소리·배경음까지
+[런타임에 합성](#소리도-파일이-없습니다)하므로 오디오 파일도 0 입니다.
+
 ## 핵심 개념
 
 ### 재질은 19가지 `Finish`
@@ -297,6 +300,68 @@ facing.snap8 / snap16 / snap32
 정면에서는 팔이 몸 옆으로 내려가고 다리가 좌우로 벌어지며, 측면에서는 코와 턱이
 실루엣 밖으로 나옵니다. `solve(body, pose, yaw:)` 가 관절을 시상면·좌우·수직
 세 성분으로 나눠 투영하기 때문입니다.
+
+## 소리도 파일이 없습니다
+
+그림에 스프라이트가 없는 것과 같은 이유로, 소리에도 `.wav` 가 없습니다.
+발소리·검격·방어·몬스터의 목소리·배경음까지 **런타임에 합성**합니다.
+
+```dart
+final bank = SoundBank.field(seed: 7);            // 표준 창고
+final wav  = bank.pick(SfxKeys.step(StepGround.grass), rng);  // WAV 바이트
+```
+
+`SoundBank` 는 이름 하나에 변주 여럿을 매답니다. 발소리 하나를 반복 재생하면
+기관총이 되기 때문입니다 — 나무마다 시드를 바꾸는 것과 같은 규칙입니다.
+굽기는 **처음 요청될 때** 일어나고 그 뒤로는 캐시를 줍니다.
+
+| 무엇 | 어디에 |
+|---|---|
+| 발소리 — 바닥 5종(풀·흙·돌·나무·물) × 걷기/달리기 | `Sfx.footstep` |
+| 휘두르기 — 무기 8종의 도플러 | `Sfx.swing` |
+| 타격 · 방어 · 흘리기 · 사격 · 쓰러짐 | `Sfx.impact` · `block` · `parry` · `bowShot` · `bodyFall` |
+| 몬스터의 목소리 — 목 7종 × 발화 5종 | `CreatureVoice` |
+| 배경음 — 무드 4종의 이음매 없는 스테레오 루프 | `Bgm.bake` |
+| 발진기 · 포락선 · 필터 · 잔향 | `Osc` · `Env` · `Svf` · `reverb` |
+
+### 몬스터의 목소리는 그 몬스터에서 나온다
+
+목소리는 **성대**(펄스열 + 거칢)와 **성도**(포먼트 공명 셋)의 곱입니다. 몸집이
+커지면 성도가 길어져 포먼트가 통째로 내려가므로, `size` 하나만 올려도 같은
+레시피가 거인이 됩니다.
+
+```dart
+final voice = CreatureVoice.of(monster, kind: VoiceKind.roar);
+bank.addVoice(monster.id, voice);          // idle · alert · attack · hurt · die
+```
+
+`id` 가 시드이므로 **같은 캐릭터는 언제나 같은 목소리**를 냅니다. 같은 종을 열
+마리 놓아도 개체마다 다릅니다.
+
+### 재생은 하지 않습니다
+
+라이브러리는 WAV 바이트까지만 만듭니다. 오디오 백엔드에 묶이지 않기 위해서이며,
+덕분에 합성은 격리 스레드에서 돌릴 수 있습니다.
+
+```dart
+final bytes = encodeWav(Sfx.block(seed: 3));   // 이 뒤는 앱의 몫
+```
+
+`example/lib/audio/` 에 `audioplayers` 로 붙인 재생 계층이 있습니다 — 창고를
+격리 스레드에서 굽고, 거리로 음량을, 화면 가로 위치로 좌우 균형을 정합니다.
+
+### 소리는 클립 이벤트에 붙입니다
+
+프레임 수를 세지 않습니다. `Clip.events` 에 찍힌 정규화 시각을 `Animator.fired`
+로 읽으므로, 보폭 동기화로 재생 배속이 바뀌어도 **발이 땅에 닿는 그 프레임**에
+소리가 납니다.
+
+```dart
+for (final e in actor.animator.fired) {
+  if (e == 'footfall') audio.play(SfxKeys.step(groundAt(actor.tile)));
+  if (e == 'strike')   resolveHit();
+}
+```
 
 ## 결정론
 
