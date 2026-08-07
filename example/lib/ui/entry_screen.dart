@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import 'package:provis/provis.dart';
 import '../characters/roster.dart';
+import '../i18n/character_text.dart';
+import '../i18n/lang.dart';
 import 'portrait_card.dart';
 import 'stage.dart';
 
@@ -123,9 +125,9 @@ class _Header extends StatelessWidget {
         children: [
           Container(width: 3, height: 22, color: hero.accent),
           const SizedBox(width: 10),
-          const Text(
-            'THE VIGIL ROSTER',
-            style: TextStyle(
+          Text(
+            context.t.rosterTitle,
+            style: const TextStyle(
               color: Color(0xFFE4EBF5),
               fontSize: 15,
               fontWeight: FontWeight.w800,
@@ -133,17 +135,21 @@ class _Header extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Text(
-              '누가 어떤 밤을 마주할 것인가 — 챔피언과 악몽을 하나씩 고르십시오.',
+              context.t.rosterSubtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Color(0xFF6E7C90),
                 fontSize: 11.5,
                 letterSpacing: 0.4,
               ),
             ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(right: 12),
+            child: LangToggle(accent: Color(0xFFE8B84B)),
           ),
           Container(width: 3, height: 22, color: monster.accent),
         ],
@@ -175,7 +181,9 @@ class _NamePlate extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              artist.camp == Camp.player ? 'CHAMPION' : 'NIGHTMARE',
+              artist.camp == Camp.player
+                  ? context.t.champion
+                  : context.t.nightmare,
               style: TextStyle(
                 color: artist.accent.fade(0.85),
                 fontSize: 10,
@@ -203,7 +211,7 @@ class _NamePlate extends StatelessWidget {
             Container(width: compact ? 60 : 110, height: 2, color: artist.accent),
             const SizedBox(height: 6),
             Text(
-              artist.title,
+              artist.titleIn(context.lang),
               textAlign: right ? TextAlign.right : TextAlign.left,
               style: const TextStyle(
                 color: Color(0xFFA9B6C7),
@@ -214,7 +222,7 @@ class _NamePlate extends StatelessWidget {
             if (!compact) ...[
               const SizedBox(height: 8),
               Text(
-                artist.blurb,
+                artist.blurbIn(context.lang),
                 textAlign: right ? TextAlign.right : TextAlign.left,
                 style: const TextStyle(
                   color: Color(0xFF7C8A9C),
@@ -261,8 +269,12 @@ class _EngageButton extends StatelessWidget {
                   duration: const Duration(seconds: 3),
                   backgroundColor: const Color(0xFF0C1420),
                   content: Text(
-                    '${hero.name} 이(가) ${monster.name} 을(를) 마주 봅니다 — '
-                    '${hero.title} vs ${monster.title}.',
+                    context.t.faceOff(
+                      hero.name,
+                      monster.name,
+                      hero.titleIn(context.lang),
+                      monster.titleIn(context.lang),
+                    ),
                     style: const TextStyle(color: Color(0xFFD8E2EE)),
                   ),
                 ),
@@ -324,15 +336,15 @@ class _SelectionStrip extends StatelessWidget {
     final males = heroes.where((a) => a.sex == Sex.male).length;
     final females = heroes.where((a) => a.sex == Sex.female).length;
     final left = _Group(
-      label: 'CHAMPIONS',
-      hint: '남성 $males · 여성 $females',
+      label: context.t.champions,
+      hint: context.t.sexTally(males, females),
       accent: matchup.hero.accent,
       list: heroes,
       matchup: matchup,
     );
     final right = _Group(
-      label: 'NIGHTMARES',
-      hint: '${monsters.length} 종의 이형',
+      label: context.t.nightmares,
+      hint: context.t.aberrationTally(monsters.length),
       accent: matchup.monster.accent,
       list: monsters,
       matchup: matchup,

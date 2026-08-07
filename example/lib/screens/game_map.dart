@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' as m show Colors;
 import 'package:provis/provis.dart';
 
 import '../characters/roster.dart';
+import '../i18n/lang.dart';
 
 /// 게임 맵 — 선택한 캐릭터로 입장하고, 명부의 모든 몬스터가 한 마리씩 나온다.
 ///
@@ -36,7 +37,7 @@ class _GameMapScreenState extends State<GameMapScreen> {
             child: Row(
               children: [
                 _Chip(
-                  label: '← 명부',
+                  label: context.t.backToRoster,
                   on: false,
                   onTap: () => Navigator.of(context).pop(),
                 ),
@@ -54,7 +55,7 @@ class _GameMapScreenState extends State<GameMapScreen> {
                       ),
                     ),
                     Text(
-                      '맵을 클릭해 이동  ·  몬스터 ${monsters.length}종 출현',
+                      context.t.mapHint(monsters.length),
                       style: TextStyle(
                         fontSize: 11,
                         color: m.Colors.white.withValues(alpha: 0.45),
@@ -72,20 +73,19 @@ class _GameMapScreenState extends State<GameMapScreen> {
             top: 16,
             child: Row(
               children: [
-                for (final (i, name) in const [
-                  (0, '정오'),
-                  (1, '황혼'),
-                  (2, '달빛'),
-                  (3, '화톳불'),
-                ])
+                for (var i = 0; i < 4; i++)
                   Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: _Chip(
-                      label: name,
+                      label: context.t.lightPreset(i),
                       on: _game.preset == i,
                       onTap: () => setState(() => _game.setPreset(i)),
                     ),
                   ),
+                const Padding(
+                  padding: EdgeInsets.only(left: 14),
+                  child: LangToggle(),
+                ),
               ],
             ),
           ),
@@ -100,13 +100,14 @@ class _GameMapScreenState extends State<GameMapScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _Chip(
-                    label: '맵 다시 생성',
+                    label: context.t.regenerateMap,
                     on: false,
                     onTap: () => setState(_game.regenerate),
                   ),
                   const SizedBox(width: 10),
                   _Chip(
-                    label: _game.showGrid ? '격자 끄기' : '격자 켜기',
+                    label:
+                        _game.showGrid ? context.t.hideGrid : context.t.showGrid,
                     on: _game.showGrid,
                     onTap: () => setState(_game.toggleGrid),
                   ),
@@ -181,8 +182,12 @@ class FieldGame extends FlameGame with TapCallbacks {
   late IsoController _heroCtrl;
   late RiggedIsoActor _heroActor;
 
-  /// 몬스터와 각자의 배회 컨트롤러.
-  final List<(RiggedIsoActor, IsoController)> _mobs = [];
+  /// 몬스터와 각자의 배회 컨트롤러, 그리고 다음 목적지까지 남은 시간.
+  ///
+  /// 프레임마다 주사위를 굴리면 배회 빈도가 프레임률에 비례한다 — 120fps
+  /// 기기에서 몬스터가 두 배로 부산해진다. 초 단위 타이머로 재야 어디서나
+  /// 같은 리듬으로 움직인다.
+  final List<_Mob> _mobs = [];
 
   @override
   Color backgroundColor() => const Color(0xFF090D18);
@@ -411,24 +416,27 @@ class FieldGame extends FlameGame with TapCallbacks {
   void _spawnActors() {
     final start = _openTileNear(Offset(cols / 2 + 0.5, rows - 4.5));
     _heroCtrl = IsoController(tile: start, grid: _scene.grid, speed: 3.2);
-    _heroActor = riggedFromArtist(hero, tile: start, height: 200);
+    // iso 를 넘겨야 보폭이 이 맵의 타일 크기에 맞는다 — 빠뜨리면 기본 타일
+    // 크기로 계산해 걸음 수와 이동 거리가 어긋난다.
+    _heroActor = riggedFromArtist(hero, tile: start, height: 200, iso: iso);
     _scene.rigged.add(_heroActor);
 
     // 몬스터는 맵 곳곳에 흩어 놓고 각자 배회시킨다.
+    final r = Rng(mapSeed ^ 0x5A17);
     for (final (i, m) in monsters.indexed) {
       final want = Offset(
         2.5 + (i % 2) * 9.0 + (i ~/ 2) * 2.0,
         2.5 + (i ~/ 2) * 8.0 + (i % 2) * 1.5,
       );
       final tile = _openTileNear(want);
-      final actor = riggedFromArtist(m, tile: tile, height: 215);
+      final actor = riggedFromArtist(m, tile: tile, height: 215, iso: iso);
       final ctrl = IsoController(
         tile: tile,
         grid: _scene.grid,
         speed: 1.2 + i * 0.28,
       );
       _scene.rigged.add(actor);
-      _mobs.add((actor, ctrl));
+      _mobs.add(_Mob(actor, ctrl, r.range(0.5, 4.0)));
     }
   }
 
@@ -463,21 +471,38 @@ class FieldGame extends FlameGame with TapCallbacks {
     super.update(dt);
 
     _heroCtrl.update(dt);
-    // follow 가 위치·방향·클립(대기/걷기/달리기)을 한 번에 맞춘다.
+    // follow 가 위치·방향·클립(대기/걷기/달리기)과 보폭을 한 번에 맞춘다.
+    // 시간은 씬이 이미 진행시켰으므로 여기서 또 밀지 않는다.
     _heroActor.follow(_heroCtrl, dt);
 
-    // 몬스터 배회. 목적지에 닿으면 새 목적지를 고른다.
+    // 몬스터 배회. 쉬는 시간이 다 되면 새 목적지를 고른다. 프레임마다
+    // 주사위를 굴리지 않으므로 프레임률이 바뀌어도 리듬이 같다.
     _wanderTick++;
     final r = Rng(mapSeed ^ (_wanderTick * 2654435761));
-    for (final (actor, ctrl) in _mobs) {
-      if (!ctrl.isMoving && r.chance(0.02)) {
-        ctrl.moveTo(Offset(
-          r.range(0.5, cols - 0.5),
-          r.range(0.5, rows - 0.5),
-        ));
+    for (final m in _mobs) {
+      if (!m.ctrl.isMoving) {
+        m.rest -= dt;
+        if (m.rest <= 0) {
+          m.ctrl.moveTo(Offset(
+            r.range(0.5, cols - 0.5),
+            r.range(0.5, rows - 0.5),
+          ));
+          m.rest = r.range(1.5, 6.0);
+        }
       }
-      ctrl.update(dt);
-      actor.follow(ctrl, dt);
+      m.ctrl.update(dt);
+      m.actor.follow(m.ctrl, dt);
     }
   }
+}
+
+/// 배회하는 몬스터 한 마리.
+class _Mob {
+  _Mob(this.actor, this.ctrl, this.rest);
+
+  final RiggedIsoActor actor;
+  final IsoController ctrl;
+
+  /// 다음 목적지를 고르기까지 남은 시간(초).
+  double rest;
 }

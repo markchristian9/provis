@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'i18n/lang.dart';
 import 'ui/entry_screen.dart';
 
 /// 캐릭터 선택 화면의 진입점.
@@ -14,19 +15,21 @@ class VisEntryApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Vigil Roster',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF05070C),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE8B84B),
+    return LangScope(
+      child: MaterialApp(
+        title: 'Vigil Roster',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
           brightness: Brightness.dark,
+          scaffoldBackgroundColor: const Color(0xFF05070C),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFFE8B84B),
+            brightness: Brightness.dark,
+          ),
+          splashFactory: InkSparkle.splashFactory,
         ),
-        splashFactory: InkSparkle.splashFactory,
+        home: const EntryScreen(),
       ),
-      home: const EntryScreen(),
     );
   }
 }

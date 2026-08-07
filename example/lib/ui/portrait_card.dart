@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 
 import 'package:provis/provis.dart';
 
+import '../i18n/character_text.dart';
+import '../i18n/lang.dart';
+
 /// 카드 안에 캐릭터 전신을 그리는 페인터.
 ///
 /// 스테이지와 완전히 같은 [Artist.paint] 를 부르되 [detail] 만 낮춘다.
@@ -183,7 +186,7 @@ class _ArtistCardState extends State<ArtistCard> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _tag(a),
+                        _tag(a.titleIn(context.lang)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -225,8 +228,9 @@ class _ArtistCardState extends State<ArtistCard> {
     );
   }
 
-  static String _tag(Artist a) {
-    final parts = a.title.split(' ');
-    return parts.length > 2 ? parts.take(2).join(' ') : a.title;
+  /// 카드 밑에 들어갈 짧은 꼬리표. 칭호가 길면 앞 두 마디만 남긴다.
+  static String _tag(String title) {
+    final parts = title.split(' ');
+    return parts.length > 2 ? parts.take(2).join(' ') : title;
   }
 }

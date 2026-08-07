@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'i18n/lang.dart';
 import 'screens/start_screen.dart';
 
 /// provis 데모.
@@ -13,6 +14,7 @@ import 'screens/start_screen.dart';
 /// - 8방향 회전과 보행 애니메이션 — 북쪽은 뒷모습, 남쪽은 앞모습
 /// - 기물과 캐릭터가 **하나의 깊이 정렬**을 거친다
 /// - 조명 프리셋을 바꾸면 화면 전체가 한꺼번에 반응한다
+/// - 한국어 · English 를 화면 어디서나 한 번에 전환한다
 void main() {
   runApp(const ProvisDemoApp());
 }
@@ -22,11 +24,15 @@ class ProvisDemoApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'provis',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(useMaterial3: true),
-      home: const StartScreen(),
+    // LangScope 는 MaterialApp **위**에 둔다. Navigator 가 밀어 올린 게임 맵도
+    // 같은 언어를 봐야 하므로, 라우트보다 위에 있어야 한다.
+    return LangScope(
+      child: MaterialApp(
+        title: 'provis',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData.dark(useMaterial3: true),
+        home: const StartScreen(),
+      ),
     );
   }
 }

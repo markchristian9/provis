@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 
 import 'package:provis/provis.dart';
 
+import 'i18n/lang.dart';
+
 void main() {
   runApp(const VisApp());
 }
@@ -14,18 +16,20 @@ class VisApp extends StatelessWidget {
   const VisApp({super.key});
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: 'Procedural Actor Viewer',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF7AA2FF),
+  Widget build(BuildContext context) => LangScope(
+        child: MaterialApp(
+          title: 'Procedural Actor Viewer',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
             brightness: Brightness.dark,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF7AA2FF),
+              brightness: Brightness.dark,
+            ),
+            fontFamily: 'monospace',
           ),
-          fontFamily: 'monospace',
+          home: const ViewerPage(),
         ),
-        home: const ViewerPage(),
       );
 }
 
@@ -314,7 +318,9 @@ class _TopBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  model.beast ? 'BEAST' : s.archetype.label.toUpperCase(),
+                  model.beast
+                      ? context.t.beast
+                      : context.t.job(s.archetype).toUpperCase(),
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -324,8 +330,12 @@ class _TopBar extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'seed ${model.seed}  ·  ${s.weapon.name}  ·  ${s.headGear.name}'
-                  '  ·  facing ${model.facingLabel}',
+                  context.t.facingLine(
+                    model.seed,
+                    s.weapon.name,
+                    s.headGear.name,
+                    model.facingLabel,
+                  ),
                   style: TextStyle(
                     fontSize: 11,
                     color: Colors.white.withValues(alpha: 0.45),
@@ -334,26 +344,36 @@ class _TopBar extends StatelessWidget {
               ],
             ),
           ),
-          _IconChip(icon: Icons.casino, tip: '새 시드', onTap: model.reroll),
+          const LangToggle(accent: Color(0xFF7AA2FF)),
+          const SizedBox(width: 6),
+          _IconChip(
+            icon: Icons.casino,
+            tip: context.t.newSeed,
+            onTap: model.reroll,
+          ),
           const SizedBox(width: 6),
           _IconChip(
             icon: model.beast ? Icons.pets : Icons.person,
-            tip: '영웅 / 몬스터',
+            tip: context.t.heroOrMonster,
             active: model.beast,
             onTap: model.toggleBeast,
           ),
           const SizedBox(width: 6),
-          _IconChip(icon: Icons.wb_twilight, tip: '조명', onTap: model.cycleLight),
+          _IconChip(
+            icon: Icons.wb_twilight,
+            tip: context.t.lighting,
+            onTap: model.cycleLight,
+          ),
           const SizedBox(width: 6),
           _IconChip(
             icon: Icons.rotate_left,
-            tip: '왼쪽으로 회전',
+            tip: context.t.turnLeft,
             onTap: () => model.turn(-1),
           ),
           const SizedBox(width: 6),
           _IconChip(
             icon: Icons.rotate_right,
-            tip: '오른쪽으로 회전',
+            tip: context.t.turnRight,
             onTap: () => model.turn(1),
           ),
         ],
@@ -407,7 +427,7 @@ class _AnimationBar extends StatelessWidget {
             children: [
               for (final clip in Anims.all)
                 _ClipChip(
-                  label: clip.label,
+                  label: context.t.clip(clip.name),
                   selected: model.clipName == clip.name,
                   dimmed: auto,
                   onTap: () => model.play(clip.name),
@@ -420,7 +440,7 @@ class _AnimationBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'SPEED',
+                context.t.speed,
                 style: TextStyle(
                   fontSize: 10,
                   letterSpacing: 2,

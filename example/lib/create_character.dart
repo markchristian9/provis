@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provis/provis.dart';
 
+import 'i18n/lang.dart';
+
 /// 캐릭터 만드는 법 — 실행되는 예제.
 ///
 /// ```bash
@@ -27,32 +29,39 @@ class CreateCharacterApp extends StatelessWidget {
   const CreateCharacterApp({super.key});
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: 'provis — 캐릭터 만들기',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF7AA2FF),
-            brightness: Brightness.dark,
+  Widget build(BuildContext context) => LangScope(
+        child: Builder(
+          builder: (context) => MaterialApp(
+            onGenerateTitle: (context) => context.t.workbenchTitle,
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              brightness: Brightness.dark,
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: const Color(0xFF7AA2FF),
+                brightness: Brightness.dark,
+              ),
+              fontFamily: 'monospace',
+            ),
+            home: const _Workbench(),
           ),
-          fontFamily: 'monospace',
         ),
-        home: const _Workbench(),
       );
 }
 
 /// 고를 수 있는 강조색. 직업마다 대역을 갈라 두면 명부에서 역할이 먼저 읽힌다.
-const _accents = <String, Color>{
-  '전사 · 금': Color(0xFFD9A441),
-  '전사 · 주홍': Color(0xFFE86A3A),
-  '마법사 · 청': Color(0xFF6FA8FF),
-  '마법사 · 보라': Color(0xFF9A6BFF),
-  '궁수 · 연두': Color(0xFF8FD44A),
-  '군인 · 황토': Color(0xFFB8A05A),
-  '사이보그 · 청록': Color(0xFF3AE0FF),
-  '사이보그 · 주황': Color(0xFFFF9A3A),
-};
+///
+/// 이름은 [Strings.accentSwatch] 가 순번으로 들고 있다. 색 자체는 언어와
+/// 무관하므로, 언어를 바꿔도 고른 색이 그대로 남는다.
+const _accents = <Color>[
+  Color(0xFFD9A441), // 전사 · 금
+  Color(0xFFE86A3A), // 전사 · 주홍
+  Color(0xFF6FA8FF), // 마법사 · 청
+  Color(0xFF9A6BFF), // 마법사 · 보라
+  Color(0xFF8FD44A), // 궁수 · 연두
+  Color(0xFFB8A05A), // 군인 · 황토
+  Color(0xFF3AE0FF), // 사이보그 · 청록
+  Color(0xFFFF9A3A), // 사이보그 · 주황
+];
 
 const _skins = <Color>[
   Color(0xFF8A5F44),
@@ -95,7 +104,7 @@ class _WorkbenchState extends State<_Workbench>
   Sex sex = Sex.male;
   WeaponKind weapon = WeaponKind.sword;
   HeadGear headGear = HeadGear.halfHelm;
-  Color accent = _accents['전사 · 금']!;
+  Color accent = _accents.first;
   Color skin = _skins[2];
   Color hair = _hairs[1];
   Color cloth = _cloths[0];
@@ -124,9 +133,9 @@ class _WorkbenchState extends State<_Workbench>
   /// **이 메서드가 이 예제의 핵심이다.** 캐릭터 하나는 결국 이 선언 하나다.
   BuiltArtist get artist => BuiltArtist(
         id: 'workbench',
-        name: 'New Recruit',
-        title: '작업대에서 만드는 중',
-        blurb: '왼쪽 값을 바꾸면 이 인물이 바뀐다.',
+        name: context.t.workbenchName,
+        title: context.t.workbenchArtistTitle,
+        blurb: context.t.workbenchArtistBlurb,
         build: CharacterBuild(
           archetype: archetype,
           sex: sex,
@@ -183,11 +192,11 @@ class _WorkbenchState extends State<_Workbench>
           Positioned.fill(
             child: CustomPaint(painter: _PortraitPainter(a, _t)),
           ),
-          const Positioned(
+          Positioned(
             left: 14,
             top: 10,
-            child: Text('명부 초상 — Artist.paint()',
-                style: TextStyle(fontSize: 11, color: Colors.white38)),
+            child: Text(context.t.portraitCaption,
+                style: const TextStyle(fontSize: 11, color: Colors.white38)),
           ),
         ],
       );
@@ -199,11 +208,11 @@ class _WorkbenchState extends State<_Workbench>
           Positioned.fill(
             child: CustomPaint(painter: _TurntablePainter(a, _t)),
           ),
-          const Positioned(
+          Positioned(
             left: 14,
             top: 8,
-            child: Text('게임 액터 — riggedFromArtist() · 걷기 · 8방향',
-                style: TextStyle(fontSize: 11, color: Colors.white38)),
+            child: Text(context.t.turntableCaption,
+                style: const TextStyle(fontSize: 11, color: Colors.white38)),
           ),
         ],
       );
@@ -213,6 +222,7 @@ class _WorkbenchState extends State<_Workbench>
   String get _source {
     String hex(Color c) =>
         '0x${(c.toARGB32() & 0xFFFFFFFF).toRadixString(16).toUpperCase().padLeft(8, '0')}';
+    final blurb = context.t.sampleBlurb;
     final opts = <String>[
       if (hasCape) 'hasCape: true',
       if (hasPauldrons) 'hasPauldrons: true',
@@ -221,7 +231,7 @@ class _WorkbenchState extends State<_Workbench>
     ];
     return '''
 final myCharacter = BuiltArtist(
-  id: 'my_character', name: 'Name', title: 'Title', blurb: '한 줄 소개.',
+  id: 'my_character', name: 'Name', title: 'Title', blurb: '$blurb',
   build: CharacterBuild(
     archetype: Archetype.${archetype.name},
     sex: Sex.${sex.name},
@@ -244,7 +254,7 @@ final myCharacter = BuiltArtist(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('이 값을 그대로 characters/recruits.dart 에 붙여 넣으면 된다',
+            Text(context.t.pasteHint,
                 style: TextStyle(
                     fontSize: 10, color: accent.withValues(alpha: 0.8))),
             const SizedBox(height: 6),
@@ -266,15 +276,24 @@ final myCharacter = BuiltArtist(
   Widget _panel() => ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
-          const Text('CharacterBuild',
-              style: TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 1)),
+          Row(
+            children: [
+              const Expanded(
+                child: Text('CharacterBuild',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1)),
+              ),
+              LangToggle(accent: accent),
+            ],
+          ),
           const SizedBox(height: 4),
-          const Text('캐릭터 하나 = 이 선언 하나',
-              style: TextStyle(fontSize: 10, color: Colors.white38)),
+          Text(context.t.workbenchSubtitle,
+              style: const TextStyle(fontSize: 10, color: Colors.white38)),
           const SizedBox(height: 18),
 
-          _label('archetype — 체형과 기본 장비의 대역'),
+          _label(context.t.archetypeLabel),
           _chips(Archetype.values, archetype, (v) {
             setState(() {
               archetype = v;
@@ -294,23 +313,23 @@ final myCharacter = BuiltArtist(
                 _ => 0.9,
               };
             });
-          }, (v) => v.label),
+          }, (v) => context.t.job(v)),
 
           _label('sex'),
           _chips(Sex.values, sex, (v) => setState(() => sex = v),
-              (v) => v.label),
+              (v) => context.t.sex(v)),
 
           _label('weapon'),
           _chips(WeaponKind.values, weapon, (v) => setState(() => weapon = v),
               (v) => v.name),
 
-          _label('headGear — 비워 두면 시드가 정한다. 반드시 명시할 것'),
+          _label(context.t.headGearLabel),
           _chips(HeadGear.values, headGear,
               (v) => setState(() => headGear = v), (v) => v.name),
 
-          _label('accent — 이 색이 정체성이다'),
-          _swatches(_accents.values.toList(), accent,
-              (c) => setState(() => accent = c)),
+          _label(context.t.accentLabel),
+          _swatches(_accents, accent, (c) => setState(() => accent = c),
+              names: context.t.accentSwatch),
 
           _label('skin'),
           _swatches(_skins, skin, (c) => setState(() => skin = c)),
@@ -319,7 +338,7 @@ final myCharacter = BuiltArtist(
           _label('cloth'),
           _swatches(_cloths, cloth, (c) => setState(() => cloth = c)),
 
-          _slider('armorHeaviness — 0 천, 1 판금', armorHeaviness,
+          _slider(context.t.armorLabel, armorHeaviness,
               (v) => setState(() => armorHeaviness = v)),
           _slider('muscle', muscle, (v) => setState(() => muscle = v)),
           _slider('hairLength', hairLength,
@@ -369,23 +388,35 @@ final myCharacter = BuiltArtist(
         ],
       );
 
-  Widget _swatches(List<Color> all, Color current, ValueChanged<Color> onPick) =>
+  /// 색 견본 줄.
+  ///
+  /// [names] 를 주면 견본마다 그 이름을 툴팁으로 단다. 강조색처럼 "이 색이
+  /// 어떤 직업의 대역인가"가 선택에 영향을 주는 자리에만 붙인다.
+  Widget _swatches(
+    List<Color> all,
+    Color current,
+    ValueChanged<Color> onPick, {
+    String Function(int)? names,
+  }) =>
       Wrap(
         spacing: 6,
         runSpacing: 6,
         children: [
-          for (final c in all)
-            GestureDetector(
-              onTap: () => onPick(c),
-              child: Container(
-                width: 30,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: c,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(
-                    color: c == current ? Colors.white : Colors.white24,
-                    width: c == current ? 2 : 1,
+          for (final (i, c) in all.indexed)
+            Tooltip(
+              message: names?.call(i) ?? '',
+              child: GestureDetector(
+                onTap: () => onPick(c),
+                child: Container(
+                  width: 30,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: c,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: c == current ? Colors.white : Colors.white24,
+                      width: c == current ? 2 : 1,
+                    ),
                   ),
                 ),
               ),
