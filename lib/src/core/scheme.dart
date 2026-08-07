@@ -94,6 +94,18 @@ class Palette {
   }
 
   /// 몬스터 계열. 살/키틴/독기. 영웅과 색이 겹치지 않도록 대역을 분리한다.
+  ///
+  /// ## 왜 몸 색이 이만큼 밝은가
+  ///
+  /// 예전 대역은 명도 0.13~0.28 이었다. 위협적으로 들리지만 그레이스케일
+  /// 감사에서 몬스터가 전부 **구멍 난 검은 덩어리**로 나왔다 — 가죽 얼룩도,
+  /// 등줄기 그늘도, 사지의 주름 띠도 그 아래에 그릴 자리가 없었기 때문이다.
+  /// 셰이딩은 베이스에서 아래로 내려가며 명암을 만드는데(`Ramp.of` 의 deep 은
+  /// 베이스의 28%), 베이스가 이미 바닥이면 내려갈 곳이 없다.
+  ///
+  /// 그래서 **명암이 들어설 자리**를 남기도록 바닥을 올렸다. 영웅의 피부
+  /// 대역(0.42~0.78)과는 여전히 겹치지 않으므로 "사람이 아니다"는 그대로다.
+  /// 몬스터의 어둠은 베이스 색이 아니라 조명(`ambient`)과 대비가 만든다.
   factory Palette.monster(Rng r) {
     final family = r.intRange(0, 4);
     late double bodyHue, bodySat, bodyLight;
@@ -102,22 +114,22 @@ class Palette {
       case 0: // 부패한 살덩이
         bodyHue = r.range(300, 355);
         bodySat = r.range(0.18, 0.34);
-        bodyLight = r.range(0.28, 0.42);
+        bodyLight = r.range(0.34, 0.46);
         glowHue = r.range(70, 100);
       case 1: // 갑각/키틴
         bodyHue = r.range(230, 275);
         bodySat = r.range(0.24, 0.44);
-        bodyLight = r.range(0.16, 0.28);
+        bodyLight = r.range(0.26, 0.38);
         glowHue = r.range(150, 185);
       case 2: // 화산암/재
         bodyHue = r.range(10, 28);
         bodySat = r.range(0.10, 0.24);
-        bodyLight = r.range(0.14, 0.24);
+        bodyLight = r.range(0.24, 0.34);
         glowHue = r.range(18, 40);
       default: // 심연/그림자
         bodyHue = r.range(190, 225);
         bodySat = r.range(0.22, 0.40);
-        bodyLight = r.range(0.13, 0.24);
+        bodyLight = r.range(0.23, 0.34);
         glowHue = r.range(280, 320);
     }
 

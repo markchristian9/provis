@@ -262,6 +262,32 @@ Shader _radial(Rect b, Alignment c, List<Color> colors, List<double> stops,
     RadialGradient(center: c, radius: radius, colors: colors, stops: stops)
         .createShader(b);
 
+/// 형태를 감싸는 확산 그라디언트의 반지름 보정.
+///
+/// ## 왜 필요한가 — 팔다리가 검게 죽던 진짜 원인
+///
+/// `RadialGradient.createShader` 는 반지름을 사각형의 **짧은 변**에 곱한다
+/// (`radius * rect.shortestSide`, Flutter `painting/gradient.dart`). 그래서
+/// 팔·다리·몸통·굴뚝처럼 길고 좁은 형상에서는 그 원이 **폭에만** 맞고, 길이
+/// 방향으로는 하이라이트 바로 아래부터 램프의 마지막 단(`deep` — 베이스의
+/// 28% 명도, 사실상 검정)이 깔린다.
+///
+/// 그레이스케일 감사에서 몬스터 여섯이 전부 내부 명도 없는 **검은 덩어리**로
+/// 나온 원인이 이것이었다. 색을 밝게 바꿔도 소용이 없었다 — 베이스가 아니라
+/// 그라디언트의 기하가 틀렸기 때문이다. 굴뚝이 까만 비석으로 서 있던 것도
+/// 같은 결함의 다른 얼굴이다.
+///
+/// 확산광은 형태 **전체**를 감싸야 하므로 긴 변까지 닿게 늘린다. 반대로 좁고
+/// 강한 스펙큘러([_sheen])는 작은 점이어야 맞으므로 보정하지 않는다 — 그쪽에
+/// 이걸 걸면 하이라이트가 파츠를 통째로 덮어 플라스틱이 된다.
+double _formRadius(Rect b, double k) {
+  final s = b.shortestSide;
+  if (s < 1e-6) return k;
+  // 상한을 둔다. 극단적으로 가느다란 파츠(시위·발톱)에서 보정이 발산하면
+  // 그라디언트가 사실상 단색이 되어 입체가 사라진다.
+  return k * (b.longestSide / s).clamp(1.0, 4.5);
+}
+
 Shader _linear(Rect b, Alignment from, Alignment to, List<Color> colors,
         List<double> stops) =>
     LinearGradient(begin: from, end: to, colors: colors, stops: stops)
@@ -280,6 +306,16 @@ void paintSurface(
   int seed = 7,
   bool rim = true,
   bool ao = true,
+  /// 실루엣을 따라가는 얇고 선명한 빛 테두리를 얹는다.
+  ///
+  /// 채도 높은 지면 위에서 캐릭터가 배경에 녹는 것을 막는다 — 아이소 게임에서
+  /// 그것은 취향이 아니라 조작 가능성의 문제다. 기본이 `false` 인 이유는 이
+  /// 효과가 **윤곽선 하나짜리 형상**에서만 옳기 때문이다. [leafCluster] 처럼
+  /// 여러 덩어리를 겹쳐 만든 복합 경로에 걸면 채워질 때는 사라지는 내부
+  /// 윤곽까지 전부 그어져, 수관이 원을 잔뜩 그린 철망이 된다.
+  ///
+  /// `tube`·`blob` 처럼 닫힌 링 하나로 만든 파츠에만 켠다.
+  bool edgeRim = false,
   /// 다른 파츠에 가려진 정도(0..1). 몸통 뒤로 들어가는 팔처럼 뒤쪽 평면에 있는
   /// 파츠에 0.3~0.6 을 준다. 이 값이 없으면 사지가 몸통 앞에 떠 보인다.
   double occlusion = 0.0,
@@ -336,6 +372,7 @@ void paintSurface(
 
   if (ao) _ambientOcclusion(c, b, l, s);
   if (rim && s.finish != Finish.energy) _rimInside(c, b, l, s);
+  if (edgeRim && s.finish != Finish.energy) _rimEdge(c, path, b, l, s);
 
   // 뒤쪽 평면에 있는 파츠를 통째로 눌러 앞뒤를 가른다. 아이소·3/4 뷰에서
   // 먼 쪽 팔다리가 몸통 앞으로 떠오르는 것을 막는 가장 값싼 수단이다.
@@ -372,7 +409,7 @@ void _diffuse(Canvas c, Rect b, Ramp r, LightRig l, {double softness = 0.4}) {
         l.keyAlign,
         [r.light, r.mid, r.shadow, r.deep],
         [0.0, mid, 0.80, 1.0],
-        radius: 1.05 + softness * 0.5,
+        radius: _formRadius(b, 1.05 + softness * 0.5),
       ),
   );
 }
@@ -441,7 +478,7 @@ void _skin(Canvas c, Rect b, Ramp r, LightRig l, Surface s) {
         l.keyAlign,
         [r.light, r.mid, sss, r.shadow, r.deep],
         const [0.0, 0.34, 0.60, 0.83, 1.0],
-        radius: 1.25,
+        radius: _formRadius(b, 1.25),
       ),
   );
   // 피지막이 만드는 넓고 흐릿한 스펙큘러.
@@ -496,7 +533,7 @@ void _chitin(Canvas c, Rect b, Ramp r, LightRig l, Surface s) {
         l.keyAlign,
         [r.mid, r.shadow, r.deep, r.deep.darken(0.35)],
         const [0.0, 0.42, 0.78, 1.0],
-        radius: 1.2,
+        radius: _formRadius(b, 1.2),
       ),
   );
   c.drawRect(
@@ -569,7 +606,7 @@ void _bone(Canvas c, Rect b, Ramp r, LightRig l, double detail, int seed) {
           r.deep,
         ],
         const [0.0, 0.22, 0.52, 0.82, 1.0],
-        radius: 1.2,
+        radius: _formRadius(b, 1.2),
       ),
   );
   if (detail > 0.5) _grain(c, b, r, seed, 0.08);
@@ -862,6 +899,44 @@ void _rimInside(Canvas c, Rect b, LightRig l, Surface s) {
           l.rim.fade(0.30 * s.alpha * l.intensity),
         ],
         const [0.0, 0.68, 1.0],
+      ),
+  );
+}
+
+/// 실루엣을 그대로 훑는 얇고 선명한 빛 테두리.
+///
+/// [_rimInside] 는 클립 안쪽을 넓게 물들이는 그라디언트라 부피감은 주지만
+/// 배경에서 형태를 **떼어 놓지는** 못한다. 채도 높은 지면 위에 캐릭터를 세우면
+/// 명도가 비슷한 구간에서 윤곽이 녹아 버리는데, 아이소 게임에서 그것은 취향이
+/// 아니라 조작 가능성의 문제다 — 어디 서 있는지 안 보이는 캐릭터는 움직일 수
+/// 없다.
+///
+/// 처방은 윤곽을 **획으로 훑는 것**이다. 호출 시점에 이미 형상으로 클립되어
+/// 있으므로 획의 바깥 절반은 잘리고 안쪽 절반만 남아, 정확히 실루엣에 앉는
+/// 선이 된다. [rimBand] 와 달리 [Path.combine] 도 블러도 쓰지 않아 매 프레임
+/// 수십 번 돌려도 싸다.
+void _rimEdge(Canvas c, Path p, Rect b, LightRig l, Surface s) {
+  // 파츠가 작을수록 선도 가늘어야 한다. 고정 폭을 쓰면 손가락만 한 파츠가
+  // 통째로 빛나 실루엣이 부풀어 오른다.
+  final w = (b.shortestSide * 0.10).clamp(0.7, 4.0);
+  c.drawPath(
+    p,
+    _p()
+      ..style = PaintingStyle.stroke
+      // 바깥 절반은 클립에 잘리므로 원하는 두께의 두 배를 긋는다.
+      ..strokeWidth = w * 2
+      ..strokeJoin = StrokeJoin.round
+      ..blendMode = BlendMode.plus
+      ..shader = _linear(
+        b,
+        Alignment(-l.rimDir.dx, -l.rimDir.dy),
+        Alignment(l.rimDir.dx, l.rimDir.dy),
+        [
+          l.rim.fade(0.0),
+          l.rim.fade(0.06 * s.alpha),
+          l.rim.fade((0.52 * s.alpha * l.intensity).clamp(0.0, 0.85)),
+        ],
+        const [0.0, 0.52, 1.0],
       ),
   );
 }

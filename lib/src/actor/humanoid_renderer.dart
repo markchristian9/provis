@@ -262,7 +262,8 @@ class HumanoidRenderer {
       samples: 24,
     );
     paintSurface(canvas, leg, _legUnder, light,
-        detail: q, occlusion: occ, seed: spec.seed + depth.round());
+        detail: q, occlusion: occ, edgeRim: true,
+        seed: spec.seed + depth.round());
     if (beast) _limbBands(canvas, leg, l.a, l.c, r, q, salt: depth.round());
 
     // 판금 다리는 **덧댄 조각**으로 그린다.
@@ -316,7 +317,7 @@ class HumanoidRenderer {
       samples: 12,
     );
     paintSurface(canvas, boot, Surface(pal.leather, Finish.leather), light,
-        detail: q, occlusion: occ + 0.2);
+        detail: q, occlusion: occ + 0.2, edgeRim: true);
     if (depth == 0) paintTopPlane(canvas, boot, light, iso, strength: 0.45);
 
     // 무릎 방어구. 판금 계열에서만.
@@ -359,7 +360,8 @@ class HumanoidRenderer {
       );
     }
     paintSurface(canvas, arm, _limbArmor, light,
-        detail: q, occlusion: occ, seed: spec.seed + 7 + depth.round());
+        detail: q, occlusion: occ, edgeRim: true,
+        seed: spec.seed + 7 + depth.round());
     if (beast) _limbBands(canvas, arm, l.a, l.c, r, q, salt: 5 + depth.round());
 
     // 손.
@@ -370,7 +372,7 @@ class HumanoidRenderer {
       rotation: (l.d - l.c).angle,
     );
     paintSurface(canvas, hand, Surface(pal.skin, Finish.skin), light,
-        detail: q, occlusion: occ + 0.1);
+        detail: q, occlusion: occ + 0.1, edgeRim: true);
 
     // 발톱. 짐승형에게는 이것이 무기이므로 손끝에서 확실히 튀어나와야 한다.
     if (beast) {
@@ -407,7 +409,7 @@ class HumanoidRenderer {
         warp: (a, t) => 1 + 0.12 * math.sin(a * 3 + spec.seed),
       );
       paintSurface(canvas, pauldron, _plate, light,
-          detail: q, occlusion: occ * 0.6);
+          detail: q, occlusion: occ * 0.6, edgeRim: true);
       paintTopPlane(canvas, pauldron, light, iso, strength: depth == 0 ? 0.62 : 0.3);
       if (spec.trimAccent) {
         trimBand(canvas, pauldron, pal.accent, light, width: 1.4, alpha: 0.55);
@@ -449,6 +451,7 @@ class HumanoidRenderer {
     paintSurface(canvas, torso, _torsoSurface, light,
         detail: q,
         occlusion: 0.14,
+        edgeRim: true,
         seed: spec.seed);
     paintTopPlane(canvas, torso, light, iso, strength: 0.3);
 
@@ -481,7 +484,7 @@ class HumanoidRenderer {
           samples: 8,
         );
         paintSurface(canvas, spike, Surface(pal.metal, Finish.bone), light,
-            detail: q, occlusion: 0.2);
+            detail: q, occlusion: 0.2, edgeRim: true);
         paintTopPlane(canvas, spike, light, iso, strength: 0.45);
       }
     }
@@ -578,7 +581,30 @@ class HumanoidRenderer {
     }
 
     if (spec.glowRunes || beast) {
-      final rune = blob(lerpO(sk.waist, sk.chest, 0.62), _h * 0.017, _h * 0.017);
+      final at = lerpO(sk.waist, sk.chest, 0.62);
+
+      // 발광체는 자기만 빛나지 않는다. 주변 수광 파츠에 같은 색 반사광이
+      // 얹혀야 룬이 **몸 위에 있는** 것이 되고, 그러지 않으면 가슴에 붙인
+      // 스티커로 보인다. 채도 높은 강조색을 어두운 몸에 한 점 떨어뜨리는 것은
+      // 60-30-10 의 10 이기도 하다 — 시선이 여기 멈춘다.
+      canvas.save();
+      canvas.clipPath(torso);
+      canvas.drawCircle(
+        at,
+        _h * 0.085,
+        Paint()
+          ..isAntiAlias = true
+          ..blendMode = BlendMode.plus
+          ..shader = Gradient.radial(
+            at,
+            _h * 0.085,
+            [pal.glow.fade(0.30), pal.glow.fade(0.09), const Color(0x00000000)],
+            const [0.0, 0.42, 1.0],
+          ),
+      );
+      canvas.restore();
+
+      final rune = blob(at, _h * 0.017, _h * 0.017);
       paintSurface(canvas, rune, Surface(pal.glow, Finish.gem, glow: 0.9, glowColor: pal.glow), light,
           detail: q);
       glowPath(canvas, rune, pal.glow, _h * 0.05, alpha: 0.8);
@@ -696,7 +722,13 @@ class HumanoidRenderer {
     canvas.save();
     canvas.clipPath(torso);
 
-    // ① 등줄기의 어둠.
+    // ① 카운터셰이딩 — 등은 어둡고 배는 밝다.
+    //
+    // 실제 동물의 보편적 무늬이며, 여기서는 그 이상의 일을 한다. 그레이스케일
+    // 감사에서 몬스터는 명도가 한 덩어리로 뭉친 **검은 구멍**이었다. 몸 하나에
+    // 밝은 구역과 어두운 구역이 갈려 있어야 관객이 부피를 읽고, 그 위에 올린
+    // 얼룩과 주름도 비로소 보인다. 등의 어둠만으로는 대비가 생기지 않는다 —
+    // 반드시 배를 함께 올려야 한다.
     canvas.drawRect(
       b,
       Paint()
@@ -709,6 +741,20 @@ class HumanoidRenderer {
             const Color(0x00FFFFFF),
           ],
           const [0.0, 0.62],
+        ),
+    );
+    canvas.drawRect(
+      b,
+      Paint()
+        ..blendMode = BlendMode.plus
+        ..shader = Gradient.linear(
+          b.center - back * (b.width * 0.52),
+          b.center + back * (b.width * 0.30),
+          [
+            pal.skin.lighten(0.40).fade(0.26),
+            const Color(0x00000000),
+          ],
+          const [0.0, 0.85],
         ),
     );
 
@@ -787,7 +833,7 @@ class HumanoidRenderer {
       samples: 24,
     );
     paintSurface(canvas, tail, Surface(pal.skin, Finish.skin), light,
-        detail: q, occlusion: 0.34, seed: spec.seed + 21);
+        detail: q, occlusion: 0.34, edgeRim: true, seed: spec.seed + 21);
   }
 
   void _head(
@@ -844,8 +890,58 @@ class HumanoidRenderer {
     );
     paintSurface(canvas, skull, beast ? Surface(pal.skin, Finish.skin) : Surface(pal.skin, Finish.skin),
         hLight,
-        detail: q, occlusion: 0.12, seed: spec.seed + 3);
+        detail: q, occlusion: 0.12, edgeRim: true, seed: spec.seed + 3);
     paintTopPlane(canvas, skull, hLight, iso, strength: 0.34);
+
+    // 얼굴을 화면에서 가장 대비가 센 곳으로 만든다.
+    //
+    // 캐릭터 디자인의 통칙이다 — 시선은 대비가 가장 강한 곳에 멈추므로, 그
+    // 자리가 얼굴이 아니면 관객은 갑옷이나 무기를 먼저 본다. 그레이스케일
+    // 감사에서 이 렌더러의 머리는 몸통과 같은 중간 명도 덩어리였고, 그래서
+    // 여섯 캐릭터가 전부 "얼굴 없는 실루엣"으로 읽혔다.
+    //
+    // 광원 쪽 이마·광대에 좁은 하이라이트를 얹어 명도의 위쪽 끝을 여기에
+    // 몰아준다. 파츠를 더 그리는 것이 아니라 **이미 있는 형태를 밝히는**
+    // 것이므로 실루엣은 그대로다.
+    canvas.save();
+    canvas.clipPath(skull);
+    final keyAt = Offset(hLight.dir.dx, hLight.dir.dy) * (hl * 0.30);
+    canvas.drawCircle(
+      keyAt,
+      hl * 0.46,
+      Paint()
+        ..isAntiAlias = true
+        ..blendMode = BlendMode.plus
+        ..shader = Gradient.radial(
+          keyAt,
+          hl * 0.46,
+          [
+            pal.skin.lighten(0.34).fade(0.30),
+            pal.skin.lighten(0.20).fade(0.10),
+            const Color(0x00000000),
+          ],
+          const [0.0, 0.45, 1.0],
+        ),
+    );
+    // 반대쪽 턱선은 반대로 눌러 준다. 밝은 쪽만 올리면 머리가 커 보이고,
+    // 어두운 쪽을 함께 내려야 대비가 생긴다.
+    canvas.drawCircle(
+      -keyAt,
+      hl * 0.42,
+      Paint()
+        ..isAntiAlias = true
+        ..blendMode = BlendMode.multiply
+        ..shader = Gradient.radial(
+          -keyAt,
+          hl * 0.42,
+          [
+            pal.skinDeep.mix(hLight.ambient, 0.35).fade(0.34),
+            const Color(0x00FFFFFF),
+          ],
+          const [0.0, 1.0],
+        ),
+    );
+    canvas.restore();
 
     // 짐승형의 아래턱. 벌린 입이 실루엣 밖으로 나가야 포효가 읽힌다.
     if (beast) {
@@ -910,7 +1006,7 @@ class HumanoidRenderer {
         samples: 20,
       );
       paintSurface(canvas, horn, Surface(pal.metal, Finish.bone), light,
-          detail: q, occlusion: 0.12, seed: spec.seed + 31);
+          detail: q, occlusion: 0.12, edgeRim: true, seed: spec.seed + 31);
       paintTopPlane(canvas, horn, light, iso, strength: 0.55);
     }
   }
@@ -1044,7 +1140,7 @@ class HumanoidRenderer {
             1 + 0.18 * math.max(0.0, -math.cos(a)) + 0.08 * math.sin(a * 2),
       );
       paintSurface(canvas, cowl, Surface(pal.clothShade, Finish.cloth), light,
-          detail: q, occlusion: 0.12);
+          detail: q, occlusion: 0.12, edgeRim: true);
       paintTopPlane(canvas, cowl, light, iso, strength: 0.5);
     }
 
@@ -1077,7 +1173,7 @@ class HumanoidRenderer {
       samples: 24,
     );
     paintSurface(canvas, hair, Surface(pal.hair, Finish.hair), light,
-        detail: q, occlusion: 0.18, seed: s.seed + 5);
+        detail: q, occlusion: 0.18, edgeRim: true, seed: s.seed + 5);
     paintTopPlane(canvas, hair, light, iso, strength: 0.4);
   }
 
@@ -1164,7 +1260,7 @@ class HumanoidRenderer {
           warp: (a, t) => 1 + 0.07 * math.sin(a * 2 + 0.6),
         );
         paintSurface(canvas, helm, _plate, light,
-            detail: q, occlusion: 0.08);
+            detail: q, occlusion: 0.08, edgeRim: true);
         paintTopPlane(canvas, helm, light, iso, strength: 0.66);
         if (s.trimAccent) {
           trimBand(canvas, helm, pal.accent, light, width: 1.5, alpha: 0.5);
@@ -1261,7 +1357,7 @@ class HumanoidRenderer {
       capEnd: false,
     );
     paintSurface(canvas, cape, Surface(pal.cloth, Finish.cloth), light,
-        detail: q, occlusion: 0.26, seed: spec.seed + 11);
+        detail: q, occlusion: 0.26, edgeRim: true, seed: spec.seed + 11);
     paintTopPlane(canvas, cape, light, iso, strength: 0.22);
     if (spec.trimAccent) {
       trimBand(canvas, cape, pal.accent, light, width: 1.2, alpha: 0.4);
@@ -1395,7 +1491,8 @@ class HumanoidRenderer {
       // 아래로 살짝 뾰족한 연 방패. 완전한 원보다 방향이 읽힌다.
       warp: (a, t) => 1 + 0.10 * math.sin(a) - 0.06 * math.cos(a * 2),
     );
-    paintSurface(canvas, face, _plate, light, detail: q, occlusion: 0.16);
+    paintSurface(canvas, face, _plate, light,
+        detail: q, occlusion: 0.16, edgeRim: true);
     paintTopPlane(canvas, face, light, iso, strength: 0.42);
     trimBand(canvas, face, pal.accent, light, width: 2.0, alpha: 0.6);
 
