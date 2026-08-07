@@ -342,6 +342,7 @@ actor.facesLeft = hero.facesLeft;
 | [animation.md](references/animation.md) | `Pose`/`solve`/IK/베를레, 클립 레시피, 타이밍 표 |
 | [performance.md](references/performance.md) | 비용 표, 디테일 티어, 캐싱 |
 | [publishing.md](references/publishing.md) | pub.dev 배포 — 체크리스트, 버전 정책, public API 관리 |
+| **`pc` 스킬** | **조작되는 주인공과 전투** — PC 를 맵에 세우고, 공격 클립을 저작하고, 입력 → `ClipEvent` 판정 → 히트스톱 → 피격 반응까지 배선한다. 이 문서가 "어떻게 그리는가"라면 그쪽은 "어떻게 손에 쥐여지는가"다 |
 
 ## 실행
 
